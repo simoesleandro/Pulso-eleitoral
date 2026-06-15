@@ -1,4 +1,4 @@
-﻿.env
+.env
 __pycache__/
 *.pyc
 *.db
@@ -8,3 +8,4 @@ venv/
 .cursor/
 logs/
 *.log
+PulsoEleitoral.exe

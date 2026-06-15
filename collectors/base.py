@@ -49,45 +49,11 @@ class BaseCollector(ABC):
 
     def save(self, pesquisas: list[dict]):
         """Realiza a persistência das pesquisas e intenções no banco SQLite em uma transação segura.
-        Agrupa os dados pelo código único registro_tse antes de inserir na tabela de pesquisas
-        e intenções."""
+        Normaliza os dados agrupando por (instituto_id, cargo, data_coleta, fonte_url)."""
         if not pesquisas:
             return
 
-        # Agrupar itens de intenção pelo registro_tse da pesquisa correspondente
-        grouped = {}
-        for item in pesquisas:
-            tse = item.get("registro_tse")
-            if not tse:
-                # Fallback caso não seja provido registro_tse
-                inst_id = item.get("instituto_id", self.instituto_id)
-                cargo = item.get("cargo", "geral")
-                dt_coleta = item.get("data_coleta", "1970-01-01")
-                tse = f"GEN-{inst_id}-{cargo}-{dt_coleta}"
-
-            if tse not in grouped:
-                grouped[tse] = {
-                    "metadata": {
-                        "instituto_id": item.get("instituto_id", self.instituto_id),
-                        "cargo": item.get("cargo"),
-                        "data_pesquisa": item.get("data_coleta"),
-                        "data_publicacao": item.get("data_divulgacao"),
-                        "tamanho_amostra": item.get("tamanho_amostra"),
-                        "margem_erro": item.get("margem_erro"),
-                        "contratante": item.get("metodologia") or item.get("contratante") or "Não informado",
-                        "registro_tse": tse,
-                        "fonte_url": item.get("fonte_url")
-                    },
-                    "intencoes": []
-                }
-
-            # Adiciona a intenção de voto do candidato atual
-            grouped[tse]["intencoes"].append({
-                "candidato": item.get("candidato"),
-                "partido": item.get("partido", "—"),
-                "percentual": item.get("percentual"),
-                "tipo": item.get("tipo", "estimulada")
-            })
+        from datetime import date
 
         # Abre conexão e grava de forma transacional
         conn = sqlite3.connect(self.db_path)
@@ -96,50 +62,93 @@ class BaseCollector(ABC):
         cursor = conn.cursor()
 
         try:
-            for tse, data in grouped.items():
-                meta = data["metadata"]
+            # 1. Agrupar os dicts por (instituto_id, cargo, data_coleta, fonte_url)
+            groups = {}
+            for item in pesquisas:
+                inst_id = item.get("instituto_id", self.instituto_id)
+                cargo = item.get("cargo", "presidente")
+                dt_coleta = item.get("data_coleta")
+                url = item.get("fonte_url") or ""
                 
-                # Executa INSERT OR REPLACE para a pesquisa
-                cursor.execute("""
-                    INSERT OR REPLACE INTO pesquisas 
-                    (instituto_id, cargo, data_pesquisa, data_publicacao, tamanho_amostra, margem_erro, contratante, registro_tse, fonte_url)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    meta["instituto_id"],
-                    meta["cargo"],
-                    meta["data_pesquisa"],
-                    meta["data_publicacao"],
-                    meta["tamanho_amostra"],
-                    meta["margem_erro"],
-                    meta["contratante"],
-                    meta["registro_tse"],
-                    meta["fonte_url"]
-                ))
-                
-                # Obtém o ID da pesquisa inserida/substituída
-                cursor.execute("SELECT id FROM pesquisas WHERE registro_tse = ?", (meta["registro_tse"],))
-                pesquisa_row = cursor.fetchone()
-                if pesquisa_row:
-                    pesquisa_id = pesquisa_row["id"]
+                # Fallback para data_coleta
+                if not dt_coleta:
+                    dt_coleta = date.today().isoformat()
                     
-                    # Limpa intenções antigas dessa pesquisa específica
+                key = (inst_id, cargo, dt_coleta, url)
+                if key not in groups:
+                    groups[key] = []
+                groups[key].append(item)
+
+            n_pesquisas = 0
+            n_intencoes = 0
+
+            # 2. Para cada grupo
+            for (inst_id, cargo, dt_coleta, url), group_items in groups.items():
+                # a. Verifica se já existe registro em pesquisas com mesmo instituto_id + cargo + data_pesquisa + fonte_url
+                cursor.execute(
+                    "SELECT id FROM pesquisas WHERE instituto_id=? AND cargo=? AND date(data_pesquisa)=? AND fonte_url=?",
+                    (inst_id, cargo, dt_coleta, url)
+                )
+                row = cursor.fetchone()
+                
+                if row:
+                    pesquisa_id = row[0]
+                    # Limpa as intenções anteriores para evitar duplicação
                     cursor.execute("DELETE FROM intencoes WHERE pesquisa_id = ?", (pesquisa_id,))
-                    
-                    # Insere as novas intenções de voto
-                    for intent in data["intencoes"]:
-                        cursor.execute("""
-                            INSERT INTO intencoes (pesquisa_id, candidato, partido, percentual, tipo)
-                            VALUES (?, ?, ?, ?, ?)
-                        """, (
-                            pesquisa_id,
-                            intent["candidato"],
-                            intent["partido"],
-                            intent["percentual"],
-                            intent["tipo"]
-                        ))
+                else:
+                    # b. Se não existe: INSERT INTO pesquisas
+                    first = group_items[0]
+                    margem_erro = first.get("margem_erro")
+                    if margem_erro is None:
+                        margem_erro = 0.0
+                    tamanho_amostra = first.get("tamanho_amostra")
+                    if tamanho_amostra is None:
+                        tamanho_amostra = 0
+                    metodologia = first.get("metodologia") or "Não informado"
+                    data_divulgacao = first.get("data_divulgacao") or dt_coleta
+                    registro_tse = first.get("registro_tse") or f"GEN-{inst_id}-{cargo}-{dt_coleta}-{hash(url)}"
+
+                    cursor.execute("""
+                        INSERT INTO pesquisas 
+                        (instituto_id, cargo, data_pesquisa, data_publicacao, tamanho_amostra, margem_erro, contratante, registro_tse, fonte_url)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        inst_id,
+                        cargo,
+                        dt_coleta,
+                        data_divulgacao,
+                        tamanho_amostra,
+                        margem_erro,
+                        metodologia,
+                        registro_tse,
+                        url
+                    ))
+                    pesquisa_id = cursor.lastrowid
+                    n_pesquisas += 1
+
+                # d. Para cada candidato do grupo:
+                for item in group_items:
+                    candidato = item.get("candidato")
+                    percentual = item.get("percentual")
+                    partido = item.get("partido")  # None por padrão
+                    tipo = item.get("tipo") or "estimulada"
+
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO intencoes (pesquisa_id, candidato, percentual, partido, tipo)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (
+                        pesquisa_id,
+                        candidato,
+                        percentual,
+                        partido,
+                        tipo
+                    ))
+                    n_intencoes += 1
+
             conn.commit()
+            logger.info("[COLLECTOR] Salvo: %d pesquisas, %d intenções", n_pesquisas, n_intencoes)
         except Exception as e:
             conn.rollback()
-            raise e
+            logger.error("[COLLECTOR] Erro ao salvar pesquisas no banco: %s", str(e))
         finally:
             conn.close()
