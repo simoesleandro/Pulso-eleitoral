@@ -37,10 +37,14 @@ scheduler = BackgroundScheduler()
 def run_all_collectors():
     """Roda todos os coletores cadastrados sequencialmente e salva log de execução."""
     from collectors.datafolha import DatafolhaCollector
+    from collectors.quaest import QuaestCollector
+    from collectors.atlas import AtlasCollector
     from database import salvar_log_scheduler
     
     coletores = [
-        DatafolhaCollector(db_path=DB_PATH)
+        DatafolhaCollector(db_path=DB_PATH),
+        QuaestCollector(db_path=DB_PATH),
+        AtlasCollector(db_path=DB_PATH),
     ]
     
     resultados = []

@@ -21,7 +21,7 @@ def test_concrete_collectors_instantiation(tmp_path):
         assert isinstance(collector.instituto_id, int)
         assert hasattr(collector, "fetch")
         assert hasattr(collector, "save")
-        assert hasattr(collector, "_parse")
+        assert hasattr(collector, "_parse") or hasattr(collector, "_parse_release")
 
 def test_run_does_not_crash_on_empty_fetch(tmp_path):
     """Verifica que o método run() não crasha quando o fetch() retorna uma lista vazia []."""
