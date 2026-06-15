@@ -1,0 +1,115 @@
+/* ============================================================
+   PULSO ELEITORAL — Design Tokens
+   Versão: 1.0 | Junho 2026
+   Autor: Leandro Simões
+   ============================================================ */
+
+:root {
+
+  /* ── Cores primárias ──────────────────────────────────────── */
+  --pe-navy:        #0A2240;   /* azul-institucional · primária */
+  --pe-navy-light:  #1B3D6B;   /* hover / estados */
+  --pe-red:         #C0392B;   /* vermelho-eleitoral · acento */
+  --pe-red-light:   #E04030;   /* hover do acento */
+
+  /* ── Fundos / superfícies ────────────────────────────────── */
+  --pe-bg:          #F7F9FB;   /* página */
+  --pe-surface:     #E8EDF2;   /* cards secundários, KPIs */
+  --pe-surface-2:   #FFFFFF;   /* cards primários, modais */
+
+  /* ── Texto ───────────────────────────────────────────────── */
+  --pe-text:        #0A2240;   /* texto principal */
+  --pe-text-muted:  #5a7184;   /* labels, metadados */
+  --pe-text-hint:   #9aaab8;   /* placeholders, dicas */
+
+  /* ── Bordas ──────────────────────────────────────────────── */
+  --pe-border:      rgba(10, 34, 64, 0.12);   /* padrão */
+  --pe-border-md:   rgba(10, 34, 64, 0.22);   /* ênfase */
+  --pe-border-strong: rgba(10, 34, 64, 0.40); /* divisores */
+
+  /* ── Semânticas ──────────────────────────────────────────── */
+  --pe-up:          #1a7a4a;   /* alta / positivo */
+  --pe-up-bg:       #eaf3de;   /* fundo badge alta */
+  --pe-up-text:     #27500A;   /* texto em fundo claro */
+  --pe-down:        #A32D2D;   /* queda / negativo */
+  --pe-down-bg:     #FCEBEB;   /* fundo badge queda */
+  --pe-down-text:   #791F1F;   /* texto em fundo claro */
+  --pe-warn:        #BA7517;   /* atenção / evento */
+  --pe-warn-bg:     #FAEEDA;   /* fundo alerta */
+  --pe-warn-text:   #633806;   /* texto em fundo claro */
+
+  /* ── Candidatos (série temporal) ─────────────────────────── */
+  --pe-cand-1:      #0A2240;   /* candidato 1 · navy */
+  --pe-cand-2:      #C0392B;   /* candidato 2 · vermelho */
+  --pe-cand-3:      #5a7184;   /* candidato 3 · slate */
+  --pe-cand-4:      #B4B2A9;   /* candidato 4 · gray */
+  --pe-cand-5:      #1D9E75;   /* candidato 5 · teal */
+  --pe-event-line:  #BA7517;   /* linha de evento no gráfico */
+
+  /* ── Institutos (badges) ─────────────────────────────────── */
+  --pe-inst-bg:     #E6EEF6;
+  --pe-inst-text:   #0C447C;
+
+  /* ── Tipografia ──────────────────────────────────────────── */
+  --pe-font-sans:   'Inter', system-ui, -apple-system, sans-serif;
+  --pe-font-mono:   'JetBrains Mono', 'Fira Code', monospace;
+
+  --pe-text-xs:     11px;
+  --pe-text-sm:     12px;
+  --pe-text-base:   14px;
+  --pe-text-md:     16px;
+  --pe-text-lg:     18px;
+  --pe-text-xl:     22px;
+  --pe-text-2xl:    28px;
+  --pe-text-3xl:    36px;
+
+  --pe-weight-normal: 400;
+  --pe-weight-medium: 500;
+
+  /* ── Espaçamento ─────────────────────────────────────────── */
+  --pe-space-1:   4px;
+  --pe-space-2:   8px;
+  --pe-space-3:   12px;
+  --pe-space-4:   16px;
+  --pe-space-5:   20px;
+  --pe-space-6:   24px;
+  --pe-space-8:   32px;
+  --pe-space-10:  40px;
+  --pe-space-12:  48px;
+
+  /* ── Bordas arredondadas ─────────────────────────────────── */
+  --pe-radius-sm:   4px;
+  --pe-radius-md:   8px;
+  --pe-radius-lg:   12px;
+  --pe-radius-pill: 20px;
+
+  /* ── Topbar ──────────────────────────────────────────────── */
+  --pe-topbar-h:    52px;
+  --pe-topbar-bg:   #0A2240;
+  --pe-topbar-text: #FFFFFF;
+  --pe-topbar-muted: rgba(255,255,255,0.45);
+  --pe-topbar-active-border: #C0392B;
+
+  /* ── Layout ──────────────────────────────────────────────── */
+  --pe-content-max: 1200px;
+  --pe-sidebar-w:   240px;
+  --pe-gap-page:    24px;
+}
+
+/* ── Dark mode (opcional — base para implementação futura) ─── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pe-bg:          #0D1B2A;
+    --pe-surface:     #152336;
+    --pe-surface-2:   #1C2E42;
+    --pe-text:        #E8EDF2;
+    --pe-text-muted:  #8AAABF;
+    --pe-text-hint:   #4A6A82;
+    --pe-border:      rgba(184, 213, 240, 0.10);
+    --pe-border-md:   rgba(184, 213, 240, 0.18);
+    --pe-border-strong: rgba(184, 213, 240, 0.30);
+    --pe-surface:     #152336;
+    --pe-inst-bg:     #0C2A42;
+    --pe-inst-text:   #85B7EB;
+  }
+}

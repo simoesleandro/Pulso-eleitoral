@@ -1,0 +1,435 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+.screen { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); background: var(--color-background-primary); margin-bottom: 2rem; overflow: hidden; }
+.screen-label { font-size: 11px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.08em; padding: 0.5rem 1rem; background: var(--color-background-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.topbar-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
+.topbar-sub { font-size: 12px; color: var(--color-text-secondary); }
+.nav { display: flex; gap: 4px; padding: 8px 16px; border-bottom: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); }
+.nav-btn { font-size: 12px; padding: 4px 12px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); color: var(--color-text-secondary); background: transparent; cursor: pointer; }
+.nav-btn.active { background: var(--color-background-primary); color: var(--color-text-primary); border-color: var(--color-border-secondary); }
+.content { padding: 16px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+.kpi { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 12px; }
+.kpi-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.kpi-value { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
+.kpi-sub { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
+.chart-area { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px; margin-bottom: 16px; }
+.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.chart-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
+.chart-filters { display: flex; gap: 6px; }
+.filter-chip { font-size: 11px; padding: 3px 8px; border-radius: 20px; border: 0.5px solid var(--color-border-tertiary); color: var(--color-text-secondary); }
+.filter-chip.active { border-color: var(--color-border-info); color: var(--color-text-info); background: var(--color-background-info); }
+.chart-mock { height: 140px; position: relative; display: flex; align-items: flex-end; gap: 3px; padding: 0 4px; }
+.chart-line { position: absolute; width: 100%; height: 100%; }
+svg.chart-svg { width: 100%; height: 100%; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--color-text-secondary); }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+.poll-section { margin-bottom: 16px; }
+.section-title { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.poll-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.poll-name { font-size: 12px; color: var(--color-text-primary); width: 80px; flex-shrink: 0; }
+.poll-bar-wrap { flex: 1; height: 6px; background: var(--color-background-secondary); border-radius: 3px; overflow: hidden; }
+.poll-bar { height: 100%; border-radius: 3px; }
+.poll-pct { font-size: 12px; font-weight: 500; color: var(--color-text-primary); width: 32px; text-align: right; }
+.poll-delta { font-size: 11px; width: 36px; text-align: right; }
+.delta-up { color: var(--color-text-success); }
+.delta-down { color: var(--color-text-danger); }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.card { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px; }
+.card-title { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 8px; }
+.table-mock { width: 100%; }
+.tr { display: flex; padding: 5px 0; border-bottom: 0.5px solid var(--color-border-tertiary); align-items: center; gap: 8px; }
+.tr:last-child { border-bottom: none; }
+.td { font-size: 11px; color: var(--color-text-secondary); }
+.td-main { font-size: 12px; color: var(--color-text-primary); flex: 1; }
+.badge { font-size: 10px; padding: 2px 6px; border-radius: 10px; }
+.badge-new { background: var(--color-background-success); color: var(--color-text-success); }
+.badge-alert { background: var(--color-background-warning); color: var(--color-text-warning); }
+.alert-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--color-background-warning); border-radius: var(--border-radius-md); margin-bottom: 6px; }
+.alert-icon { color: var(--color-text-warning); font-size: 14px; }
+.alert-text { font-size: 11px; color: var(--color-text-warning); flex: 1; }
+.alert-time { font-size: 10px; color: var(--color-text-secondary); }
+.tag { font-size: 10px; padding: 2px 6px; border-radius: 10px; background: var(--color-background-secondary); color: var(--color-text-secondary); border: 0.5px solid var(--color-border-tertiary); }
+.divider { height: 0.5px; background: var(--color-border-tertiary); margin: 12px 0; }
+.screen-footer { padding: 8px 16px; background: var(--color-background-secondary); border-top: 0.5px solid var(--color-border-tertiary); display: flex; justify-content: space-between; align-items: center; }
+.footer-text { font-size: 11px; color: var(--color-text-tertiary); }
+</style>
+
+<h2 class="sr-only">Wireframes do Radar de Pesquisas Eleitorais 2026 — três telas: visão geral, presidente e governador RJ</h2>
+
+<div style="padding: 1rem 0;">
+
+<div class="screen">
+  <div class="screen-label">tela 1 — visão geral</div>
+  <div class="topbar">
+    <div>
+      <div class="topbar-title"><i class="ti ti-radar" aria-hidden="true" style="font-size:16px; margin-right:6px; vertical-align:-2px;"></i>Radar Eleitoral 2026</div>
+      <div class="topbar-sub">Atualizado há 2h · 7 institutos</div>
+    </div>
+    <div style="display:flex; gap:6px;">
+      <button class="nav-btn"><i class="ti ti-bell" aria-hidden="true"></i></button>
+      <button class="nav-btn"><i class="ti ti-settings" aria-hidden="true"></i></button>
+    </div>
+  </div>
+  <div class="nav">
+    <button class="nav-btn active">visão geral</button>
+    <button class="nav-btn">presidente</button>
+    <button class="nav-btn">governador rj</button>
+    <button class="nav-btn">institutos</button>
+    <button class="nav-btn">eventos</button>
+  </div>
+  <div class="content">
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">pesquisas coletadas</div>
+        <div class="kpi-value">48</div>
+        <div class="kpi-sub">desde jan/2026</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">institutos ativos</div>
+        <div class="kpi-value">7</div>
+        <div class="kpi-sub">monitorados</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">última pesquisa</div>
+        <div class="kpi-value">hoje</div>
+        <div class="kpi-sub">Quaest · presidente</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">alertas ativos</div>
+        <div class="kpi-value" style="color:var(--color-text-warning);">2</div>
+        <div class="kpi-sub">variação relevante</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-flag" aria-hidden="true" style="font-size:13px; margin-right:4px;"></i>poll of polls · presidente</div>
+        <div class="poll-section">
+          <div class="poll-row">
+            <div class="poll-name">Cand. A</div>
+            <div class="poll-bar-wrap"><div class="poll-bar" style="width:42%; background:#378ADD;"></div></div>
+            <div class="poll-pct">42%</div>
+            <div class="poll-delta delta-up">+1.2</div>
+          </div>
+          <div class="poll-row">
+            <div class="poll-name">Cand. B</div>
+            <div class="poll-bar-wrap"><div class="poll-bar" style="width:28%; background:#D85A30;"></div></div>
+            <div class="poll-pct">28%</div>
+            <div class="poll-delta delta-down">-0.8</div>
+          </div>
+          <div class="poll-row">
+            <div class="poll-name">Cand. C</div>
+            <div class="poll-bar-wrap"><div class="poll-bar" style="width:18%; background:#1D9E75;"></div></div>
+            <div class="poll-pct">18%</div>
+            <div class="poll-delta" style="color:var(--color-text-tertiary);">—</div>
+          </div>
+          <div class="poll-row">
+            <div class="poll-name">Cand. D</div>
+            <div class="poll-bar-wrap"><div class="poll-bar" style="width:8%; background:#888780;"></div></div>
+            <div class="poll-pct">8%</div>
+            <div class="poll-delta delta-down">-0.3</div>
+          </div>
+        </div>
+        <div style="font-size:10px; color:var(--color-text-tertiary);">média de 6 pesquisas · margem ±2pp</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><i class="ti ti-building" aria-hidden="true" style="font-size:13px; margin-right:4px;"></i>poll of polls · governador rj</div>
+        <div class="poll-section">
+          <div class="poll-row">
+            <div class="poll-name">Cand. A</div>
+            <div class="poll-bar-wrap"><div class="poll-bar" style="width:38%; background:#378ADD;"></div></div>
+            <div class="poll-pct">38%</div>
+            <div class="poll-delta delta-up">+2.1</div>
+          </div>
+          <div class="poll-row">
+            <div class="poll-name">Cand. B</div>
+            <div class="poll-bar-wrap"><div class="poll-bar" style="width:31%; background:#D85A30;"></div></div>
+            <div class="poll-pct">31%</div>
+            <div class="poll-delta delta-down">-1.4</div>
+          </div>
+          <div class="poll-row">
+            <div class="poll-name">Cand. C</div>
+            <div class="poll-bar-wrap"><div class="poll-bar" style="width:22%; background:#1D9E75;"></div></div>
+            <div class="poll-pct">22%</div>
+            <div class="poll-delta delta-up">+0.5</div>
+          </div>
+          <div class="poll-row">
+            <div class="poll-name">Cand. D</div>
+            <div class="poll-bar-wrap"><div class="poll-bar" style="width:6%; background:#888780;"></div></div>
+            <div class="poll-pct">6%</div>
+            <div class="poll-delta" style="color:var(--color-text-tertiary);">—</div>
+          </div>
+        </div>
+        <div style="font-size:10px; color:var(--color-text-tertiary);">média de 4 pesquisas · margem ±2.5pp</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-title"><i class="ti ti-bell-ringing" aria-hidden="true" style="font-size:13px; margin-right:4px;"></i>alertas recentes</div>
+      <div class="alert-row">
+        <i class="ti ti-trending-up alert-icon" aria-hidden="true"></i>
+        <div class="alert-text">Cand. A (Presidente) subiu 2.1pp na Quaest — maior variação em 30 dias</div>
+        <div class="alert-time">há 2h</div>
+      </div>
+      <div class="alert-row">
+        <i class="ti ti-trending-down alert-icon" aria-hidden="true"></i>
+        <div class="alert-text">Cand. B (Gov. RJ) caiu 1.4pp no Datafolha — 3ª queda consecutiva</div>
+        <div class="alert-time">ontem</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-clock" aria-hidden="true" style="font-size:13px; margin-right:4px;"></i>pesquisas recentes</div>
+      <div class="tr">
+        <div class="td-main">Quaest · Presidente</div>
+        <div class="td">15/06/2026</div>
+        <div class="td">n=2.000</div>
+        <div><span class="badge badge-new">nova</span></div>
+      </div>
+      <div class="tr">
+        <div class="td-main">Datafolha · Governador RJ</div>
+        <div class="td">14/06/2026</div>
+        <div class="td">n=1.800</div>
+        <div><span class="badge badge-alert">alerta</span></div>
+      </div>
+      <div class="tr">
+        <div class="td-main">AtlasIntel · Presidente</div>
+        <div class="td">13/06/2026</div>
+        <div class="td">n=5.200</div>
+        <div><span class="tag">normal</span></div>
+      </div>
+      <div class="tr">
+        <div class="td-main">PoderData · Presidente</div>
+        <div class="td">10/06/2026</div>
+        <div class="td">n=1.500</div>
+        <div><span class="tag">normal</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="screen-footer">
+    <div class="footer-text">Radar Eleitoral 2026 · uso restrito campanha</div>
+    <div class="footer-text">próxima coleta: 06h00</div>
+  </div>
+</div>
+
+<div class="screen">
+  <div class="screen-label">tela 2 — presidente (detalhe)</div>
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">presidente · evolução de intenção de voto</div>
+      <div class="topbar-sub">Jan/2026 → Jun/2026 · estimulada</div>
+    </div>
+    <div style="display:flex; gap:6px;">
+      <button class="nav-btn">exportar</button>
+    </div>
+  </div>
+  <div class="nav">
+    <button class="nav-btn">visão geral</button>
+    <button class="nav-btn active">presidente</button>
+    <button class="nav-btn">governador rj</button>
+    <button class="nav-btn">institutos</button>
+    <button class="nav-btn">eventos</button>
+  </div>
+  <div class="content">
+    <div class="chart-area">
+      <div class="chart-header">
+        <div class="chart-title">evolução temporal · todos os institutos</div>
+        <div class="chart-filters">
+          <span class="filter-chip active">todos</span>
+          <span class="filter-chip">datafolha</span>
+          <span class="filter-chip">quaest</span>
+          <span class="filter-chip">atlasintel</span>
+        </div>
+      </div>
+      <div class="chart-mock">
+        <svg class="chart-svg" viewBox="0 0 580 130" preserveAspectRatio="none">
+          <line x1="0" y1="0" x2="580" y2="0" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+          <line x1="0" y1="32" x2="580" y2="32" stroke="var(--color-border-tertiary)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="0" y1="65" x2="580" y2="65" stroke="var(--color-border-tertiary)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="0" y1="97" x2="580" y2="97" stroke="var(--color-border-tertiary)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="0" y1="130" x2="580" y2="130" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+          <text x="0" y="128" font-size="9" fill="var(--color-text-tertiary)">20%</text>
+          <text x="0" y="96" font-size="9" fill="var(--color-text-tertiary)">30%</text>
+          <text x="0" y="63" font-size="9" fill="var(--color-text-tertiary)">40%</text>
+          <text x="0" y="30" font-size="9" fill="var(--color-text-tertiary)">50%</text>
+          <polyline points="20,90 80,85 140,80 200,75 260,70 320,65 380,60 440,58 500,55 560,52" fill="none" stroke="#378ADD" stroke-width="2"/>
+          <polyline points="20,70 80,75 140,78 200,80 260,82 320,85 380,88 440,90 500,92 560,95" fill="none" stroke="#D85A30" stroke-width="2"/>
+          <polyline points="20,110 80,108 140,105 200,100 260,98 320,95 380,92 440,90 500,88 560,85" fill="none" stroke="#1D9E75" stroke-width="2"/>
+          <line x1="290" y1="0" x2="290" y2="130" stroke="var(--color-border-warning)" stroke-width="1" stroke-dasharray="3,3"/>
+          <text x="292" y="12" font-size="9" fill="var(--color-text-warning)">debate</text>
+          <circle cx="560" cy="52" r="3" fill="#378ADD"/>
+          <circle cx="560" cy="95" r="3" fill="#D85A30"/>
+          <circle cx="560" cy="85" r="3" fill="#1D9E75"/>
+        </svg>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#378ADD;"></div>Cand. A</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#D85A30;"></div>Cand. B</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#1D9E75;"></div>Cand. C</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#888780;"></div>Cand. D</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--color-border-warning); width:2px; height:8px; border-radius:0;"></div>evento</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">análise de tendência · ia</div>
+        <div style="font-size:12px; color:var(--color-text-primary); line-height:1.6;">
+          Cand. A mantém trajetória de alta há <strong style="font-weight:500;">6 semanas consecutivas</strong>, com ganho acumulado de +4.2pp. O pico de crescimento ocorreu após o debate de maio. Cand. B apresenta tendência de queda sustentada.
+        </div>
+        <div style="margin-top:8px; font-size:10px; color:var(--color-text-tertiary);">gerado por gemini · atualizado há 2h</div>
+      </div>
+      <div class="card">
+        <div class="card-title">variações por instituto · última pesquisa</div>
+        <div class="tr">
+          <div class="td-main">Quaest</div>
+          <div class="td">Cand. A</div>
+          <div class="poll-delta delta-up">+2.1pp</div>
+        </div>
+        <div class="tr">
+          <div class="td-main">Datafolha</div>
+          <div class="td">Cand. A</div>
+          <div class="poll-delta delta-up">+1.4pp</div>
+        </div>
+        <div class="tr">
+          <div class="td-main">AtlasIntel</div>
+          <div class="td">Cand. B</div>
+          <div class="poll-delta delta-down">-2.3pp</div>
+        </div>
+        <div class="tr">
+          <div class="td-main">PoderData</div>
+          <div class="td">Cand. C</div>
+          <div class="poll-delta" style="color:var(--color-text-tertiary);">+0.1pp</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">todas as pesquisas · presidente</div>
+      <div class="tr" style="background:var(--color-background-secondary); border-radius:4px; margin-bottom:4px;">
+        <div class="td" style="width:80px;">data</div>
+        <div class="td" style="width:80px;">instituto</div>
+        <div class="td" style="flex:1;">cand. a</div>
+        <div class="td" style="flex:1;">cand. b</div>
+        <div class="td" style="flex:1;">cand. c</div>
+        <div class="td" style="width:60px;">amostra</div>
+      </div>
+      <div class="tr">
+        <div class="td" style="width:80px;">15/06</div>
+        <div class="td" style="width:80px;">Quaest</div>
+        <div class="td" style="flex:1; color:var(--color-text-success);">42%</div>
+        <div class="td" style="flex:1;">28%</div>
+        <div class="td" style="flex:1;">18%</div>
+        <div class="td" style="width:60px;">2.000</div>
+      </div>
+      <div class="tr">
+        <div class="td" style="width:80px;">10/06</div>
+        <div class="td" style="width:80px;">Datafolha</div>
+        <div class="td" style="flex:1;">40%</div>
+        <div class="td" style="flex:1;">29%</div>
+        <div class="td" style="flex:1;">18%</div>
+        <div class="td" style="width:60px;">1.800</div>
+      </div>
+      <div class="tr">
+        <div class="td" style="width:80px;">08/06</div>
+        <div class="td" style="width:80px;">AtlasIntel</div>
+        <div class="td" style="flex:1;">41%</div>
+        <div class="td" style="flex:1;">30%</div>
+        <div class="td" style="flex:1;">17%</div>
+        <div class="td" style="width:60px;">5.200</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="screen">
+  <div class="screen-label">tela 3 — governador rj (detalhe)</div>
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">governador rj · evolução de intenção de voto</div>
+      <div class="topbar-sub">Jan/2026 → Jun/2026 · estimulada</div>
+    </div>
+  </div>
+  <div class="nav">
+    <button class="nav-btn">visão geral</button>
+    <button class="nav-btn">presidente</button>
+    <button class="nav-btn active">governador rj</button>
+    <button class="nav-btn">institutos</button>
+    <button class="nav-btn">eventos</button>
+  </div>
+  <div class="content">
+    <div class="chart-area">
+      <div class="chart-header">
+        <div class="chart-title">evolução temporal · governador rj</div>
+        <div class="chart-filters">
+          <span class="filter-chip active">todos</span>
+          <span class="filter-chip">datafolha</span>
+          <span class="filter-chip">paraná pesquisas</span>
+        </div>
+      </div>
+      <div class="chart-mock">
+        <svg class="chart-svg" viewBox="0 0 580 130" preserveAspectRatio="none">
+          <line x1="0" y1="0" x2="580" y2="0" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+          <line x1="0" y1="32" x2="580" y2="32" stroke="var(--color-border-tertiary)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="0" y1="65" x2="580" y2="65" stroke="var(--color-border-tertiary)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="0" y1="97" x2="580" y2="97" stroke="var(--color-border-tertiary)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <line x1="0" y1="130" x2="580" y2="130" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+          <text x="0" y="128" font-size="9" fill="var(--color-text-tertiary)">15%</text>
+          <text x="0" y="96" font-size="9" fill="var(--color-text-tertiary)">25%</text>
+          <text x="0" y="63" font-size="9" fill="var(--color-text-tertiary)">35%</text>
+          <text x="0" y="30" font-size="9" fill="var(--color-text-tertiary)">45%</text>
+          <polyline points="20,95 80,90 140,85 200,78 260,72 320,68 380,62 440,58 500,55 560,52" fill="none" stroke="#378ADD" stroke-width="2"/>
+          <polyline points="20,65 80,68 140,72 200,75 260,78 320,82 380,85 440,88 500,90 560,92" fill="none" stroke="#D85A30" stroke-width="2"/>
+          <polyline points="20,105 80,102 140,98 200,95 260,92 320,90 380,88 440,85 500,83 560,80" fill="none" stroke="#1D9E75" stroke-width="2"/>
+          <line x1="200" y1="0" x2="200" y2="130" stroke="var(--color-border-warning)" stroke-width="1" stroke-dasharray="3,3"/>
+          <text x="202" y="12" font-size="9" fill="var(--color-text-warning)">evento rj</text>
+          <circle cx="560" cy="52" r="3" fill="#378ADD"/>
+          <circle cx="560" cy="92" r="3" fill="#D85A30"/>
+          <circle cx="560" cy="80" r="3" fill="#1D9E75"/>
+        </svg>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#378ADD;"></div>Cand. A</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#D85A30;"></div>Cand. B</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#1D9E75;"></div>Cand. C</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#888780;"></div>Cand. D</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">análise de tendência · ia</div>
+        <div style="font-size:12px; color:var(--color-text-primary); line-height:1.6;">
+          Disputa governadorial está em <strong style="font-weight:500;">momento de inflexão</strong>. Cand. A ultrapassou Cand. B em abril e mantém vantagem crescente. Cand. C apresenta crescimento consistente e pode impactar o segundo turno.
+        </div>
+        <div style="margin-top:8px; font-size:10px; color:var(--color-text-tertiary);">gerado por gemini · atualizado há 3h</div>
+      </div>
+      <div class="card">
+        <div class="card-title">cadastrar evento</div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <input type="text" placeholder="título do evento" style="font-size:12px; padding:6px 8px; width:100%;"/>
+          <input type="date" style="font-size:12px; padding:6px 8px; width:100%;"/>
+          <select style="font-size:12px; padding:6px 8px; width:100%;">
+            <option>cargo afetado</option>
+            <option>presidente</option>
+            <option>governador rj</option>
+            <option>ambos</option>
+          </select>
+          <button style="font-size:12px; padding:6px 8px; width:100%;">salvar evento</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="screen-footer">
+    <div class="footer-text">Radar Eleitoral 2026 · uso restrito campanha</div>
+    <div class="footer-text">próxima coleta: 06h00</div>
+  </div>
+</div>
+
+</div>

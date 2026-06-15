@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Pulso Eleitoral 2026{% endblock %}</title>
+
+  <!-- Fontes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Ícones Tabler -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+
+  <!-- Design System -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+
+  {% block head %}{% endblock %}
+</head>
+<body class="pe-page">
+
+  <!-- Topbar -->
+  <nav class="pe-topbar">
+    <a class="pe-topbar__logo" href="/">
+      <div class="pe-topbar__logomark">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="2.5" fill="#fff"/>
+          <path d="M7 1.5 Q11 4 11 7 Q11 10 7 12.5" stroke="rgba(255,255,255,0.85)" stroke-width="1.2" fill="none"/>
+          <path d="M7 1.5 Q3 4 3 7 Q3 10 7 12.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" fill="none"/>
+        </svg>
+      </div>
+      <span class="pe-topbar__name">Pulso Eleitoral</span>
+    </a>
+
+    <div class="pe-topbar__nav">
+      <a class="pe-topbar__nav-item {% if request.endpoint == 'index' %}pe-topbar__nav-item--active{% endif %}"
+         href="/">visão geral</a>
+      <a class="pe-topbar__nav-item {% if request.endpoint == 'presidente' %}pe-topbar__nav-item--active{% endif %}"
+         href="/presidente">presidente</a>
+      <a class="pe-topbar__nav-item {% if request.endpoint == 'governador_rj' %}pe-topbar__nav-item--active{% endif %}"
+         href="/governador-rj">gov. rj</a>
+      <a class="pe-topbar__nav-item {% if request.endpoint == 'institutos' %}pe-topbar__nav-item--active{% endif %}"
+         href="/institutos">institutos</a>
+      <a class="pe-topbar__nav-item {% if request.endpoint == 'eventos' %}pe-topbar__nav-item--active{% endif %}"
+         href="/eventos">eventos</a>
+    </div>
+
+    <div class="pe-topbar__meta">
+      <span id="topbar-update">carregando...</span>
+      <div class="pe-topbar__status-dot" id="topbar-dot"></div>
+    </div>
+  </nav>
+
+  <!-- Conteúdo principal -->
+  <main class="pe-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+  <!-- Helpers Pulso Eleitoral -->
+  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+
+  <!-- Status do sistema -->
+  <script>
+    fetch('/api/status')
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('topbar-update').textContent =
+          d.ultima_coleta ? 'atualizado ' + d.ultima_coleta : 'sem dados';
+        document.getElementById('topbar-dot').style.background =
+          d.online ? '#1a7a4a' : '#A32D2D';
+      })
+      .catch(() => {
+        document.getElementById('topbar-update').textContent = 'offline';
+        document.getElementById('topbar-dot').style.background = '#A32D2D';
+      });
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
