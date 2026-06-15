@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Pulso Eleitoral</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <style>
+    .login-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--pe-space-6);
+      background: var(--pe-bg);
+    }
+    .login-card {
+      width: 100%;
+      max-width: 380px;
+      padding: var(--pe-space-8);
+      background: var(--pe-surface-2);
+      border: 0.5px solid var(--pe-border);
+      border-radius: var(--pe-radius-lg);
+    }
+    .login-header {
+      text-align: center;
+      margin-bottom: var(--pe-space-6);
+    }
+    .login-logo {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      background: var(--pe-red);
+      border-radius: var(--pe-radius-md);
+      margin-bottom: var(--pe-space-3);
+    }
+    .login-logo svg {
+      fill: #fff;
+    }
+    .login-title {
+      font-size: var(--pe-text-xl);
+      font-weight: var(--pe-weight-medium);
+      color: var(--pe-navy);
+      margin-bottom: var(--pe-space-1);
+    }
+    .login-subtitle {
+      font-size: var(--pe-text-xs);
+      color: var(--pe-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .form-group {
+      margin-bottom: var(--pe-space-4);
+    }
+    .form-label {
+      display: block;
+      font-size: var(--pe-text-xs);
+      font-weight: var(--pe-weight-medium);
+      color: var(--pe-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--pe-space-1);
+    }
+    .form-input {
+      width: 100%;
+      padding: var(--pe-space-2) var(--pe-space-3);
+      font-size: var(--pe-text-base);
+      font-family: var(--pe-font-sans);
+      border: 0.5px solid var(--pe-border-md);
+      border-radius: var(--pe-radius-md);
+      background: var(--pe-surface-2);
+      color: var(--pe-text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-input:focus {
+      border-color: var(--pe-navy);
+    }
+    .login-error {
+      font-size: var(--pe-text-xs);
+      color: var(--pe-down-text);
+      margin-bottom: var(--pe-space-4);
+      padding: var(--pe-space-2) var(--pe-space-3);
+      background: var(--pe-down-bg);
+      border-left: 2px solid var(--pe-down);
+      border-radius: 0 var(--pe-radius-sm) var(--pe-radius-sm) 0;
+    }
+    .login-btn {
+      width: 100%;
+      justify-content: center;
+      padding: var(--pe-space-3);
+      font-size: var(--pe-text-sm);
+    }
+  </style>
+</head>
+<body class="pe-page">
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
+            <circle cx="7" cy="7" r="2.5" fill="#fff"/>
+            <path d="M7 1.5 Q11 4 11 7 Q11 10 7 12.5" stroke="rgba(255,255,255,0.85)" stroke-width="1.2" fill="none"/>
+            <path d="M7 1.5 Q3 4 3 7 Q3 10 7 12.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" fill="none"/>
+          </svg>
+        </div>
+        <h1 class="login-title">Pulso Eleitoral</h1>
+        <p class="login-subtitle">Acesso Restrito</p>
+      </div>
+
+      {% if error %}
+      <div class="login-error">
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <form action="{{ url_for('login') }}" method="POST">
+        <div class="form-group">
+          <label for="username" class="form-label">Usuário</label>
+          <input type="text" id="username" name="username" class="form-input" required autofocus>
+        </div>
+        <div class="form-group">
+          <label for="password" class="form-label">Senha</label>
+          <input type="password" id="password" name="password" class="form-input" required>
+        </div>
+        <button type="submit" class="pe-btn pe-btn--primary login-btn">Entrar</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
