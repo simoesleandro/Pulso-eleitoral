@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 from contextlib import contextmanager
 
@@ -60,5 +61,105 @@ def get_db():
     conn = get_conn()
     try:
         yield conn
+    finally:
+        conn.close()
+
+def salvar_log_scheduler(resultado: list) -> None:
+    """Salva o log de execução de coleta no banco de dados SQLite."""
+    conn = get_conn()
+    try:
+        resultado_json = json.dumps(resultado)
+        conn.execute(
+            "INSERT INTO scheduler_log (job, resultado) VALUES (?, ?)",
+            ("coleta_diaria", resultado_json)
+        )
+        conn.commit()
+    except Exception as e:
+        raise e
+    finally:
+        conn.close()
+
+def buscar_ultimo_log() -> dict | None:
+    """Busca o log de execução do scheduler mais recente."""
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT job, executado_em, resultado FROM scheduler_log ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        if row:
+            return {
+                "job": row["job"],
+                "executado_em": row["executado_em"],
+                "resultado": json.loads(row["resultado"]) if row["resultado"] else []
+            }
+        return None
+    except Exception:
+        return None
+    finally:
+        conn.close()
+
+def get_pesquisas_mais_recentes(cargo: str) -> list[dict]:
+    """Retorna os dados da pesquisa mais recente para o cargo e suas intenções de voto."""
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        # Encontra a pesquisa mais recente
+        cursor.execute("""
+            SELECT p.id, p.data_pesquisa, p.margem_erro, p.tamanho_amostra, p.fonte_url, inst.nome AS instituto,
+                   int.candidato, int.percentual, int.partido
+            FROM pesquisas p
+            JOIN institutos inst ON p.instituto_id = inst.id
+            JOIN intencoes int ON int.pesquisa_id = p.id
+            WHERE p.cargo = ? AND p.id = (
+                SELECT id FROM pesquisas 
+                WHERE cargo = ? 
+                ORDER BY data_pesquisa DESC, id DESC 
+                LIMIT 1
+            )
+            ORDER BY int.percentual DESC
+        """, (cargo, cargo))
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+def get_historico_candidato(candidato: str) -> list[dict]:
+    """Retorna a evolução temporal (série histórica) das intenções de voto de um candidato."""
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT p.data_pesquisa AS data, int.percentual, inst.nome AS instituto
+            FROM intencoes int
+            JOIN pesquisas p ON int.pesquisa_id = p.id
+            JOIN institutos inst ON p.instituto_id = inst.id
+            WHERE int.candidato = ?
+            ORDER BY p.data_pesquisa ASC, p.id ASC
+        """, (candidato,))
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+def get_institutos_com_totais() -> list[dict]:
+    """Retorna a lista de institutos cadastrados junto com a contagem total de pesquisas e a data da última."""
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT inst.nome, COUNT(p.id) AS total, MAX(p.data_pesquisa) AS ultima_coleta
+            FROM institutos inst
+            LEFT JOIN pesquisas p ON p.instituto_id = inst.id
+            GROUP BY inst.id, inst.nome
+            ORDER BY total DESC, inst.nome ASC
+        """)
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    except Exception:
+        return []
     finally:
         conn.close()

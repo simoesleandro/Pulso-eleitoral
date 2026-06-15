@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Pulso Eleitoral</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+</head>
+<body class="pe-page">
+
+  <!-- Topbar -->
+  <nav class="pe-topbar">
+    <a class="pe-topbar__logo" href="/">
+      <div class="pe-topbar__logomark">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="2.5" fill="#fff"/>
+          <path d="M7 1.5 Q11 4 11 7 Q11 10 7 12.5" stroke="rgba(255,255,255,0.85)" stroke-width="1.2" fill="none"/>
+          <path d="M7 1.5 Q3 4 3 7 Q3 10 7 12.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" fill="none"/>
+        </svg>
+      </div>
+      <span class="pe-topbar__name">Pulso Eleitoral — Admin</span>
+    </a>
+
+    <div class="pe-topbar__nav">
+      <a class="pe-topbar__nav-item" href="/">Dashboard</a>
+      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="/admin">Painel Admin</a>
+      <a class="pe-topbar__nav-item" href="/admin/status-coletores">Diagnóstico JSON</a>
+      <a class="pe-topbar__nav-item" href="/admin/logs">Logs JSON</a>
+      <a class="pe-topbar__nav-item" href="/logout">Sair</a>
+    </div>
+  </nav>
+
+  <!-- Conteúdo Principal -->
+  <main class="pe-main pe-container">
+    <div style="margin-bottom: var(--pe-space-6);">
+      <h1 class="pe-display">Painel de Controle do Scheduler</h1>
+      <p class="pe-mono" style="margin-top: var(--pe-space-1);">Gerenciamento e monitoramento da coleta automática</p>
+    </div>
+
+    <!-- Status do Scheduler -->
+    <div class="pe-grid-3" style="margin-bottom: var(--pe-space-6);">
+      <div class="pe-kpi">
+        <div class="pe-kpi__label">Próximo Agendamento</div>
+        <div class="pe-kpi__value" style="font-size: 14px; font-family: var(--pe-font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          {{ proximo_run or 'Desativado' }}
+        </div>
+        <div class="pe-kpi__sub">Coleta diária (Cron 08h)</div>
+      </div>
+      <div class="pe-kpi">
+        <div class="pe-kpi__label">Último Run</div>
+        <div class="pe-kpi__value" style="font-size: 14px; font-family: var(--pe-font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          {{ ultimo_run or 'Sem registros' }}
+        </div>
+        <div class="pe-kpi__sub">Histórico do scheduler_log</div>
+      </div>
+      <div class="pe-kpi">
+        <div class="pe-kpi__label">Pesquisas no Banco</div>
+        <div class="pe-kpi__value">{{ total_pesquisas }}</div>
+        <div class="pe-kpi__sub">Total consolidado</div>
+      </div>
+    </div>
+
+    <!-- Ações e Resultados -->
+    <div class="pe-card" style="margin-bottom: var(--pe-space-6);">
+      <div class="pe-card__title">Ações do Administrador</div>
+      <div style="display: flex; gap: var(--pe-space-3); align-items: center; flex-wrap: wrap;">
+        <button id="btn-coletar" class="pe-btn pe-btn--primary">Coletar Agora</button>
+        <span id="coletar-loading" style="display: none;" class="pe-mono">Executando coletores...</span>
+      </div>
+      <div id="resultado-container" style="display: none; margin-top: var(--pe-space-4);">
+        <pre id="resultado" class="pe-mono" style="background: var(--pe-surface); padding: var(--pe-space-3); border-radius: var(--pe-radius-md); overflow-x: auto; font-size: 11px; border: 0.5px solid var(--pe-border);"></pre>
+      </div>
+    </div>
+
+    <!-- Tabela de Logs -->
+    <div class="pe-card">
+      <div class="pe-card__title">Últimos 10 Logs de Execução</div>
+      <div style="overflow-x: auto;">
+        <table class="pe-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Job</th>
+              <th>Executado Em</th>
+              <th>Resultado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+            <tr>
+              <td class="pe-mono">{{ log.id }}</td>
+              <td>{{ log.job }}</td>
+              <td class="pe-mono">{{ log.executado_em }}</td>
+              <td>
+                <span class="pe-mono" style="font-size: 11px;">
+                  {% for res in log.resultado %}
+                    <span class="pe-badge {% if res.status == 'ok' %}pe-badge--new{% else %}pe-badge--down{% endif %}">
+                      {{ res.coletor }}: {{ res.status }}
+                    </span>
+                  {% else %}
+                    Nenhum coletor executado
+                  {% endfor %}
+                </span>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="4" style="text-align: center; padding: var(--pe-space-4);" class="pe-mono">Nenhum log gravado no banco de dados.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    document.getElementById('btn-coletar').addEventListener('click', function() {
+      const btn = this;
+      const loading = document.getElementById('coletar-loading');
+      const container = document.getElementById('resultado-container');
+      const resultado = document.getElementById('resultado');
+      
+      btn.disabled = true;
+      loading.style.display = 'inline';
+      container.style.display = 'none';
+      
+      fetch('/admin/coletar', { method: 'POST' })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+          }
+          return response.json();
+        })
+        .then(data => {
+          resultado.textContent = JSON.stringify(data, null, 2);
+          container.style.display = 'block';
+          // Recarrega a página após 3 segundos para atualizar as estatísticas e a tabela de logs
+          setTimeout(() => {
+            window.location.reload();
+          }, 3000);
+        })
+        .catch(err => {
+          resultado.textContent = 'Erro ao executar coleta: ' + err.message;
+          container.style.display = 'block';
+          btn.disabled = false;
+        })
+        .finally(() => {
+          loading.style.display = 'none';
+        });
+    });
+  </script>
+</body>
+</html>

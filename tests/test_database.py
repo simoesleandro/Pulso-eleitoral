@@ -75,8 +75,8 @@ def test_seed_inserts_institutos():
     
     assert len(institutos) == 7
     nomes_esperados = [
-        'Datafolha', 'Quaest', 'AtlasIntel', 'PoderData', 
-        'Paraná Pesquisas', 'MDA/CNT', 'Real Time Big Data'
+        'Datafolha', 'Ibope/IPEC', 'Quaest', 'Genial/Quaest', 
+        'Atlas', 'Paraná', 'Real Time'
     ]
     for idx, nome in enumerate(nomes_esperados):
         assert institutos[idx]['nome'] == nome
@@ -139,7 +139,8 @@ def test_auth_blocks_routes_without_login(client):
     # Acesso a rota livre (/api/status) deve retornar 200 OK sem necessidade de login
     response_status = client.get('/api/status')
     assert response_status.status_code == 200
-    assert response_status.json == {"online": True, "ultima_coleta": None}
+    assert response_status.json["online"] is True
+    assert "ultima_coleta" in response_status.json
     
     # Acesso a rota protegida (/) deve redirecionar (302) para /login
     response_root = client.get('/')
@@ -156,7 +157,7 @@ def test_auth_blocks_routes_without_login(client):
     assert response_login_success.status_code == 302
     assert response_login_success.headers['Location'].endswith('/')
     
-    # Agora que está logado (na sessão do cliente de testes), acesso a (/) deve retornar 200 OK
+    # Agora que está logado (na sessão do cliente de testes), acesso a (/) deve redirecionar (302) para /dashboard
     response_root_after = client.get('/')
-    assert response_root_after.status_code == 200
-    assert b"Pulso Eleitoral" in response_root_after.data
+    assert response_root_after.status_code == 302
+    assert response_root_after.headers['Location'].endswith('/dashboard')

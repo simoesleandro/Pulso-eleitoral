@@ -69,6 +69,14 @@ CREATE TABLE IF NOT EXISTS analises_ia (
     criado_em TEXT DEFAULT (datetime('now', 'localtime'))
 );
 
+-- 7. Histórico de execução e logs do Scheduler
+CREATE TABLE IF NOT EXISTS scheduler_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job TEXT NOT NULL,
+    executado_em TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+    resultado TEXT -- String JSON contendo o array com o resultado detalhado
+);
+
 -- Índices de desempenho recomendados no PRD
 CREATE INDEX IF NOT EXISTS idx_intencoes_pesquisa_id ON intencoes(pesquisa_id);
 CREATE INDEX IF NOT EXISTS idx_intencoes_candidato ON intencoes(candidato);
