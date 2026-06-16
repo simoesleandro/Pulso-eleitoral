@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import time
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -16,7 +17,13 @@ Analise o texto abaixo e extraia APENAS intenções de voto com percentuais EXPL
 REGRAS CRÍTICAS:
 - Extraia SOMENTE quando houver percentual numérico explícito (ex: "38%", "38 por cento")
 - NÃO invente percentuais — se não há número claro, não inclua o candidato
-- NÃO extraia aprovação de governo, apenas intenção de voto
+- Extraia SOMENTE intenções de voto no 1º turno NACIONAL
+- IGNORE percentuais de 2º turno (geralmente acima de 50% em confronto direto)
+- IGNORE pesquisas estaduais/regionais — apenas âmbito nacional
+- IGNORE aprovação/rejeição de governo
+- Se o release misturar 1º e 2º turno, extraia APENAS o cenário de 1º turno
+- Percentuais válidos para presidente: entre 1% e 60% por candidato
+- Se a soma dos percentuais for maior que 120%, provavelmente são cenários de 2º turno — retorne []
 - Cargo deve ser "presidente", "governador_rj", "governador_sp" etc
 - Se o texto for sobre aprovação/rejeição de governo sem intenção de voto, retorne lista vazia
 
@@ -61,18 +68,47 @@ def extrair_com_gemini(texto: str, fonte_url: str = "") -> dict:
         texto_truncado = texto[:8000]
         
         prompt = PROMPT_EXTRACAO.replace("{texto}", texto_truncado)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
         
-        raw = response.text.strip()
+        max_retries = 3
+        for tentativa in range(max_retries):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt
+                )
+                raw = response.text.strip()
+                break  # sucesso, sai do loop
+            except Exception as e:
+                if '503' in str(e) and tentativa < max_retries - 1:
+                    wait = 5 * (tentativa + 1)  # 5s, 10s, 15s
+                    logger.warning(f"Gemini 503, tentativa {tentativa+1}/{max_retries}, aguardando {wait}s")
+                    time.sleep(wait)
+                else:
+                    logger.error(f"Gemini erro: {e}")
+                    return {"candidatos": []}
+        
         start_idx = raw.find("{")
         end_idx = raw.rfind("}")
         if start_idx != -1 and end_idx != -1:
             raw = raw[start_idx:end_idx+1]
             
         resultado = json.loads(raw.strip())
+        
+        candidatos = resultado.get("candidatos", [])
+
+        # Remove percentuais acima de 60% (são 2º turno ou aprovação)
+        candidatos = [c for c in candidatos if c.get("percentual", 0) <= 60]
+
+        # Se mesmo candidato aparece mais de uma vez, mantém só o maior percentual
+        # (indica múltiplos cenários — pega o mais representativo)
+        vistos = {}
+        for c in candidatos:
+            nome = c["nome"]
+            if nome not in vistos or c["percentual"] > vistos[nome]["percentual"]:
+                vistos[nome] = c
+        candidatos = list(vistos.values())
+
+        resultado["candidatos"] = candidatos
         
         n = len(resultado.get("candidatos", []))
         logger.info(f"Gemini extraiu {n} candidatos de {fonte_url}")
