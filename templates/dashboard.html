@@ -4,342 +4,152 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard — Pulso Eleitoral</title>
-  <style>
-    /* Design Tokens locais (Tema Escuro Sleek) */
-    :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --cyan: #06b6d4;
-      --violet: #8b5cf6;
-      --amber: #f59e0b;
-      --gray-muted: #475569;
-      --text: #e2e8f0;
-      --text-muted: #64748b;
-      --border: rgba(255, 255, 255, 0.08);
-      --font: system-ui, -apple-system, sans-serif;
-      --radius: 12px;
-      --radius-sm: 6px;
-      --radius-pill: 20px;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-      line-height: 1.5;
-      padding-bottom: 40px;
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 24px;
-      width: 100%;
-    }
-
-    header {
-      padding: 32px 0;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-
-    .logo-area h1 {
-      font-size: 24px;
-      font-weight: 800;
-      color: var(--cyan);
-      letter-spacing: -0.02em;
-    }
-
-    .logo-area p {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      font-size: 11px;
-      font-weight: 500;
-      padding: 4px 10px;
-      border-radius: var(--radius-pill);
-      white-space: nowrap;
-    }
-
-    .badge--update {
-      background: rgba(6, 182, 212, 0.12);
-      color: var(--cyan);
-      border: 0.5px solid rgba(6, 182, 212, 0.3);
-    }
-
-    .badge--green { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
-    .badge--amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-    .badge--red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-
-    .section-title {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 20px;
-      border-left: 3px solid var(--cyan);
-      padding-left: 10px;
-    }
-
-    section {
-      padding: 40px 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 3fr 2fr;
-      gap: 24px;
-    }
-
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-    }
-
-    .chart-container {
-      position: relative;
-      height: 300px;
-      width: 100%;
-    }
-
-    .info-card {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 16px;
-    }
-
-    .info-title {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .info-value {
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--cyan);
-      margin: 4px 0;
-    }
-
-    .info-desc {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-
-    .select-candidato {
-      background: var(--bg);
-      color: var(--text);
-      border: 1px solid var(--border);
-      padding: 8px 16px;
-      border-radius: var(--radius-sm);
-      outline: none;
-      font-size: 14px;
-      cursor: pointer;
-      margin-bottom: 20px;
-      width: 100%;
-      max-width: 240px;
-    }
-
-    .grid-institutos {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 20px;
-    }
-
-    .inst-card {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .inst-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .inst-name {
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    .inst-stats {
-      font-size: 24px;
-      font-weight: 700;
-    }
-
-    footer {
-      padding: 40px 0;
-      text-align: center;
-      font-size: 12px;
-      color: var(--text-muted);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      align-items: center;
-    }
-
-    footer a {
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: color 0.15s;
-    }
-
-    footer a:hover {
-      color: var(--cyan);
-    }
-
-    @media (max-width: 768px) {
-      .grid-2 {
-        grid-template-columns: 1fr;
-      }
-      header {
-        text-align: center;
-        flex-direction: column;
-      }
-    }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/base.css">
 </head>
-<body>
+<body class="pe-page">
 
-  <!-- Header -->
-  <header class="container">
-    <div class="logo-area">
-      <h1>PULSO ELEITORAL</h1>
-      <p>Radar de Pesquisas 2026</p>
+  <!-- Topbar -->
+  <nav class="pe-topbar">
+    <a class="pe-topbar__logo" href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pe-red)" stroke-width="2">
+        <circle cx="12" cy="12" r="3" fill="var(--pe-red)"/>
+        <circle cx="12" cy="12" r="7" stroke="var(--pe-red)" stroke-width="1.5" stroke-dasharray="2 2"/>
+        <circle cx="12" cy="12" r="10" stroke="var(--pe-red)" stroke-width="1"/>
+      </svg>
+      <span class="pe-topbar__name">Pulso Eleitoral</span>
+    </a>
+    <div class="pe-topbar__nav">
+      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="#">visão geral</a>
+      <a class="pe-topbar__nav-item" href="#secao-presidente">presidente</a>
+      <a class="pe-topbar__nav-item" href="#secao-governador">gov. rj</a>
+      <a class="pe-topbar__nav-item" href="#secao-evolucao">evolução</a>
     </div>
-    <div>
-      <span id="badge-update" class="badge badge--update">Atualizado em: carregando...</span>
+    <div class="pe-topbar__meta">
+      <span id="badge-update">carregando...</span>
+      <div class="pe-topbar__status-dot"></div>
     </div>
-  </header>
+  </nav>
 
-  <!-- Seção 1: Presidente -->
-  <section class="container">
-    <h2 class="section-title">Corrida Presidencial 2026</h2>
-    <div class="grid-2">
-      <!-- Gráfico -->
-      <div class="card">
-        <div class="chart-container">
-          <canvas id="chart-presidente"></canvas>
-        </div>
-      </div>
-      <!-- Painel Info -->
-      <div class="card info-card">
-        <div>
-          <div class="info-title">Instituto mais recente</div>
-          <div id="pres-instituto" class="info-value">—</div>
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-          <div>
-            <div class="info-title">Margem de Erro</div>
-            <div id="pres-margem" style="font-size: 20px; font-weight: 700; color: var(--text);">—</div>
-          </div>
-          <div>
-            <div class="info-title">Data de Coleta</div>
-            <div id="pres-data" style="font-size: 20px; font-weight: 700; color: var(--text);">—</div>
+  <main class="pe-container pe-main">
+    
+    <!-- Seção 1: Presidente -->
+    <section id="secao-presidente" class="pe-section">
+      <h2 class="pe-section__title">Corrida Presidencial 2026</h2>
+      <div class="pe-grid-2">
+        <!-- Gráfico -->
+        <div class="pe-card">
+          <div class="pe-chart-container">
+            <canvas id="chart-presidente"></canvas>
           </div>
         </div>
-        <div class="info-desc" id="pres-fonte">
-          Fonte: —
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Seção 2: Evolução Temporal -->
-  <section class="container">
-    <h2 class="section-title">Evolução nas Pesquisas</h2>
-    <div class="card">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-        <select id="select-candidatos" class="select-candidato">
-          <option value="Lula">Lula</option>
-          <option value="Bolsonaro">Bolsonaro</option>
-          <option value="Tarcísio">Tarcísio</option>
-          <option value="Ciro">Ciro</option>
-          <option value="Simone">Simone</option>
-          <option value="Eduardo Paes">Eduardo Paes</option>
-          <option value="Cláudio Castro">Cláudio Castro</option>
-          <option value="Marcelo Freixo">Marcelo Freixo</option>
-          <option value="Rodrigo Neves">Rodrigo Neves</option>
-        </select>
-        <span class="info-title" style="margin-bottom: 20px;">Série histórica desde Jan/2026</span>
-      </div>
-      <div class="chart-container" style="height: 350px;">
-        <canvas id="chart-historico"></canvas>
-      </div>
-    </div>
-  </section>
-
-  <!-- Seção 3: Governador RJ -->
-  <section class="container">
-    <h2 class="section-title">Governo do Estado — RJ 2026</h2>
-    <div class="grid-2">
-      <!-- Gráfico -->
-      <div class="card">
-        <div class="chart-container">
-          <canvas id="chart-governador"></canvas>
-        </div>
-      </div>
-      <!-- Painel Info -->
-      <div class="card info-card">
-        <div>
-          <div class="info-title">Instituto mais recente</div>
-          <div id="gov-instituto" class="info-value">—</div>
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-          <div>
-            <div class="info-title">Margem de Erro</div>
-            <div id="gov-margem" style="font-size: 20px; font-weight: 700; color: var(--text);">—</div>
+        <!-- Painel Info -->
+        <div class="pe-card pe-info-card">
+          <div class="pe-kpi">
+            <div class="pe-kpi__label">Instituto mais recente</div>
+            <div id="pres-instituto" class="pe-kpi__value">—</div>
           </div>
-          <div>
-            <div class="info-title">Data de Coleta</div>
-            <div id="gov-data" style="font-size: 20px; font-weight: 700; color: var(--text);">—</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="pe-kpi">
+              <div class="pe-kpi__label">Margem de Erro</div>
+              <div id="pres-margem" class="pe-kpi__value" style="font-size: 20px;">—</div>
+            </div>
+            <div class="pe-kpi">
+              <div class="pe-kpi__label">Data de Coleta</div>
+              <div id="pres-data" class="pe-kpi__value" style="font-size: 20px;">—</div>
+            </div>
+          </div>
+          <div id="pres-fonte" class="pe-mono" style="margin-top: 8px;">
+            Fonte: —
           </div>
         </div>
-        <div class="info-desc" id="gov-fonte">
-          Fonte: —
+      </div>
+    </section>
+
+    <!-- Seção 2: Evolução Temporal -->
+    <section id="secao-evolucao" class="pe-section">
+      <h2 class="pe-section__title">Evolução nas Pesquisas</h2>
+      <div class="pe-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <select id="select-candidatos" class="pe-select-candidato">
+            <option value="Lula">Lula</option>
+            <option value="Bolsonaro">Bolsonaro</option>
+            <option value="Tarcísio">Tarcísio</option>
+            <option value="Ciro">Ciro</option>
+            <option value="Simone">Simone</option>
+            <option value="Eduardo Paes">Eduardo Paes</option>
+            <option value="Cláudio Castro">Cláudio Castro</option>
+            <option value="Marcelo Freixo">Marcelo Freixo</option>
+            <option value="Rodrigo Neves">Rodrigo Neves</option>
+          </select>
+          <span class="pe-kpi__label" style="margin-bottom: 20px;">Série histórica desde Jan/2026</span>
+        </div>
+        <div class="pe-chart-container" style="height: 350px;">
+          <canvas id="chart-historico"></canvas>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- Seção 4: Institutos -->
-  <section class="container">
-    <h2 class="section-title">Integridade dos Coletores</h2>
-    <div class="grid-institutos" id="lista-institutos">
-      <!-- Inserido via JS -->
-    </div>
-  </section>
+    <!-- Seção 3: Governador RJ -->
+    <section id="secao-governador" class="pe-section">
+      <h2 class="pe-section__title">Governo do Estado — RJ 2026</h2>
+      <div class="pe-grid-2">
+        <!-- Gráfico -->
+        <div class="pe-card">
+          <div class="pe-chart-container">
+            <canvas id="chart-governador"></canvas>
+          </div>
+        </div>
+        <!-- Painel Info -->
+        <div class="pe-card pe-info-card">
+          <div class="pe-kpi">
+            <div class="pe-kpi__label">Instituto mais recente</div>
+            <div id="gov-instituto" class="pe-kpi__value">—</div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="pe-kpi">
+              <div class="pe-kpi__label">Margem de Erro</div>
+              <div id="gov-margem" class="pe-kpi__value" style="font-size: 20px;">—</div>
+            </div>
+            <div class="pe-kpi">
+              <div class="pe-kpi__label">Data de Coleta</div>
+              <div id="gov-data" class="pe-kpi__value" style="font-size: 20px;">—</div>
+            </div>
+          </div>
+          <div id="gov-fonte" class="pe-mono" style="margin-top: 8px;">
+            Fonte: —
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção 4: Institutos -->
+    <section id="secao-institutos" class="pe-section">
+      <h2 class="pe-section__title">Integridade dos Coletores</h2>
+      <div class="pe-grid-institutos" id="lista-institutos">
+        <!-- Inserido via JS -->
+      </div>
+    </section>
+
+  </main>
 
   <!-- Footer -->
-  <footer class="container">
-    <p>Dados coletados de fontes públicas | Sentinela RJ / Pulso Eleitoral</p>
+  <footer class="pe-footer">
+    <p>Pulso Eleitoral · dados públicos · 2026</p>
     <a href="/admin">Painel Administrativo</a>
   </footer>
 
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/static/js/charts.js"></script>
   <script>
     // Configurações globais do Chart.js
-    Chart.defaults.color = '#64748b';
-    Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
-    Chart.defaults.font.family = 'system-ui, -apple-system, sans-serif';
+    Chart.defaults.color = '#5a7184';
+    Chart.defaults.borderColor = 'rgba(10,34,64,0.06)';
+    Chart.defaults.font.family = "'Inter', sans-serif";
 
     // Estado da aplicação para instâncias dos gráficos
     let chartPres = null;
@@ -382,6 +192,16 @@
       return isoStr;
     }
 
+    // Helper para retornar cor do candidato
+    function getCandidateColor(name) {
+      if (name === 'Lula') return PE_CANDIDATE_COLORS[0];
+      if (name === 'Bolsonaro') return PE_CANDIDATE_COLORS[1];
+      if (name === 'Tarcísio') return PE_CANDIDATE_COLORS[2];
+      if (name === 'Ciro') return PE_CANDIDATE_COLORS[3];
+      if (name === 'Simone') return PE_CANDIDATE_COLORS[4];
+      return '#5a7184'; // fallback
+    }
+
     // Carrega dados da Corrida Presidencial
     async function carregarPresidente() {
       let data = fallbackPres;
@@ -403,8 +223,8 @@
       document.getElementById('pres-data').textContent = formatarData(data.data_coleta);
       document.getElementById('pres-fonte').textContent = `Fonte: ${data.instituto} | ${formatarData(data.data_coleta)}`;
 
-      // Badge de última atualização no Header (se baseia no mais recente do presidente)
-      document.getElementById('badge-update').textContent = `Atualizado em: ${formatarData(data.data_coleta)}`;
+      // Badge de última atualização no Header
+      document.getElementById('badge-update').textContent = `atualizado em: ${formatarData(data.data_coleta)}`;
 
       // Renderiza gráfico
       const ctx = document.getElementById('chart-presidente');
@@ -418,13 +238,10 @@
             data: data.percentuais,
             backgroundColor: function(context) {
               const idx = context.dataIndex;
-              if (idx === 0) return '#06b6d4'; // primeiro (cyan)
-              if (idx === 1) return '#8b5cf6'; // segundo (violet)
-              return '#475569'; // demais (gray)
+              return PE_CANDIDATE_COLORS[idx % PE_CANDIDATE_COLORS.length];
             },
-            borderRadius: 6,
-            borderSkipped: false,
-            barThickness: 24
+            borderRadius: 4,
+            barThickness: 16
           }]
         },
         options: {
@@ -434,14 +251,15 @@
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#1e293b',
-              titleColor: '#e2e8f0',
-              bodyColor: '#e2e8f0',
-              borderColor: 'rgba(255,255,255,0.08)',
-              borderWidth: 1,
+              backgroundColor: '#FFFFFF',
+              titleColor: '#0A2240',
+              bodyColor: '#5a7184',
+              borderColor: 'rgba(10,34,64,0.06)',
+              borderWidth: 0.5,
+              padding: 10,
               callbacks: {
                 label: function(context) {
-                  return ` ${context.parsed.x}% (margem: ±${data.margem_erro}%)`;
+                  return ` ${context.parsed.x.toFixed(1)}% (margem: ±${data.margem_erro}%)`;
                 }
               }
             }
@@ -449,12 +267,12 @@
           scales: {
             x: {
               suggestedMax: 60,
-              grid: { display: false },
-              ticks: { color: '#64748b' }
+              grid: { color: 'rgba(10,34,64,0.06)' },
+              ticks: { color: '#5a7184', font: { size: 11, family: 'JetBrains Mono' } }
             },
             y: {
               grid: { display: false },
-              ticks: { color: '#e2e8f0', font: { weight: 'bold' } }
+              ticks: { color: '#0A2240', font: { weight: 500, family: 'Inter' } }
             }
           }
         }
@@ -494,13 +312,10 @@
             data: data.percentuais,
             backgroundColor: function(context) {
               const idx = context.dataIndex;
-              if (idx === 0) return '#06b6d4'; // primeiro (cyan)
-              if (idx === 1) return '#8b5cf6'; // segundo (violet)
-              return '#475569'; // demais (gray)
+              return PE_CANDIDATE_COLORS[idx % PE_CANDIDATE_COLORS.length];
             },
-            borderRadius: 6,
-            borderSkipped: false,
-            barThickness: 24
+            borderRadius: 4,
+            barThickness: 16
           }]
         },
         options: {
@@ -510,14 +325,15 @@
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#1e293b',
-              titleColor: '#e2e8f0',
-              bodyColor: '#e2e8f0',
-              borderColor: 'rgba(255,255,255,0.08)',
-              borderWidth: 1,
+              backgroundColor: '#FFFFFF',
+              titleColor: '#0A2240',
+              bodyColor: '#5a7184',
+              borderColor: 'rgba(10,34,64,0.06)',
+              borderWidth: 0.5,
+              padding: 10,
               callbacks: {
                 label: function(context) {
-                  return ` ${context.parsed.x}% (margem: ±${data.margem_erro}%)`;
+                  return ` ${context.parsed.x.toFixed(1)}% (margem: ±${data.margem_erro}%)`;
                 }
               }
             }
@@ -525,12 +341,12 @@
           scales: {
             x: {
               suggestedMax: 60,
-              grid: { display: false },
-              ticks: { color: '#64748b' }
+              grid: { color: 'rgba(10,34,64,0.06)' },
+              ticks: { color: '#5a7184', font: { size: 11, family: 'JetBrains Mono' } }
             },
             y: {
               grid: { display: false },
-              ticks: { color: '#e2e8f0', font: { weight: 'bold' } }
+              ticks: { color: '#0A2240', font: { weight: 500, family: 'Inter' } }
             }
           }
         }
@@ -554,6 +370,7 @@
 
       const labels = data.historico.map(h => formatarData(h.data));
       const values = data.historico.map(h => h.percentual);
+      const candColor = getCandidateColor(data.candidato);
 
       const ctx = document.getElementById('chart-historico');
       if (chartHist) chartHist.destroy();
@@ -565,47 +382,36 @@
           datasets: [{
             label: data.candidato,
             data: values,
-            borderColor: '#06b6d4',
-            backgroundColor: 'rgba(6, 182, 212, 0.08)',
-            borderWidth: 3,
-            pointBackgroundColor: '#06b6d4',
-            pointBorderColor: '#0f172a',
-            pointBorderWidth: 2,
-            pointRadius: 6,
-            pointHoverRadius: 8,
+            borderColor: candColor,
+            backgroundColor: candColor + '18',
+            borderWidth: 2,
+            pointBackgroundColor: candColor,
+            pointBorderColor: '#FFFFFF',
+            pointBorderWidth: 1.5,
+            pointRadius: 4,
+            pointHoverRadius: 6,
             tension: 0.2,
             fill: true
           }]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
+          ...PE_CHART_DEFAULTS,
           plugins: {
-            legend: { display: false },
+            ...PE_CHART_DEFAULTS.plugins,
             tooltip: {
-              backgroundColor: '#1e293b',
-              titleColor: '#e2e8f0',
-              bodyColor: '#e2e8f0',
-              borderColor: 'rgba(255,255,255,0.08)',
-              borderWidth: 1,
+              ...PE_CHART_DEFAULTS.plugins.tooltip,
+              backgroundColor: '#FFFFFF',
+              titleColor: '#0A2240',
+              bodyColor: '#5a7184',
+              borderColor: 'rgba(10,34,64,0.06)',
+              borderWidth: 0.5,
+              padding: 10,
               callbacks: {
                 label: function(context) {
                   const item = data.historico[context.dataIndex];
-                  return ` ${context.parsed.y}% (Instituto: ${item.instituto})`;
+                  return ` ${context.parsed.y.toFixed(1)}% (${item.instituto})`;
                 }
               }
-            }
-          },
-          scales: {
-            x: {
-              grid: { color: 'rgba(255,255,255,0.04)' },
-              ticks: { color: '#64748b' }
-            },
-            y: {
-              suggestedMin: 0,
-              suggestedMax: 60,
-              grid: { color: 'rgba(255,255,255,0.04)' },
-              ticks: { color: '#64748b' }
             }
           }
         }
@@ -642,7 +448,7 @@
       const hoje = new Date();
 
       insts.forEach(inst => {
-        let badgeClass = 'badge--red';
+        let badgeClass = 'pe-badge--inst';
         let badgeText = 'Sem coletas';
 
         if (inst.ultima_coleta) {
@@ -651,29 +457,29 @@
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
           if (diffDays < 7) {
-            badgeClass = 'badge--green';
+            badgeClass = 'pe-badge--new';
             badgeText = 'Atualizado';
           } else if (diffDays < 30) {
-            badgeClass = 'badge--amber';
+            badgeClass = 'pe-badge--inst';
             badgeText = 'Atenção';
           } else {
-            badgeClass = 'badge--red';
+            badgeClass = 'pe-badge--inst';
             badgeText = 'Defasado';
           }
         }
 
         const card = document.createElement('div');
-        card.className = 'card inst-card';
+        card.className = 'pe-card pe-inst-card';
         card.innerHTML = `
-          <div class="inst-header">
-            <span class="inst-name">${inst.nome}</span>
-            <span class="badge ${badgeClass}">${badgeText}</span>
+          <div class="pe-inst-header">
+            <span class="pe-heading" style="font-weight: 500; color: var(--pe-navy);">${inst.nome}</span>
+            <span class="pe-badge ${badgeClass}">${badgeText}</span>
           </div>
-          <div>
-            <div class="inst-stats">${inst.total}</div>
-            <div class="info-title" style="margin-top: 4px;">Pesquisas registradas</div>
+          <div class="pe-kpi">
+            <div class="pe-kpi__value">${inst.total}</div>
+            <div class="pe-kpi__label" style="margin-top: 4px;">Pesquisas registradas</div>
           </div>
-          <div class="info-desc" style="font-size: 11px;">
+          <div class="pe-mono">
             Última coleta: ${inst.ultima_coleta ? formatarData(inst.ultima_coleta) : '—'}
           </div>
         `;

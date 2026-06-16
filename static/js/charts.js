@@ -220,8 +220,18 @@ async function peFetch(url, params = {}) {
   }
 }
 
+const PE_CANDIDATE_COLORS = [
+  '#0A2240',  // cand-1
+  '#C0392B',  // cand-2
+  '#5a7184',  // cand-3
+  '#B4B2A9',  // cand-4
+  '#1D9E75',  // cand-5
+];
+
 /* ── Export ──────────────────────────────────────────────── */
 window.PE = PE;
+window.PE_CANDIDATE_COLORS = PE_CANDIDATE_COLORS;
+window.PE_CHART_DEFAULTS = PE_CHART_DEFAULTS;
 window.peCandidateDataset  = peCandidateDataset;
 window.peCreateLineChart   = peCreateLineChart;
 window.peEventAnnotation   = peEventAnnotation;
