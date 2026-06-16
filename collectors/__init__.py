@@ -7,6 +7,7 @@ from .genial_quaest import GenialQuaestCollector
 from .atlas import AtlasCollector
 from .paraná_pesquisas import ParanaPesquisasCollector
 from .real_time import RealTimeCollector
+from .poder360 import Poder360Collector
 
 # Lista com todas as classes de coletores concretos para fácil iteração
 ALL_COLLECTORS = [
@@ -16,5 +17,6 @@ ALL_COLLECTORS = [
     GenialQuaestCollector,
     AtlasCollector,
     ParanaPesquisasCollector,
-    RealTimeCollector
+    RealTimeCollector,
+    Poder360Collector
 ]

@@ -17,6 +17,18 @@ if not logger.handlers:
 class BaseCollector(ABC):
     def __init__(self, db_path: str):
         self.db_path = db_path
+        self.logger = logger
+
+    def _get_page_requests(self, url: str) -> str:
+        """Faz requisição utilizando requests com headers do coletor."""
+        headers = getattr(self, "HEADERS", {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "pt-BR,pt;q=0.9",
+            "Referer": "https://www.google.com.br/"
+        })
+        from .utils import fetch_with_retry
+        return fetch_with_retry(url, headers=headers)
 
     @property
     @abstractmethod
@@ -152,3 +164,64 @@ class BaseCollector(ABC):
             logger.error("[COLLECTOR] Erro ao salvar pesquisas no banco: %s", str(e))
         finally:
             conn.close()
+
+    def _parse_com_gemini(self, html: str, url: str,
+                           instituto_id: int) -> list[dict]:
+        """
+        Extrai texto limpo do HTML e usa Gemini para estruturar os dados.
+        Retorna lista de dicts no formato padrão do save().
+        """
+        from collectors.gemini_extractor import extrair_com_gemini
+        from bs4 import BeautifulSoup
+        from datetime import date
+        
+        # Extrai texto limpo
+        soup = BeautifulSoup(html, 'lxml')
+        # Remove scripts, styles, nav, footer
+        for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
+            tag.decompose()
+        texto = soup.get_text(separator=' ', strip=True)
+        
+        if len(texto) < 50:
+            self.logger.warning(f"Texto muito curto em {url}: {len(texto)} chars")
+            return []
+        
+        resultado = extrair_com_gemini(texto, fonte_url=url)
+        candidatos = resultado.get("candidatos", [])
+        
+        if not candidatos:
+            return []
+        
+        hoje = date.today().isoformat()
+        
+        # Determina o instituto_id (com detecção para Poder360)
+        inst_id = instituto_id
+        if inst_id == 0:
+            inst_name = resultado.get("instituto") or ""
+            mapping = {
+                "datafolha": 1, "ibope": 2, "ipec": 2, "quaest": 3, "genial": 4,
+                "atlas": 5, "paraná": 6, "parana": 6, "real time": 7, "realtime": 7
+            }
+            inst_id = 1
+            for chave, idx in mapping.items():
+                if chave in inst_name.lower() or chave in texto.lower():
+                    inst_id = idx
+                    break
+                    
+        return [
+            {
+                "instituto_id": inst_id,
+                "cargo": resultado.get("cargo", "presidente"),
+                "candidato": c["nome"],
+                "percentual": float(c["percentual"]),
+                "data_coleta": hoje,
+                "data_divulgacao": resultado.get("data"),
+                "tamanho_amostra": resultado.get("tamanho_amostra"),
+                "margem_erro": resultado.get("margem_erro"),
+                "fonte_url": url,
+                "metodologia": "Espontânea"
+            }
+            for c in candidatos
+            if c.get("nome") and c.get("percentual") is not None
+        ]
+
