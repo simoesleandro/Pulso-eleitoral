@@ -69,23 +69,42 @@ def extrair_com_gemini(texto: str, fonte_url: str = "") -> dict:
         
         prompt = PROMPT_EXTRACAO.replace("{texto}", texto_truncado)
         
-        max_retries = 3
-        for tentativa in range(max_retries):
-            try:
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=prompt
-                )
-                raw = response.text.strip()
-                break  # sucesso, sai do loop
-            except Exception as e:
-                if '503' in str(e) and tentativa < max_retries - 1:
-                    wait = 5 * (tentativa + 1)  # 5s, 10s, 15s
-                    logger.warning(f"Gemini 503, tentativa {tentativa+1}/{max_retries}, aguardando {wait}s")
-                    time.sleep(wait)
-                else:
-                    logger.error(f"Gemini erro: {e}")
-                    return {"candidatos": []}
+        MODELOS = [
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash"
+        ]
+        
+        raw = None
+        modelo_usado = None
+        
+        for modelo in MODELOS:
+            max_retries = 2
+            sucesso_modelo = False
+            for tentativa in range(max_retries):
+                try:
+                    response = client.models.generate_content(
+                        model=modelo,
+                        contents=prompt
+                    )
+                    raw = response.text.strip()
+                    modelo_usado = modelo
+                    sucesso_modelo = True
+                    break  # sucesso, sai do loop do modelo
+                except Exception as e:
+                    if '503' in str(e) and tentativa < max_retries - 1:
+                        wait = 5 * (tentativa + 1)
+                        logger.warning(f"Gemini 503 para {modelo}, tentativa {tentativa+1}/{max_retries}, aguardando {wait}s")
+                        time.sleep(wait)
+                    else:
+                        logger.warning(f"Falha no modelo {modelo} na tentativa {tentativa+1}/{max_retries}: {e}")
+                        break  # passa para o próximo modelo
+            if sucesso_modelo:
+                break
+                
+        if raw is None:
+            logger.error("Todos os modelos em cascata falharam.")
+            return {"candidatos": []}
         
         start_idx = raw.find("{")
         end_idx = raw.rfind("}")
@@ -111,7 +130,7 @@ def extrair_com_gemini(texto: str, fonte_url: str = "") -> dict:
         resultado["candidatos"] = candidatos
         
         n = len(resultado.get("candidatos", []))
-        logger.info(f"Gemini extraiu {n} candidatos de {fonte_url}")
+        logger.info(f"Gemini extraiu {n} candidatos usando {modelo_usado}")
         return resultado
         
     except json.JSONDecodeError as e:
