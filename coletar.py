@@ -38,6 +38,12 @@ def main():
     from collectors.atlas import AtlasCollector
     from collectors.poder360 import Poder360Collector
     from database import salvar_log_scheduler
+    from notifier import send_telegram, montar_mensagem_coleta
+    
+    # Antes da coleta
+    with database.get_db() as conn:
+        p_antes = conn.execute("SELECT COUNT(*) FROM pesquisas").fetchone()[0]
+        i_antes = conn.execute("SELECT COUNT(*) FROM intencoes").fetchone()[0]
     
     coletores = [
         QuaestCollector(db_path=DB_PATH),
@@ -62,6 +68,20 @@ def main():
             })
     
     salvar_log_scheduler(resultados)
+    
+    # Depois da coleta
+    with database.get_db() as conn:
+        p_depois = conn.execute("SELECT COUNT(*) FROM pesquisas").fetchone()[0]
+        i_depois = conn.execute("SELECT COUNT(*) FROM intencoes").fetchone()[0]
+
+    pesquisas_novas = p_depois - p_antes
+    intencoes_novas = i_depois - i_antes
+
+    # Envia notificação
+    mensagem = montar_mensagem_coleta(resultados, pesquisas_novas, intencoes_novas)
+    send_telegram(mensagem)
+    logger.info(f"Notificação enviada: {pesquisas_novas} pesquisas novas, {intencoes_novas} intenções novas")
+    
     logger.info(f"=== Coleta finalizada: {len(resultados)} coletores ===")
 
 if __name__ == "__main__":
