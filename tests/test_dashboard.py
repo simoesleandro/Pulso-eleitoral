@@ -179,6 +179,27 @@ def test_api_comparativo(client):
     # Seed tem Lula como candidato; deve retornar lista (pode ser vazia se seed não tiver dados)
     assert isinstance(data['institutos'], list)
 
+def test_api_media_agregada(client):
+    """Testa GET /api/media-agregada?cargo=presidente retorna candidatos."""
+    setup_db_with_seed()
+    response = client.get('/api/media-agregada?cargo=presidente')
+    assert response.status_code == 200
+    data = response.json
+    assert 'candidatos' in data
+    assert isinstance(data['candidatos'], list)
+    assert len(data['candidatos']) > 0
+    assert 'cargo' in data
+    assert data['cargo'] == 'presidente'
+    assert 'total_pesquisas' in data
+    assert 'institutos_incluidos' in data
+    assert 'atualizado_em' in data
+    primeiro = data['candidatos'][0]
+    assert 'candidato' in primeiro
+    assert 'media' in primeiro
+    assert 'min' in primeiro
+    assert 'max' in primeiro
+    assert 'pesquisas_count' in primeiro
+
 from unittest.mock import patch, MagicMock
 
 def test_api_visao_geral(client):

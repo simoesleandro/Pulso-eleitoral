@@ -200,6 +200,75 @@ _FALLBACK_COLORS = ['#0A2240', '#C0392B', '#5a7184', '#B4B2A9', '#1D9E75']
 
 _EXCLUIR_CATEGORIAS = ['outros', 'nulos', 'brancos', 'indecisos', 'não sabe', 'nao sabe', 'não respondeu', 'nao respondeu']
 
+from datetime import date, timedelta
+from statistics import mean
+
+
+def get_media_agregada(cargo: str, dias: int = 30) -> dict:
+    """Retorna média agregada dos percentuais dos últimos `dias` dias por candidato."""
+    data_limite = (date.today() - timedelta(days=dias)).isoformat()
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT i.candidato, i.percentual, p.data_pesquisa, inst.nome AS instituto
+            FROM intencoes i
+            JOIN pesquisas p ON i.pesquisa_id = p.id
+            JOIN institutos inst ON p.instituto_id = inst.id
+            WHERE p.cargo = ? AND p.data_pesquisa >= ?
+            AND LOWER(i.candidato) NOT LIKE '%outros%'
+            AND LOWER(i.candidato) NOT LIKE '%nulos%'
+            AND LOWER(i.candidato) NOT LIKE '%brancos%'
+            AND LOWER(i.candidato) NOT LIKE '%indecisos%'
+            AND LOWER(i.candidato) NOT LIKE '%não sabe%'
+            AND LOWER(i.candidato) NOT LIKE '%não respondeu%'
+            ORDER BY i.candidato, p.data_pesquisa
+        """, (cargo, data_limite)).fetchall()
+
+    # Agrupa por candidato
+    por_candidato: dict[str, list] = {}
+    for r in rows:
+        por_candidato.setdefault(r['candidato'], []).append(r)
+
+    data_meio = (date.today() - timedelta(days=dias // 2)).isoformat()
+
+    candidatos_resultado = []
+    institutos_set: set[str] = set()
+    total_pesquisas = 0
+
+    for candidato, entradas in por_candidato.items():
+        if len(entradas) < 2:
+            continue
+        percentuais = [e['percentual'] for e in entradas]
+        for e in entradas:
+            institutos_set.add(e['instituto'])
+
+        recentes = [e['percentual'] for e in entradas if e['data_pesquisa'] >= data_meio]
+        anteriores = [e['percentual'] for e in entradas if e['data_pesquisa'] < data_meio]
+        if recentes and anteriores:
+            variacao = round(mean(recentes) - mean(anteriores), 1)
+        else:
+            variacao = None
+
+        candidatos_resultado.append({
+            "candidato": candidato,
+            "media": round(mean(percentuais), 1),
+            "min": round(min(percentuais), 1),
+            "max": round(max(percentuais), 1),
+            "variacao_30d": variacao,
+            "pesquisas_count": len(percentuais),
+        })
+        total_pesquisas += len(percentuais)
+
+    candidatos_resultado.sort(key=lambda x: x['media'], reverse=True)
+
+    return {
+        "cargo": cargo,
+        "periodo": f"últimos {dias} dias",
+        "total_pesquisas": total_pesquisas,
+        "institutos_incluidos": sorted(institutos_set),
+        "candidatos": candidatos_resultado,
+        "atualizado_em": date.today().strftime("%d/%m/%Y"),
+    }
+
 
 def _e_candidato(nome: str) -> bool:
     nome_lower = nome.lower()

@@ -82,7 +82,8 @@ def require_login():
         'api_pesquisas_presidente', 'api_pesquisas_historico', 
         'api_pesquisas_governador_rj', 'api_institutos',
         'api_visao_geral', 'api_visao_geral_analise', 'api_comparativo',
-        'api_pesquisas_historico_multi'
+        'api_pesquisas_historico_multi',
+        'api_media_agregada'
     ]
     if request.endpoint in allowed_endpoints:
         return
@@ -518,6 +519,14 @@ def api_pesquisas_historico_multi():
         candidatos = get_top_candidatos(cargo, n=3)
     series = get_historico_multi(candidatos, cargo)
     return jsonify({"cargo": cargo, "series": series})
+
+@app.route('/api/media-agregada')
+def api_media_agregada():
+    """Retorna média agregada dos últimos 30 dias por candidato para um cargo."""
+    from database import get_media_agregada
+    cargo = request.args.get('cargo', 'presidente')
+    dias = int(request.args.get('dias', 30))
+    return jsonify(get_media_agregada(cargo, dias))
 
 @app.route('/api/pesquisas/historico')
 def api_pesquisas_historico():

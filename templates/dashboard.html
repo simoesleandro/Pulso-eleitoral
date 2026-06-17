@@ -25,6 +25,7 @@
     </a>
     <div class="pe-topbar__nav">
       <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="#">Visão Geral</a>
+      <a class="pe-topbar__nav-item" href="#secao-media">Média</a>
       <a class="pe-topbar__nav-item" href="#secao-presidente">Presidente</a>
       <a class="pe-topbar__nav-item" href="#secao-evolucao">Evolução</a>
       <a class="pe-topbar__nav-item" href="#secao-comparativo">Comparativo</a>
@@ -59,7 +60,22 @@
       </div>
     </section>
     
-    <!-- Seção 1: Presidente -->
+    <!-- Seção 1: Média Agregada -->
+    <section id="secao-media" class="pe-section">
+      <h2 class="pe-section__title">Média Agregada — Últimos 30 dias</h2>
+      <div class="pe-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; gap:12px;">
+            <span class="pe-badge pe-badge--inst" id="media-institutos">carregando...</span>
+            <span class="pe-badge pe-badge--inst" id="media-pesquisas">— pesquisas</span>
+          </div>
+          <span class="pe-mono" id="media-atualizado" style="color:var(--pe-text-muted);">—</span>
+        </div>
+        <div id="media-container"></div>
+      </div>
+    </section>
+
+    <!-- Seção 2: Presidente -->
     <section id="secao-presidente" class="pe-section">
       <h2 class="pe-section__title">Corrida Presidencial 2026</h2>
       <div class="pe-grid-2">
@@ -748,11 +764,51 @@
       select.addEventListener('change', e => carregarComparativo(e.target.value));
     }
 
+    async function carregarMediaAgregada() {
+      const res = await fetch('/api/media-agregada?cargo=presidente');
+      const data = await res.json();
+
+      document.getElementById('media-institutos').textContent =
+        data.institutos_incluidos.length ? data.institutos_incluidos.join(' + ') : '—';
+      document.getElementById('media-pesquisas').textContent =
+        `${data.total_pesquisas} pesquisas`;
+      document.getElementById('media-atualizado').textContent =
+        `atualizado em: ${data.atualizado_em}`;
+
+      const container = document.getElementById('media-container');
+      if (!data.candidatos || data.candidatos.length === 0) {
+        container.innerHTML = '<p style="color:var(--pe-text-muted); font-size:13px;">Sem dados nos últimos 30 dias.</p>';
+        return;
+      }
+
+      container.innerHTML = data.candidatos.map((c, idx) => {
+        const cor = PE_CANDIDATE_COLORS[idx % PE_CANDIDATE_COLORS.length];
+        const variacaoStr = c.variacao_30d !== null && c.variacao_30d !== undefined
+          ? (c.variacao_30d > 0 ? `+${c.variacao_30d.toFixed(1)}pp` : `${c.variacao_30d.toFixed(1)}pp`)
+          : '—';
+        const variacaoCls = c.variacao_30d > 0 ? 'color:var(--pe-up)'
+                          : c.variacao_30d < 0 ? 'color:var(--pe-down)'
+                          : 'color:var(--pe-text-muted)';
+        return `
+          <div class="pe-poll__row" style="padding: 10px 0;">
+            <span class="pe-poll__name" style="width:160px; font-weight:500;">${c.candidato}</span>
+            <div class="pe-poll__bar-wrap">
+              <div class="pe-poll__bar" style="width:${c.media}%; background:${cor};"></div>
+            </div>
+            <span class="pe-poll__pct" style="width:50px; font-size:15px; font-weight:500;">${c.media.toFixed(1)}%</span>
+            <span style="width:70px; font-size:12px; font-family:'JetBrains Mono',monospace; ${variacaoCls};">${variacaoStr}</span>
+            <span style="width:80px; font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">${c.min.toFixed(1)}–${c.max.toFixed(1)}%</span>
+            <span class="pe-badge pe-badge--inst" style="font-size:10px;">${c.pesquisas_count} pesq.</span>
+          </div>`;
+      }).join('');
+    }
+
     // Inicialização da página
     async function inicializar() {
       // Carrega informações globais em paralelo
       await Promise.all([
         carregarVisaoGeral(),
+        carregarMediaAgregada(),
         carregarPresidente(),
         carregarGovernador(),
         carregarInstitutos(),
