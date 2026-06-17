@@ -21,9 +21,17 @@ REGRAS CRÍTICAS:
 - IGNORE percentuais de 2º turno (geralmente acima de 50% em confronto direto)
 - IGNORE pesquisas estaduais/regionais — apenas âmbito nacional
 - IGNORE aprovação/rejeição de governo
+- Extraia SOMENTE o cenário de 1º turno ESPONTÂNEO (sem lista de nomes)
+- Se o release apresentar múltiplos cenários, escolha APENAS o cenário
+  principal de 1º turno com mais candidatos
 - Se o release misturar 1º e 2º turno, extraia APENAS o cenário de 1º turno
+- IGNORE: cenários de 2º turno, cenários hipotéticos com candidatos
+  que ainda não declararam candidatura (Michelle Bolsonaro, Aécio Neves, etc.)
 - Percentuais válidos para presidente: entre 1% e 60% por candidato
-- Se a soma dos percentuais for maior que 120%, provavelmente são cenários de 2º turno — retorne []
+- A soma dos percentuais dos candidatos deve ser <= 100%
+- Se a soma ultrapassar 100%, os percentuais provavelmente são de
+  cenários diferentes — retorne {"candidatos": []}
+- Se a soma for maior que 120%, provavelmente são cenários de 2º turno — retorne []
 - Cargo deve ser "presidente", "governador_rj", "governador_sp" etc
 - Se o texto for sobre aprovação/rejeição de governo sem intenção de voto, retorne lista vazia
 - IGNORE pesquisas estaduais — só extraia se for âmbito NACIONAL (Brasil inteiro)
@@ -92,11 +100,17 @@ MAPA_NOMES = {
     'claudio castro': 'Cláudio Castro',
     'marcelo freixo': 'Marcelo Freixo',
     'rodrigo neves': 'Rodrigo Neves',
+    # Candidatos hipotéticos / não declarados — descartar
+    'michelle bolsonaro': None,
+    'michelle': None,
+    'aécio neves': None,
+    'aecio neves': None,
+    'aldo rebelo': None,
 }
 
 
-def normalizar_nome(nome: str) -> str:
-    """Normaliza nome do candidato para forma canônica."""
+def normalizar_nome(nome: str) -> str | None:
+    """Normaliza nome do candidato para forma canônica. Retorna None para descartar."""
     chave = nome.lower().strip()
     return MAPA_NOMES.get(chave, nome)
 
@@ -171,6 +185,9 @@ def extrair_com_gemini(texto: str, fonte_url: str = "") -> dict:
 
         # Remove percentuais acima de 60% (são 2º turno ou aprovação)
         candidatos = [c for c in candidatos if c.get("percentual", 0) <= 60]
+
+        # Descarta candidatos com nome mapeado para None (hipotéticos / não declarados)
+        candidatos = [c for c in candidatos if normalizar_nome(c["nome"]) is not None]
 
         # Normaliza nomes para forma canônica
         for c in candidatos:
