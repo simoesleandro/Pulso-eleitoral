@@ -78,8 +78,8 @@ def main():
         p_depois = conn.execute("SELECT COUNT(*) FROM pesquisas").fetchone()[0]
         i_depois = conn.execute("SELECT COUNT(*) FROM intencoes").fetchone()[0]
 
-    pesquisas_novas = p_depois - p_antes
-    intencoes_novas = i_depois - i_antes
+    pesquisas_novas = max(0, p_depois - p_antes)
+    intencoes_novas = max(0, i_depois - i_antes)
 
     # Envia notificação
     mensagem = montar_mensagem_coleta(resultados, pesquisas_novas, intencoes_novas)
