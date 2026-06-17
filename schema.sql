@@ -83,3 +83,14 @@ CREATE INDEX IF NOT EXISTS idx_intencoes_candidato ON intencoes(candidato);
 CREATE INDEX IF NOT EXISTS idx_pesquisas_cargo ON pesquisas(cargo);
 CREATE INDEX IF NOT EXISTS idx_pesquisas_data_pesquisa ON pesquisas(data_pesquisa);
 CREATE INDEX IF NOT EXISTS idx_alertas_cargo ON alertas(cargo);
+
+-- 8. Tabela de usuários para controle de acesso
+CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    nome TEXT,
+    ativo INTEGER DEFAULT 1,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ultimo_login TIMESTAMP
+);

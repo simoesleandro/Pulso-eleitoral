@@ -16,8 +16,6 @@ app = Flask(__name__)
 
 # Configurações do Flask
 app.secret_key = os.getenv('SECRET_KEY', 'default-session-secret-key-9999')
-ADMIN_USER = os.getenv('ADMIN_USER', 'admin')
-ADMIN_PASS = os.getenv('ADMIN_PASS', 'admin123')
 
 # Inicializa o banco de dados
 init_db()
@@ -107,8 +105,12 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        if username == ADMIN_USER and password == ADMIN_PASS:
+        from database import verificar_usuario
+        user = verificar_usuario(username, password)
+        if user:
             session['logged_in'] = True
+            session['username'] = user['username']
+            session['nome'] = user['nome']
             return redirect(url_for('index'))
         else:
             error = "Usuário ou senha incorretos."
@@ -261,6 +263,90 @@ def admin_logs():
         app.logger.error(f"Erro ao obter logs de execução: {e}")
         
     return jsonify({"logs": logs})
+
+@app.route('/admin/usuarios')
+@login_required
+def admin_usuarios():
+    """Lista todos os usuários e renderiza a tela de gestão."""
+    from database import listar_usuarios
+    usuarios = listar_usuarios()
+    return render_template('admin_usuarios.html', usuarios=usuarios)
+
+@app.route('/admin/usuarios/criar', methods=['POST'])
+@login_required
+def admin_criar_usuario():
+    """Cria um novo usuário."""
+    username = request.form.get('username')
+    password = request.form.get('password')
+    nome = request.form.get('nome')
+    
+    from flask import flash
+    if not username or not password:
+        flash("Usuário e senha são obrigatórios.", "danger")
+        return redirect(url_for('admin_usuarios'))
+        
+    from database import criar_usuario
+    sucesso = criar_usuario(username, password, nome)
+    if sucesso:
+        flash("Usuário criado com sucesso!", "success")
+    else:
+        flash("Nome de usuário já existe.", "danger")
+        
+    return redirect(url_for('admin_usuarios'))
+
+@app.route('/admin/usuarios/<int:user_id>/remover', methods=['POST'])
+@login_required
+def admin_remover_usuario(user_id):
+    """Remove um usuário do banco."""
+    from database import listar_usuarios
+    from flask import flash
+    
+    usuarios = listar_usuarios()
+    target_username = None
+    for u in usuarios:
+        if u['id'] == user_id:
+            target_username = u['username']
+            break
+            
+    if target_username == session.get('username'):
+        flash("Você não pode excluir a sua própria conta.", "danger")
+        return redirect(url_for('admin_usuarios'))
+        
+    from database import remover_usuario
+    sucesso = remover_usuario(user_id)
+    if sucesso:
+        flash("Usuário removido com sucesso!", "success")
+    else:
+        flash("Erro ao remover usuário.", "danger")
+        
+    return redirect(url_for('admin_usuarios'))
+
+@app.route('/admin/usuarios/<int:user_id>/toggle', methods=['POST'])
+@login_required
+def admin_toggle_usuario(user_id):
+    """Ativa/desativa um usuário."""
+    from database import listar_usuarios
+    from flask import flash
+    
+    usuarios = listar_usuarios()
+    target_username = None
+    for u in usuarios:
+        if u['id'] == user_id:
+            target_username = u['username']
+            break
+            
+    if target_username == session.get('username'):
+        flash("Você não pode desativar a sua própria conta.", "danger")
+        return redirect(url_for('admin_usuarios'))
+        
+    from database import toggle_usuario
+    sucesso = toggle_usuario(user_id)
+    if sucesso:
+        flash("Status do usuário alterado com sucesso!", "success")
+    else:
+        flash("Erro ao alterar status do usuário.", "danger")
+        
+    return redirect(url_for('admin_usuarios'))
 
 @app.route('/api/visao-geral')
 def api_visao_geral():

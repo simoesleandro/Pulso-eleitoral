@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usuários — Pulso Eleitoral</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <style>
+    .pe-alert {
+      padding: var(--pe-space-3) var(--pe-space-4);
+      border-radius: var(--pe-radius-md, 4px);
+      margin-bottom: var(--pe-space-4);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .pe-alert--danger {
+      background: #FDF2F2;
+      color: var(--pe-down);
+      border: 1.5px solid #FBD5D5;
+    }
+    .pe-alert--success {
+      background: #F3FAF7;
+      color: var(--pe-up);
+      border: 1.5px solid #DEF7EC;
+    }
+    .form-group {
+      margin-bottom: var(--pe-space-3);
+    }
+    .form-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--pe-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--pe-space-1);
+    }
+    .form-input {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      border: 1.5px solid var(--pe-surface);
+      border-radius: 4px;
+      background: var(--pe-surface-2);
+      color: var(--pe-text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-input:focus {
+      border-color: var(--pe-navy);
+    }
+  </style>
+</head>
+<body class="pe-page">
+
+  <!-- Topbar -->
+  <nav class="pe-topbar">
+    <a class="pe-topbar__logo" href="/">
+      <div class="pe-topbar__logomark">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="2.5" fill="#fff"/>
+          <path d="M7 1.5 Q11 4 11 7 Q11 10 7 12.5" stroke="rgba(255,255,255,0.85)" stroke-width="1.2" fill="none"/>
+          <path d="M7 1.5 Q3 4 3 7 Q3 10 7 12.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" fill="none"/>
+        </svg>
+      </div>
+      <span class="pe-topbar__name">Pulso Eleitoral — Admin</span>
+    </a>
+
+    <div class="pe-topbar__nav">
+      <a class="pe-topbar__nav-item" href="/">Dashboard</a>
+      <a class="pe-topbar__nav-item" href="/admin">Painel Admin</a>
+      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="/admin/usuarios">Usuários</a>
+      <a class="pe-topbar__nav-item" href="/admin/status-coletores">Diagnóstico JSON</a>
+      <a class="pe-topbar__nav-item" href="/admin/logs">Logs JSON</a>
+      <a class="pe-topbar__nav-item" href="/logout">Sair</a>
+    </div>
+  </nav>
+
+  <!-- Conteúdo Principal -->
+  <main class="pe-main pe-container">
+    <div style="margin-bottom: var(--pe-space-6);">
+      <h1 class="pe-display">Gerenciamento de Usuários</h1>
+      <p class="pe-mono" style="margin-top: var(--pe-space-1);">Controle de acesso ao painel de administração</p>
+    </div>
+
+    <!-- Flash Messages / Feedbacks -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="pe-alert pe-alert--{% if category == 'danger' %}danger{% else %}success{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    <div id="js-alert" class="pe-alert pe-alert--danger" style="display: none;"></div>
+
+    <div class="pe-grid-2">
+      <!-- Tabela de Usuários -->
+      <div class="pe-card">
+        <div class="pe-card__title" style="margin-bottom: var(--pe-space-4);">Usuários Cadastrados</div>
+        <div style="overflow-x: auto;">
+          <table class="pe-table">
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>Nome</th>
+                <th>Status</th>
+                <th>Último Login</th>
+                <th style="text-align: right;">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for user in usuarios %}
+              <tr>
+                <td>
+                  <span class="pe-mono" style="font-weight: 500;">{{ user.username }}</span>
+                </td>
+                <td>{{ user.nome or '—' }}</td>
+                <td>
+                  {% if user.ativo == 1 %}
+                    <span class="pe-badge pe-badge--new">Ativo</span>
+                  {% else %}
+                    <span class="pe-badge" style="background: var(--pe-surface); color: var(--pe-text-muted);">Inativo</span>
+                  {% endif %}
+                </td>
+                <td class="pe-mono" style="font-size: 11px;">
+                  {{ user.ultimo_login or 'Nunca' }}
+                </td>
+                <td style="text-align: right;">
+                  <div style="display: inline-flex; gap: 8px; justify-content: flex-end; align-items: center;">
+                    <!-- Botão Toggle Status -->
+                    <form action="/admin/usuarios/{{ user.id }}/toggle" method="POST" style="margin: 0;"
+                          onsubmit="return confirm('Deseja realmente alterar o status de ativação do usuário \'{{ user.username }}\'?');">
+                      <button type="submit" class="pe-btn pe-btn--secondary" style="padding: 4px 8px; font-size: 11px;">
+                        {% if user.ativo == 1 %}Desativar{% else %}Ativar{% endif %}
+                      </button>
+                    </form>
+                    
+                    <!-- Botão Excluir -->
+                    <form action="/admin/usuarios/{{ user.id }}/remover" method="POST" style="margin: 0;"
+                          onsubmit="return confirm('Tem certeza que deseja excluir o usuário \'{{ user.username }}\'? Esta ação é irreversível.');">
+                      <button type="submit" class="pe-btn pe-btn--danger" style="padding: 4px 8px; font-size: 11px;">
+                        Excluir
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5" style="text-align: center; padding: 24px;" class="pe-mono">Nenhum usuário cadastrado.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Formulário de Criação -->
+      <div class="pe-card" style="height: fit-content;">
+        <div class="pe-card__title" style="margin-bottom: var(--pe-space-4);">Novo Usuário</div>
+        <form id="criar-usuario-form" action="/admin/usuarios/criar" method="POST">
+          <div class="form-group">
+            <label class="form-label" for="username">Usuário (Username)</label>
+            <input class="form-input" type="text" id="username" name="username" required
+                   placeholder="Ex: joao_silva" pattern="[a-zA-Z0-9_]+" title="Apenas letras, números e underline.">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="nome">Nome Completo</label>
+            <input class="form-input" type="text" id="nome" name="nome" placeholder="Ex: João Silva">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="password">Senha</label>
+            <input class="form-input" type="password" id="password" name="password" required placeholder="Digite a senha">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="confirm_password">Confirmar Senha</label>
+            <input class="form-input" type="password" id="confirm_password" name="confirm_password" required placeholder="Repita a senha">
+          </div>
+          <button type="submit" class="pe-btn pe-btn--primary" style="width: 100%; margin-top: var(--pe-space-2);">
+            Cadastrar Usuário
+          </button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    document.getElementById('criar-usuario-form').addEventListener('submit', function(e) {
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirm_password').value;
+      const jsAlert = document.getElementById('js-alert');
+
+      if (password !== confirmPassword) {
+        e.preventDefault();
+        jsAlert.textContent = "As senhas não coincidem. Por favor, verifique.";
+        jsAlert.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        jsAlert.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>

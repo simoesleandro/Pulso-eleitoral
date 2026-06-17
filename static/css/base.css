@@ -260,3 +260,64 @@ body {
   color: var(--pe-text-muted);
   font-family: 'JetBrains Mono', monospace;
 }
+
+/* Botões */
+.pe-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: 'Inter', sans-serif;
+  text-decoration: none;
+}
+.pe-btn--primary {
+  background: var(--pe-navy);
+  color: #fff;
+}
+.pe-btn--primary:hover {
+  background: var(--pe-navy-light);
+}
+.pe-btn--danger {
+  background: var(--pe-red);
+  color: #fff;
+}
+.pe-btn--danger:hover {
+  background: var(--pe-red-light);
+}
+.pe-btn--secondary {
+  background: var(--pe-surface);
+  color: var(--pe-navy);
+  border: 1px solid var(--pe-surface);
+}
+.pe-btn--secondary:hover {
+  background: var(--pe-surface-2);
+}
+
+/* Tabelas */
+.pe-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  text-align: left;
+}
+.pe-table th, .pe-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--pe-surface);
+  vertical-align: middle;
+}
+.pe-table th {
+  font-weight: 500;
+  color: var(--pe-text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.pe-table tbody tr:hover {
+  background: var(--pe-bg);
+}
