@@ -1,11 +1,11 @@
 .env
 __pycache__/
 *.pyc
-*.db
+data/*.db
 *.sqlite
 .venv/
 venv/
 .cursor/
 logs/
 *.log
-PulsoEleitoral.exe
+*.exe

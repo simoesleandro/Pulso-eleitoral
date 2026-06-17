@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+.git
+.gitignore
+*.db
+data/
+logs/
+*.exe
+PulsoEleitoral.xml
+start.bat
+start_coleta.bat
+tests/
+.pytest_cache/

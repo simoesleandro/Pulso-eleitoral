@@ -67,9 +67,7 @@ scheduler.add_job(
     replace_existing=True
 )
 
-# Só inicia o scheduler se não estiver em ambiente de testes e não estiver rodando
-# (Usamos os.environ['TESTING'] além de app.testing para evitar inicialização em pytest-import-time)
-if not app.testing and os.getenv('TESTING') != 'True' and not scheduler.running:
+if not app.testing and os.getenv('TESTING') != 'True' and not os.getenv('FLY_APP_NAME') and not scheduler.running:
     scheduler.start()
 
 # Registra o shutdown limpo do scheduler no atexit
@@ -375,6 +373,15 @@ def api_status():
     })
 
 if __name__ == '__main__':
-    # Roda o servidor de produção com Waitress
+    port = int(os.getenv("PORT", 5080))
+    
+    # Inicia scheduler só se não for produção
+    if not os.getenv("FLY_APP_NAME"):
+        if not scheduler.running:
+            scheduler.start()
+    
+    init_db()
+    
     from waitress import serve
-    serve(app, host='0.0.0.0', port=5080)
+    print(f"[Pulso Eleitoral] Iniciando na porta {port}")
+    serve(app, host="0.0.0.0", port=port)

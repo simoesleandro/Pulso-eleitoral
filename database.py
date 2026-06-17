@@ -5,7 +5,14 @@ from contextlib import contextmanager
 
 # Definindo o caminho do banco de dados (data/pulso.db ou data/pulso_test.db em testes)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, 'data')
+
+# Em produção (Fly.io): /data/pulso.db
+# Em local: data/pulso.db
+if os.path.exists('/data'):
+    DATA_DIR = '/data'
+else:
+    DATA_DIR = os.path.join(BASE_DIR, 'data')
+
 DB_NAME = 'pulso_test.db' if os.getenv('TESTING') == 'True' else 'pulso.db'
 DB_PATH = os.path.join(DATA_DIR, DB_NAME)
 
