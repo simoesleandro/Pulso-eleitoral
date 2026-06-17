@@ -9,7 +9,9 @@ INSERT INTO institutos (id, nome, sigla, site, ativo) VALUES
 (4, 'Genial/Quaest', 'Genial/Quaest', 'quaest.com.br/genial', 1),
 (5, 'Atlas', 'AtlasIntel', 'atlasintel.org', 1),
 (6, 'Paraná', 'Paraná Pesquisas', 'paranapesquisas.com.br', 1),
-(7, 'Real Time', 'Real Time Big Data', 'realtimebigdata.com.br', 1);
+(7, 'Real Time', 'Real Time Big Data', 'realtimebigdata.com.br', 1),
+(8, 'Nexus/BTG Pactual', 'NEXUS', 'nexuspesquisas.com.br', 1),
+(9, 'Verita', 'VERITA', 'verita.com.br', 1);
 
 -- ============================================================================
 -- PESQUISAS PRESIDENCIAIS

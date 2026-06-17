@@ -103,7 +103,7 @@ def test_api_institutos(client):
     assert response.status_code == 200
     data = response.json
     assert 'institutos' in data
-    assert len(data['institutos']) == 7
+    assert len(data['institutos']) == 9
     
     # Verifica a estrutura do primeiro item
     first = data['institutos'][0]
