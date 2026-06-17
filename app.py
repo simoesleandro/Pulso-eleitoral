@@ -81,7 +81,7 @@ def require_login():
         'login', 'static', 'api_status', 'dashboard', 
         'api_pesquisas_presidente', 'api_pesquisas_historico', 
         'api_pesquisas_governador_rj', 'api_institutos',
-        'api_visao_geral', 'api_visao_geral_analise'
+        'api_visao_geral', 'api_visao_geral_analise', 'api_comparativo'
     ]
     if request.endpoint in allowed_endpoints:
         return
@@ -526,6 +526,16 @@ def api_pesquisas_historico():
         "candidato": candidato,
         "historico": historico
     })
+
+@app.route('/api/comparativo')
+def api_comparativo():
+    """Retorna a pesquisa mais recente de cada instituto para um candidato/cargo."""
+    candidato = request.args.get('candidato', '')
+    cargo = request.args.get('cargo', 'presidente')
+    if not candidato:
+        return jsonify({"candidato": "", "cargo": cargo, "institutos": []})
+    from database import get_comparativo_candidato
+    return jsonify(get_comparativo_candidato(candidato, cargo))
 
 @app.route('/api/institutos')
 def api_institutos():

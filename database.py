@@ -87,6 +87,40 @@ def get_db():
     finally:
         conn.close()
 
+def get_comparativo_candidato(candidato: str, cargo: str) -> dict:
+    """Retorna a pesquisa mais recente de cada instituto para o candidato/cargo."""
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT inst.nome AS instituto, i.percentual,
+                   p.data_pesquisa AS data, p.margem_erro
+            FROM intencoes i
+            JOIN pesquisas p ON i.pesquisa_id = p.id
+            JOIN institutos inst ON p.instituto_id = inst.id
+            WHERE i.candidato = ? AND p.cargo = ?
+            AND p.id = (
+                SELECT p2.id FROM pesquisas p2
+                JOIN intencoes i2 ON i2.pesquisa_id = p2.id
+                WHERE p2.instituto_id = inst.id AND p2.cargo = ?
+                  AND i2.candidato = ?
+                ORDER BY p2.data_pesquisa DESC LIMIT 1
+            )
+            ORDER BY i.percentual DESC
+        """, (candidato, cargo, cargo, candidato)).fetchall()
+
+    return {
+        "candidato": candidato,
+        "cargo": cargo,
+        "institutos": [
+            {
+                "instituto": r["instituto"],
+                "percentual": r["percentual"],
+                "data": r["data"],
+                "margem_erro": r["margem_erro"]
+            }
+            for r in rows
+        ]
+    }
+
 def limpar_cache_analises():
     """Remove todas as análises geradas por IA para forçar regeneração."""
     with get_db() as conn:

@@ -27,6 +27,7 @@
       <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="#">Visão Geral</a>
       <a class="pe-topbar__nav-item" href="#secao-presidente">Presidente</a>
       <a class="pe-topbar__nav-item" href="#secao-evolucao">Evolução</a>
+      <a class="pe-topbar__nav-item" href="#secao-comparativo">Comparativo</a>
       <a class="pe-topbar__nav-item" href="#secao-governador">Gov. RJ</a>
     </div>
     <div class="pe-topbar__meta">
@@ -115,6 +116,20 @@
       </div>
     </section>
 
+    <!-- Seção 2b: Comparativo entre Institutos -->
+    <section id="secao-comparativo" class="pe-section">
+      <h2 class="pe-section__title">Comparativo entre Institutos</h2>
+      <div class="pe-card">
+        <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+          <select id="select-comp-candidato" class="pe-select-candidato" style="max-width: 200px;">
+            <!-- preenchido via JS -->
+          </select>
+          <span class="pe-kpi__label" style="margin: 0;">pesquisa mais recente por instituto</span>
+        </div>
+        <div id="comparativo-container"></div>
+      </div>
+    </section>
+
     <!-- Seção 3: Governador RJ -->
     <section id="secao-governador" class="pe-section">
       <h2 class="pe-section__title">Governo do Estado — RJ 2026</h2>
@@ -166,8 +181,11 @@
 
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
   <script src="/static/js/charts.js"></script>
   <script>
+    Chart.register(ChartDataLabels);
+
     // Configurações globais do Chart.js
     Chart.defaults.color = '#5a7184';
     Chart.defaults.borderColor = 'rgba(10,34,64,0.06)';
@@ -241,7 +259,10 @@
 
       // Preenche metadados
       document.getElementById('pres-instituto').textContent = data.instituto;
-      document.getElementById('pres-margem').textContent = `±${data.margem_erro}%`;
+      const margem = data.margem_erro && data.margem_erro > 0
+          ? `±${data.margem_erro}%`
+          : '—';
+      document.getElementById('pres-margem').textContent = margem;
       document.getElementById('pres-data').textContent = formatarData(data.data_coleta);
       document.getElementById('pres-fonte').textContent = `Fonte: ${data.instituto} | ${formatarData(data.data_coleta)}`;
 
@@ -270,6 +291,7 @@
           indexAxis: 'y',
           responsive: true,
           maintainAspectRatio: false,
+          layout: { padding: { right: 44 } },
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -281,9 +303,22 @@
               padding: 10,
               callbacks: {
                 label: function(context) {
-                  return ` ${context.parsed.x.toFixed(1)}% (margem: ±${data.margem_erro}%)`;
+                  const m = data.margem_erro && data.margem_erro > 0 ? ` (margem: ±${data.margem_erro}%)` : '';
+                  return ` ${context.parsed.x.toFixed(1)}%${m}`;
                 }
               }
+            },
+            datalabels: {
+              anchor: 'end',
+              align: 'end',
+              formatter: (value) => value.toFixed(1) + '%',
+              color: '#0A2240',
+              font: {
+                family: "'JetBrains Mono', monospace",
+                size: 11,
+                weight: '500'
+              },
+              padding: { left: 4 }
             }
           },
           scales: {
@@ -318,7 +353,10 @@
 
       // Preenche metadados
       document.getElementById('gov-instituto').textContent = data.instituto;
-      document.getElementById('gov-margem').textContent = `±${data.margem_erro}%`;
+      const margemGov = data.margem_erro && data.margem_erro > 0
+          ? `±${data.margem_erro}%`
+          : '—';
+      document.getElementById('gov-margem').textContent = margemGov;
       document.getElementById('gov-data').textContent = formatarData(data.data_coleta);
       document.getElementById('gov-fonte').textContent = `Fonte: ${data.instituto} | ${formatarData(data.data_coleta)}`;
 
@@ -344,6 +382,7 @@
           indexAxis: 'y',
           responsive: true,
           maintainAspectRatio: false,
+          layout: { padding: { right: 44 } },
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -355,9 +394,22 @@
               padding: 10,
               callbacks: {
                 label: function(context) {
-                  return ` ${context.parsed.x.toFixed(1)}% (margem: ±${data.margem_erro}%)`;
+                  const mg = data.margem_erro && data.margem_erro > 0 ? ` (margem: ±${data.margem_erro}%)` : '';
+                  return ` ${context.parsed.x.toFixed(1)}%${mg}`;
                 }
               }
+            },
+            datalabels: {
+              anchor: 'end',
+              align: 'end',
+              formatter: (value) => value.toFixed(1) + '%',
+              color: '#0A2240',
+              font: {
+                family: "'JetBrains Mono', monospace",
+                size: 11,
+                weight: '500'
+              },
+              padding: { left: 4 }
             }
           },
           scales: {
@@ -571,6 +623,60 @@
         });
     }
 
+    async function carregarComparativo(candidato) {
+      const res = await fetch(`/api/comparativo?candidato=${encodeURIComponent(candidato)}&cargo=presidente`);
+      const data = await res.json();
+
+      const container = document.getElementById('comparativo-container');
+
+      if (!data.institutos || data.institutos.length === 0) {
+        container.innerHTML = '<p class="pe-mono" style="color: var(--pe-text-muted)">Sem dados comparativos disponíveis.</p>';
+        return;
+      }
+
+      container.innerHTML = `
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--pe-surface);">
+              <th style="text-align:left; padding:8px; font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--pe-text-muted);">Instituto</th>
+              <th style="text-align:left; padding:8px; font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--pe-text-muted);">Percentual</th>
+              <th style="text-align:left; padding:8px; font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--pe-text-muted);">Margem</th>
+              <th style="text-align:left; padding:8px; font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--pe-text-muted);">Data</th>
+              <th style="text-align:left; padding:8px; font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--pe-text-muted);">Barra</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.institutos.map(inst => `
+              <tr style="border-bottom: 1px solid var(--pe-surface);">
+                <td style="padding:10px 8px; font-size:13px; font-weight:500; color:var(--pe-navy);">${inst.instituto}</td>
+                <td style="padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:500; color:var(--pe-navy);">${inst.percentual.toFixed(1)}%</td>
+                <td style="padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--pe-text-muted);">${inst.margem_erro ? '±' + inst.margem_erro + '%' : '—'}</td>
+                <td style="padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--pe-text-muted);">${formatarData(inst.data)}</td>
+                <td style="padding:10px 8px; width:200px;">
+                  <div style="background:var(--pe-surface); border-radius:2px; height:16px; overflow:hidden;">
+                    <div style="width:${inst.percentual}%; height:100%; background:var(--pe-navy); border-radius:2px; transition:width .6s ease;"></div>
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function inicializarComparativo() {
+      const res = await fetch('/api/pesquisas/presidente');
+      const data = await res.json();
+      const select = document.getElementById('select-comp-candidato');
+      if (data.candidatos) {
+        select.innerHTML = data.candidatos.map(c =>
+          `<option value="${c}">${c}</option>`
+        ).join('');
+        carregarComparativo(data.candidatos[0]);
+      }
+      select.addEventListener('change', e => carregarComparativo(e.target.value));
+    }
+
     // Inicialização da página
     async function inicializar() {
       // Carrega informações globais em paralelo
@@ -578,7 +684,8 @@
         carregarVisaoGeral(),
         carregarPresidente(),
         carregarGovernador(),
-        carregarInstitutos()
+        carregarInstitutos(),
+        inicializarComparativo()
       ]);
 
       // Ativa o Listener do Dropdown do Histórico
@@ -597,12 +704,14 @@
    const sections = [
      { id: 'secao-presidente', nav: 'nav-presidente' },
      { id: 'secao-evolucao', nav: 'nav-evolucao' },
+     { id: 'secao-comparativo', nav: 'nav-comparativo' },
      { id: 'secao-governador', nav: 'nav-governador' },
    ];
 
    const navItems = {
      'nav-presidente': document.querySelector('a[href="#secao-presidente"]'),
      'nav-evolucao': document.querySelector('a[href="#secao-evolucao"]'),
+     'nav-comparativo': document.querySelector('a[href="#secao-comparativo"]'),
      'nav-governador': document.querySelector('a[href="#secao-governador"]'),
    };
 

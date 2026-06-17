@@ -152,6 +152,18 @@ def test_empty_database_handling(client):
         "institutos": []
     }
 
+def test_api_comparativo(client):
+    """Testa /api/comparativo?candidato=Lula&cargo=presidente com dados do seed."""
+    setup_db_with_seed()
+    response = client.get('/api/comparativo?candidato=Lula&cargo=presidente')
+    assert response.status_code == 200
+    data = response.json
+    assert 'institutos' in data
+    assert data['candidato'] == 'Lula'
+    assert data['cargo'] == 'presidente'
+    # Seed tem Lula como candidato; deve retornar lista (pode ser vazia se seed não tiver dados)
+    assert isinstance(data['institutos'], list)
+
 from unittest.mock import patch, MagicMock
 
 def test_api_visao_geral(client):
