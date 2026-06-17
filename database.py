@@ -87,6 +87,12 @@ def get_db():
     finally:
         conn.close()
 
+def limpar_cache_analises():
+    """Remove todas as análises geradas por IA para forçar regeneração."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM analises_ia")
+        conn.commit()
+
 def salvar_log_scheduler(resultado: list) -> None:
     """Salva o log de execução de coleta no banco de dados SQLite."""
     conn = get_conn()

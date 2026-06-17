@@ -38,12 +38,26 @@ Retorne SOMENTE JSON válido, sem markdown, sem explicação:
   "instituto": "nome do instituto mencionado",
   "data": "YYYY-MM-DD ou null",
   "tamanho_amostra": numero ou null,
-  "margem_erro": numero ou null,
+  "margem_erro": extraia de expressões como:
+    - "margem de erro de X pontos percentuais"
+    - "margem de erro é de X%"
+    - "erro amostral de X pontos"
+    - "intervalo de confiança de 95%, margem de X pp"
+    Se não encontrar, retorne null — nunca retorne 0,
   "candidatos": [
     {"nome": "Nome Candidato", "percentual": 38.0},
     {"nome": "Nome Candidato 2", "percentual": 32.0}
   ]
 }
+
+EXTRAÇÃO DE NOMES DE CANDIDATOS:
+- Extraia o nome completo e correto
+- Exemplos de nomes brasileiros frequentes:
+  - "Rui Costa Pimenta" (não "ii Costa Pimenta")
+  - "Flávio Bolsonaro" (com acento)
+  - "Ronaldo Caiado"
+- Se o nome aparecer truncado ou com erro, corrija com base no contexto
+- Nunca retorne nome com menos de 3 caracteres
 
 Se não encontrar intenções de voto com percentuais explícitos, retorne:
 {"candidatos": []}
@@ -51,6 +65,39 @@ Se não encontrar intenções de voto com percentuais explícitos, retorne:
 TEXTO:
 {texto}
 """
+
+MAPA_NOMES = {
+    'luiz inácio lula da silva': 'Lula',
+    'luiz inacio lula da silva': 'Lula',
+    'lula': 'Lula',
+    'flávio bolsonaro': 'Flávio Bolsonaro',
+    'flavio bolsonaro': 'Flávio Bolsonaro',
+    'jair bolsonaro': 'Jair Bolsonaro',
+    'ronaldo caiado': 'Ronaldo Caiado',
+    'romeu zema': 'Romeu Zema',
+    'renan santos': 'Renan Santos',
+    'renan santos (missão)': 'Renan Santos',
+    'samara martins': 'Samara Martins',
+    'augusto cury': 'Augusto Cury',
+    'rui costa pimenta': 'Rui Costa Pimenta',
+    'cabo daciolo': 'Cabo Daciolo',
+    'ciro gomes': 'Ciro Gomes',
+    'simone tebet': 'Simone Tebet',
+    'tarcísio de freitas': 'Tarcísio de Freitas',
+    'tarcisio de freitas': 'Tarcísio de Freitas',
+    'eduardo paes': 'Eduardo Paes',
+    'cláudio castro': 'Cláudio Castro',
+    'claudio castro': 'Cláudio Castro',
+    'marcelo freixo': 'Marcelo Freixo',
+    'rodrigo neves': 'Rodrigo Neves',
+}
+
+
+def normalizar_nome(nome: str) -> str:
+    """Normaliza nome do candidato para forma canônica."""
+    chave = nome.lower().strip()
+    return MAPA_NOMES.get(chave, nome)
+
 
 def extrair_com_gemini(texto: str, fonte_url: str = "") -> dict:
     """
@@ -123,8 +170,11 @@ def extrair_com_gemini(texto: str, fonte_url: str = "") -> dict:
         # Remove percentuais acima de 60% (são 2º turno ou aprovação)
         candidatos = [c for c in candidatos if c.get("percentual", 0) <= 60]
 
-        # Se mesmo candidato aparece mais de uma vez, mantém só o maior percentual
-        # (indica múltiplos cenários — pega o mais representativo)
+        # Normaliza nomes para forma canônica
+        for c in candidatos:
+            c["nome"] = normalizar_nome(c["nome"])
+
+        # Remove duplicatas após normalização (mesmo nome → mantém maior percentual)
         vistos = {}
         for c in candidatos:
             nome = c["nome"]
