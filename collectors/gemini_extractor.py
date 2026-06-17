@@ -106,6 +106,19 @@ MAPA_NOMES = {
     'aécio neves': None,
     'aecio neves': None,
     'aldo rebelo': None,
+    'eduardo bolsonaro': None,
+    'camilo santana': None,
+    'fernando haddad': None,
+    'elmano de freitas': None,
+    'acm neto': None,
+    'jeronimo rodrigues': None,
+    'jerônimo rodrigues': None,
+    'joaquim barbosa': None,
+    # Abreviações comuns
+    'ciro': 'Ciro Gomes',
+    'simone': 'Simone Tebet',
+    'tarcísio': 'Tarcísio de Freitas',
+    'tarcisio': 'Tarcísio de Freitas',
 }
 
 
