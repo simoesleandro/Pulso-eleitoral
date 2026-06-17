@@ -1,131 +1,127 @@
-# URL Base: https://datafolha.folha.uol.com.br/eleicoes/
-
-import re
-import requests
+import time
+import unicodedata
 from bs4 import BeautifulSoup
-from datetime import date
 from .base import BaseCollector, logger
+from .playwright_base import PlaywrightCollector
 
-class DatafolhaCollector(BaseCollector):
+BASE_URL = "https://datafolha.folha.uol.com.br"
+LISTING_URL = "https://datafolha.folha.uol.com.br/eleicoes/"
+INSTITUTO_ID = 1
+
+FILTRO_NACIONAL = [
+    'presidente', 'nacional', 'brasil', 'primeiro turno',
+    '1º turno', 'intenção de voto', 'lula', 'bolsonaro',
+    'disputa presidencial', 'eleição presidencial'
+]
+
+FILTRO_ESTADUAL = [
+    'pernambuco', 'bahia', 'são paulo', 'rio de janeiro',
+    'minas gerais', 'goiás', 'paraná', 'ceará', 'maranhão',
+    'amazonas', 'piauí', 'rio grande', 'santa catarina',
+    'espírito santo', 'mato grosso', 'pará', 'fortaleza',
+    'belo horizonte', 'recife', 'salvador', 'manaus',
+    'governador', 'prefeito', 'senado', 'câmara'
+]
+
+
+def _normalizar(texto: str) -> str:
+    """Lowercase e remove acentos para comparação robusta."""
+    return unicodedata.normalize('NFKD', texto.lower()).encode('ascii', 'ignore').decode('ascii')
+
+
+class DatafolhaCollector(PlaywrightCollector, BaseCollector):
     @property
     def name(self) -> str:
         return "Datafolha"
 
     @property
     def instituto_id(self) -> int:
-        return 1
+        return INSTITUTO_ID
 
-    def _get_listing(self, url: str) -> str:
-        """Faz a requisição HTTP para a URL especificada utilizando headers realistas."""
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept-Language": "pt-BR,pt;q=0.9",
-            "Referer": "https://www.google.com.br/"
-        }
-        try:
-            response = requests.get(url, headers=headers, timeout=15)
-            if response.status_code != 200:
-                logger.warning("[%s] Falha ao obter listagem. Status HTTP: %d", self.name, response.status_code)
-                return ""
-            return response.text
-        except Exception as e:
-            logger.warning("[%s] Exceção ao acessar %s: %s", self.name, url, str(e))
-            return ""
+    def _get_page(self, url: str) -> str:
+        html = self._get_page_requests(url)
+        if not html or 'cookie' in html[:500].lower() or len(html) < 5000:
+            self.logger.info(f"Fallback para Playwright: {url}")
+            html = self._get_page_playwright(url, wait_seconds=3)
+        return html
 
-    def _parse(self, html: str) -> list[dict]:
-        """Varre o HTML da página em busca de links sobre eleições 2026/presidente
-        e extrai título, url e data da publicação."""
-        try:
-            soup = BeautifulSoup(html, 'html.parser')
-            results = []
-            
-            for a in soup.find_all('a', href=True):
-                href = a['href']
-                # Filtra links eleitorais de 2026 ou de pesquisas presidenciais
-                if '/eleicoes/2026/' in href or '/eleicoes/presidente/' in href:
-                    # Reconstrói URLs relativas se necessário
-                    url = href
-                    if href.startswith('/'):
-                        url = "https://datafolha.folha.uol.com.br" + href
-                    elif not href.startswith('http'):
-                        url = "https://datafolha.folha.uol.com.br/eleicoes/" + href
-                    
-                    titulo = a.get_text(strip=True)
-                    if not titulo:
-                        continue
-                    
-                    # Tenta extrair a data a partir do padrão de URL da Folha: YYYY/MM/DD
-                    data_texto = None
-                    m = re.search(r'/(\d{4})/(\d{2})/(\d{2})/', url)
-                    if m:
-                        data_texto = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
-                        
-                    results.append({
-                        'titulo': titulo,
-                        'url': url,
-                        'data_texto': data_texto
-                    })
-            
-            # Deduplica os resultados por URL do artigo
-            seen_urls = set()
-            dedup_results = []
-            for item in results:
-                if item['url'] not in seen_urls:
-                    seen_urls.add(item['url'])
-                    dedup_results.append(item)
-                    
-            return dedup_results
-        except Exception as e:
-            logger.warning("[%s] Erro durante o parsing do HTML: %s", self.name, str(e))
-            return []
-
-    def _extract_data_from_title(self, titulo: str) -> dict:
-        """Extrai intenções de voto no formato 'Nome Candidato XX%' de dentro do título."""
-        try:
-            matches = re.findall(r'(\w[\w\s]+?)\s+(\d{1,2})%', titulo)
-            if not matches:
-                return {}
-            
-            result = {}
-            for name, val in matches:
-                clean_name = name.strip()
-                # Remove conjunções de ligação como "e" ou "ou" no início do nome extraído
-                clean_name = re.sub(r'^(e|ou)\s+', '', clean_name, flags=re.IGNORECASE)
-                result[clean_name] = float(val)
-            return result
-        except Exception:
-            return {}
-
-    def fetch(self) -> list[dict]:
-        """Obtém os dados da página principal de eleições e formata no padrão esperado pelo BaseCollector."""
-        url = "https://datafolha.folha.uol.com.br/eleicoes/"
-        html = self._get_listing(url)
+    def _extract_links(self, html: str) -> list[str]:
         if not html:
             return []
-            
-        items = self._parse(html)
-        if not items:
-            logger.warning("[%s] Datafolha: layout não reconhecido ou bloqueio. Retornando []", self.name)
+
+        try:
+            soup = BeautifulSoup(html, 'lxml')
+            links = []
+
+            nacional_norm = [_normalizar(p) for p in FILTRO_NACIONAL]
+            # Estadual usa só lower() — strip de acento causaria falsos positivos
+            # ('pará' → 'para' colidiria com a preposição "para")
+            estadual_lower = [p.lower() for p in FILTRO_ESTADUAL]
+
+            for a in soup.find_all('a', href=True):
+                href = a['href']
+                texto = a.get_text(strip=True)
+
+                # 1. href deve ser do domínio Datafolha ou relativo
+                if not (
+                    'datafolha.folha.uol.com.br' in href
+                    or href.startswith('/')
+                ):
+                    continue
+
+                # Exclui seções de aprovação de governo (não são pesquisas eleitorais)
+                href_lower = href.lower()
+                if any(p in href_lower for p in ['avaliacao-de-governo', 'aprovacao', 'rejeicao']):
+                    continue
+
+                # 2. texto OU href deve conter alguma palavra de FILTRO_NACIONAL
+                combinado = _normalizar(texto + ' ' + href)
+                if not any(p in combinado for p in nacional_norm):
+                    continue
+
+                # 3. texto NÃO deve conter palavras de FILTRO_ESTADUAL
+                texto_lower = texto.lower()
+                if any(p in texto_lower for p in estadual_lower):
+                    continue
+
+                # Resolve URL absoluta
+                if href.startswith('/'):
+                    url_abs = BASE_URL + href
+                elif href.startswith('http'):
+                    url_abs = href
+                else:
+                    url_abs = BASE_URL + '/' + href
+
+                links.append(url_abs)
+
+            # Remove duplicatas preservando ordem
+            seen = set()
+            unique = []
+            for l in links:
+                if l not in seen:
+                    seen.add(l)
+                    unique.append(l)
+
+            return unique[:6]
+
+        except Exception as e:
+            logger.warning("[Datafolha] Erro ao extrair links: %s", e)
             return []
-            
-        result = []
-        today_str = date.today().isoformat()
-        
-        for item in items:
-            extracted = self._extract_data_from_title(item['titulo'])
-            for candidate, pct in extracted.items():
-                result.append({
-                    'instituto_id': self.instituto_id,
-                    'cargo': 'presidente',
-                    'candidato': candidate,
-                    'percentual': pct,
-                    'fonte_url': item['url'],
-                    'data_coleta': today_str,
-                    'data_divulgacao': item.get('data_texto'),
-                    'tamanho_amostra': None,
-                    'margem_erro': None,
-                    'metodologia': 'Espontânea',
-                    # Agrupador único por data para unificar candidatos da mesma pesquisa no banco
-                    'registro_tse': f"DF-PRES-{item.get('data_texto') or today_str}"
-                })
-        return result
+
+    def _parse_release(self, html: str, url: str) -> list[dict]:
+        return self._parse_com_gemini(html, url, instituto_id=self.instituto_id)
+
+    def fetch(self) -> list[dict]:
+        html = self._get_page(LISTING_URL)
+        links = self._extract_links(html)
+
+        resultados = []
+        for idx, link in enumerate(links):
+            self.logger.info("[Datafolha] Raspando release %d/%d: %s", idx + 1, len(links), link)
+            html_release = self._get_page(link)
+            dados = self._parse_release(html_release, link)
+            resultados.extend(dados)
+            time.sleep(2)
+
+        self.logger.info("[Datafolha] %d registros extraídos de %d releases", len(resultados), len(links))
+        return resultados

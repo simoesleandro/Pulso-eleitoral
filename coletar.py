@@ -34,18 +34,20 @@ def main():
     import database
     DB_PATH = database.DB_PATH
     
+    from collectors.datafolha import DatafolhaCollector
     from collectors.quaest import QuaestCollector
     from collectors.atlas import AtlasCollector
     from collectors.poder360 import Poder360Collector
     from database import salvar_log_scheduler
     from notifier import send_telegram, montar_mensagem_coleta
-    
+
     # Antes da coleta
     with database.get_db() as conn:
         p_antes = conn.execute("SELECT COUNT(*) FROM pesquisas").fetchone()[0]
         i_antes = conn.execute("SELECT COUNT(*) FROM intencoes").fetchone()[0]
-    
+
     coletores = [
+        DatafolhaCollector(db_path=DB_PATH),
         QuaestCollector(db_path=DB_PATH),
         AtlasCollector(db_path=DB_PATH),
         Poder360Collector(db_path=DB_PATH),

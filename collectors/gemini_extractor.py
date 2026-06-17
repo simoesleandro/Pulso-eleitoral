@@ -26,6 +26,11 @@ REGRAS CRÍTICAS:
 - Se a soma dos percentuais for maior que 120%, provavelmente são cenários de 2º turno — retorne []
 - Cargo deve ser "presidente", "governador_rj", "governador_sp" etc
 - Se o texto for sobre aprovação/rejeição de governo sem intenção de voto, retorne lista vazia
+- IGNORE pesquisas estaduais — só extraia se for âmbito NACIONAL (Brasil inteiro)
+- Se o texto mencionar um estado específico como contexto principal da pesquisa,
+  retorne {"candidatos": []}
+- Pesquisas nacionais geralmente mencionam "todo o Brasil", "nível nacional",
+  "eleitorado brasileiro" ou não mencionam estado nenhum
 
 Retorne SOMENTE JSON válido, sem markdown, sem explicação:
 {

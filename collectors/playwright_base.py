@@ -50,7 +50,7 @@ class PlaywrightCollector:
                 # Tenta aceitar cookies se banner aparecer
                 try:
                     # Complianz (usado pelo Quaest)
-                    accept_btn = page.locator('button.cmplz-accept, .cmplz-btn-accept, button:has-text("Aceitar"), button:has-text("Accept"), button:has-text("Concordo")')
+                    accept_btn = page.locator('button.cmplz-accept, .cmplz-btn-accept, button:has-text("OK"), button:has-text("Aceitar"), button:has-text("Accept"), button:has-text("Concordo")')
                     if accept_btn.count() > 0:
                         accept_btn.first.click()
                         time.sleep(1)
