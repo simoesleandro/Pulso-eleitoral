@@ -83,7 +83,19 @@ def main():
     mensagem = montar_mensagem_coleta(resultados, pesquisas_novas, intencoes_novas)
     send_telegram(mensagem)
     logger.info(f"Notificação enviada: {pesquisas_novas} pesquisas novas, {intencoes_novas} intenções novas")
-    
+
+    # Sincroniza com Fly.io se houve dados novos
+    if pesquisas_novas > 0 or intencoes_novas > 0:
+        logger.info(f"Dados novos detectados ({pesquisas_novas} pesquisas, {intencoes_novas} intenções) — iniciando sync")
+        from scripts.sync_db import sync_para_fly
+        sucesso = sync_para_fly()
+        if sucesso:
+            logger.info("Fly.io atualizado automaticamente")
+        else:
+            logger.warning("Sync falhou — dashboard do Fly.io pode estar desatualizado")
+    else:
+        logger.info("Sem dados novos — sync ignorado")
+
     logger.info(f"=== Coleta finalizada: {len(resultados)} coletores ===")
 
 if __name__ == "__main__":
