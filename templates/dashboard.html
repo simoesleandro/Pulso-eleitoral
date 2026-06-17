@@ -96,23 +96,34 @@
     <section id="secao-evolucao" class="pe-section">
       <h2 class="pe-section__title">Evolução nas Pesquisas</h2>
       <div class="pe-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-          <select id="select-candidatos" class="pe-select-candidato">
-            <option value="Lula">Lula</option>
-            <option value="Bolsonaro">Bolsonaro</option>
-            <option value="Tarcísio">Tarcísio</option>
-            <option value="Ciro">Ciro</option>
-            <option value="Simone">Simone</option>
-            <option value="Eduardo Paes">Eduardo Paes</option>
-            <option value="Cláudio Castro">Cláudio Castro</option>
-            <option value="Marcelo Freixo">Marcelo Freixo</option>
-            <option value="Rodrigo Neves">Rodrigo Neves</option>
-          </select>
-          <span class="pe-kpi__label" style="margin-bottom: 20px;">Série histórica desde Jan/2026</span>
+
+        <!-- Controles -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+
+          <!-- Checkboxes de candidatos -->
+          <div id="candidatos-toggle" style="display:flex; gap:12px; flex-wrap:wrap;">
+            <!-- gerado via JS -->
+          </div>
+
+          <!-- Legenda de institutos -->
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span class="pe-kpi__label" style="margin:0;">institutos:</span>
+            <span class="pe-badge pe-badge--inst">Datafolha ●</span>
+            <span class="pe-badge pe-badge--inst">Quaest ○</span>
+          </div>
+
         </div>
-        <div class="pe-chart-container" style="height: 350px;">
-          <canvas id="chart-historico"></canvas>
+
+        <!-- Gráfico -->
+        <div class="pe-chart-container" style="height:380px;">
+          <canvas id="chart-historico-multi"></canvas>
         </div>
+
+        <!-- Nota -->
+        <div class="pe-mono" style="margin-top:8px; color:var(--pe-text-muted); font-size:11px;">
+          Pontos sólidos = Datafolha · Pontos vazios = Quaest · Linha contínua conecta pesquisas do mesmo instituto
+        </div>
+
       </div>
     </section>
 
@@ -427,69 +438,129 @@
       });
     }
 
-    // Carrega evolução temporal do candidato
-    async function carregarHistorico(candidato) {
-      let data = { candidato: candidato, historico: fallbackHist.historico };
-      try {
-        const res = await fetch(`/api/pesquisas/historico?candidato=${encodeURIComponent(candidato)}`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.historico && json.historico.length > 0) {
-            data = json;
-          }
-        }
-      } catch (err) {
-        console.warn('Erro ao buscar histórico, usando fallback:', err);
-      }
+    const CANDIDATE_COLORS = {
+      'Lula': '#0A2240',
+      'Flávio Bolsonaro': '#C0392B',
+      'Ronaldo Caiado': '#5a7184',
+      'Romeu Zema': '#B4B2A9',
+      'Renan Santos': '#1D9E75',
+    };
 
-      const labels = data.historico.map(h => formatarData(h.data));
-      const values = data.historico.map(h => h.percentual);
-      const candColor = getCandidateColor(data.candidato);
+    let chartHistoricoMulti = null;
+    let ultimasSeries = [];
 
-      const ctx = document.getElementById('chart-historico');
-      if (chartHist) chartHist.destroy();
+    async function carregarHistoricoMulti() {
+      const res = await fetch('/api/pesquisas/historico-multi?cargo=presidente');
+      const data = await res.json();
+      ultimasSeries = data.series;
 
-      chartHist = new Chart(ctx, {
+      const toggleDiv = document.getElementById('candidatos-toggle');
+      toggleDiv.innerHTML = data.series.map(s => `
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+          <input type="checkbox" value="${s.candidato}" checked
+            style="accent-color:${s.cor};"
+            onchange="toggleCandidato()">
+          <span style="color:${s.cor}; font-weight:500;">${s.candidato}</span>
+        </label>
+      `).join('');
+
+      renderizarHistoricoMulti(data.series);
+    }
+
+    function renderizarHistoricoMulti(series) {
+      const ctx = document.getElementById('chart-historico-multi');
+      if (chartHistoricoMulti) chartHistoricoMulti.destroy();
+
+      const todasDatas = [...new Set(
+        series.flatMap(s => s.dados.map(d => d.data))
+      )].sort();
+
+      const datasets = series.map(s => {
+        const pontos = todasDatas.map(data => {
+          const ponto = s.dados.find(d => d.data === data);
+          return ponto ? ponto.percentual : null;
+        });
+        return {
+          label: s.candidato,
+          data: pontos,
+          borderColor: s.cor,
+          backgroundColor: s.cor + '18',
+          borderWidth: 2,
+          pointBackgroundColor: s.cor,
+          pointBorderColor: '#FFFFFF',
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          tension: 0.2,
+          spanGaps: false,
+        };
+      });
+
+      chartHistoricoMulti = new Chart(ctx, {
         type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: data.candidato,
-            data: values,
-            borderColor: candColor,
-            backgroundColor: candColor + '18',
-            borderWidth: 2,
-            pointBackgroundColor: candColor,
-            pointBorderColor: '#FFFFFF',
-            pointBorderWidth: 1.5,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-            tension: 0.2,
-            fill: true
-          }]
-        },
+        data: { labels: todasDatas.map(formatarData), datasets },
         options: {
-          ...PE_CHART_DEFAULTS,
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
           plugins: {
-            ...PE_CHART_DEFAULTS.plugins,
+            datalabels: { display: false },
+            legend: {
+              display: true,
+              position: 'top',
+              labels: {
+                color: '#0A2240',
+                font: { family: "'Inter', sans-serif", size: 12 },
+                usePointStyle: true,
+                padding: 16
+              }
+            },
             tooltip: {
-              ...PE_CHART_DEFAULTS.plugins.tooltip,
               backgroundColor: '#FFFFFF',
               titleColor: '#0A2240',
               bodyColor: '#5a7184',
-              borderColor: 'rgba(10,34,64,0.06)',
-              borderWidth: 0.5,
-              padding: 10,
+              borderColor: 'rgba(10,34,64,0.1)',
+              borderWidth: 1,
+              padding: 12,
               callbacks: {
-                label: function(context) {
-                  const item = data.historico[context.dataIndex];
-                  return ` ${context.parsed.y.toFixed(1)}% (${item.instituto})`;
+                label: ctx => {
+                  const val = ctx.parsed.y;
+                  return val !== null ? ` ${ctx.dataset.label}: ${val.toFixed(1)}%` : null;
                 }
               }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(10,34,64,0.06)' },
+              ticks: {
+                color: '#5a7184',
+                font: { size: 10, family: "'JetBrains Mono', monospace" },
+                maxRotation: 45,
+                maxTicksLimit: 12
+              }
+            },
+            y: {
+              grid: { color: 'rgba(10,34,64,0.06)' },
+              ticks: {
+                color: '#5a7184',
+                font: { size: 11, family: "'JetBrains Mono', monospace" },
+                callback: v => v + '%'
+              },
+              suggestedMin: 0,
+              suggestedMax: 60
             }
           }
         }
       });
+    }
+
+    function toggleCandidato() {
+      const seriesFiltradas = ultimasSeries.filter(s => {
+        const cb = document.querySelector(`#candidatos-toggle input[value="${s.candidato}"]`);
+        return cb && cb.checked;
+      });
+      renderizarHistoricoMulti(seriesFiltradas);
     }
 
     // Carrega os cards de institutos e volumetria
@@ -685,17 +756,9 @@
         carregarPresidente(),
         carregarGovernador(),
         carregarInstitutos(),
-        inicializarComparativo()
+        inicializarComparativo(),
+        carregarHistoricoMulti()
       ]);
-
-      // Ativa o Listener do Dropdown do Histórico
-      const select = document.getElementById('select-candidatos');
-      select.addEventListener('change', function() {
-        carregarHistorico(this.value);
-      });
-
-      // Carrega o histórico inicial para o candidato ativo no dropdown
-      carregarHistorico(select.value);
     }
 
     document.addEventListener('DOMContentLoaded', inicializar);

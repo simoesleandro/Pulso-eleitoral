@@ -152,6 +152,21 @@ def test_empty_database_handling(client):
         "institutos": []
     }
 
+def test_api_historico_multi(client):
+    """Testa /api/pesquisas/historico-multi?cargo=presidente com dados do seed."""
+    setup_db_with_seed()
+    response = client.get('/api/pesquisas/historico-multi?cargo=presidente')
+    assert response.status_code == 200
+    data = response.json
+    assert 'series' in data
+    assert data['cargo'] == 'presidente'
+    assert isinstance(data['series'], list)
+    if data['series']:
+        s = data['series'][0]
+        assert 'candidato' in s
+        assert 'cor' in s
+        assert 'dados' in s
+
 def test_api_comparativo(client):
     """Testa /api/comparativo?candidato=Lula&cargo=presidente com dados do seed."""
     setup_db_with_seed()

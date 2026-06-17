@@ -188,6 +188,62 @@ def get_pesquisas_mais_recentes(cargo: str) -> list[dict]:
     finally:
         conn.close()
 
+_CANDIDATE_COLORS = {
+    'Lula': '#0A2240',
+    'Flávio Bolsonaro': '#C0392B',
+    'Ronaldo Caiado': '#5a7184',
+    'Romeu Zema': '#B4B2A9',
+    'Renan Santos': '#1D9E75',
+}
+_FALLBACK_COLORS = ['#0A2240', '#C0392B', '#5a7184', '#B4B2A9', '#1D9E75']
+
+
+_EXCLUIR_CATEGORIAS = ['outros', 'nulos', 'brancos', 'indecisos', 'não sabe', 'nao sabe', 'não respondeu', 'nao respondeu']
+
+
+def _e_candidato(nome: str) -> bool:
+    nome_lower = nome.lower()
+    return not any(excluir in nome_lower for excluir in _EXCLUIR_CATEGORIAS)
+
+
+def get_top_candidatos(cargo: str, n: int = 3) -> list[str]:
+    """Retorna os n candidatos com maior percentual médio para o cargo."""
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT i.candidato, AVG(i.percentual) AS media
+            FROM intencoes i
+            JOIN pesquisas p ON i.pesquisa_id = p.id
+            WHERE p.cargo = ?
+            GROUP BY i.candidato
+            ORDER BY media DESC
+        """, (cargo,)).fetchall()
+    candidatos = [r['candidato'] for r in rows if _e_candidato(r['candidato'])]
+    return candidatos[:n]
+
+
+def get_historico_multi(candidatos: list[str], cargo: str) -> list[dict]:
+    """Retorna série histórica de múltiplos candidatos para o cargo."""
+    candidatos = [c for c in candidatos if _e_candidato(c)]
+    series = []
+    with get_db() as conn:
+        for idx, candidato in enumerate(candidatos):
+            rows = conn.execute("""
+                SELECT p.data_pesquisa AS data, i.percentual, inst.nome AS instituto
+                FROM intencoes i
+                JOIN pesquisas p ON i.pesquisa_id = p.id
+                JOIN institutos inst ON p.instituto_id = inst.id
+                WHERE i.candidato = ? AND p.cargo = ?
+                ORDER BY p.data_pesquisa ASC
+            """, (candidato, cargo)).fetchall()
+            cor = _CANDIDATE_COLORS.get(candidato, _FALLBACK_COLORS[idx % len(_FALLBACK_COLORS)])
+            series.append({
+                "candidato": candidato,
+                "cor": cor,
+                "dados": [{"data": r["data"], "percentual": r["percentual"], "instituto": r["instituto"]} for r in rows]
+            })
+    return series
+
+
 def get_historico_candidato(candidato: str) -> list[dict]:
     """Retorna a evolução temporal (série histórica) das intenções de voto de um candidato."""
     conn = get_conn()

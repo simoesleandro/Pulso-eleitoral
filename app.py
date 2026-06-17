@@ -81,7 +81,8 @@ def require_login():
         'login', 'static', 'api_status', 'dashboard', 
         'api_pesquisas_presidente', 'api_pesquisas_historico', 
         'api_pesquisas_governador_rj', 'api_institutos',
-        'api_visao_geral', 'api_visao_geral_analise', 'api_comparativo'
+        'api_visao_geral', 'api_visao_geral_analise', 'api_comparativo',
+        'api_pesquisas_historico_multi'
     ]
     if request.endpoint in allowed_endpoints:
         return
@@ -504,6 +505,19 @@ def api_pesquisas_governador_rj():
         "instituto": first['instituto'],
         "margem_erro": first['margem_erro']
     })
+
+@app.route('/api/pesquisas/historico-multi')
+def api_pesquisas_historico_multi():
+    """Retorna séries históricas de múltiplos candidatos para um cargo."""
+    from database import get_historico_multi, get_top_candidatos
+    cargo = request.args.get('cargo', 'presidente')
+    candidatos_param = request.args.get('candidatos', '')
+    if candidatos_param:
+        candidatos = [c.strip() for c in candidatos_param.split(',') if c.strip()]
+    else:
+        candidatos = get_top_candidatos(cargo, n=3)
+    series = get_historico_multi(candidatos, cargo)
+    return jsonify({"cargo": cargo, "series": series})
 
 @app.route('/api/pesquisas/historico')
 def api_pesquisas_historico():

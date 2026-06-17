@@ -72,6 +72,8 @@ MAPA_NOMES = {
     'lula': 'Lula',
     'flávio bolsonaro': 'Flávio Bolsonaro',
     'flavio bolsonaro': 'Flávio Bolsonaro',
+    'bolsonaro': 'Flávio Bolsonaro',
+    'flavio': 'Flávio Bolsonaro',
     'jair bolsonaro': 'Jair Bolsonaro',
     'ronaldo caiado': 'Ronaldo Caiado',
     'romeu zema': 'Romeu Zema',
