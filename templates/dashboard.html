@@ -24,10 +24,10 @@
       <span class="pe-topbar__name">Pulso Eleitoral</span>
     </a>
     <div class="pe-topbar__nav">
-      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="#">visão geral</a>
-      <a class="pe-topbar__nav-item" href="#secao-presidente">presidente</a>
-      <a class="pe-topbar__nav-item" href="#secao-governador">gov. rj</a>
-      <a class="pe-topbar__nav-item" href="#secao-evolucao">evolução</a>
+      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="#">Visão Geral</a>
+      <a class="pe-topbar__nav-item" href="#secao-presidente">Presidente</a>
+      <a class="pe-topbar__nav-item" href="#secao-evolucao">Evolução</a>
+      <a class="pe-topbar__nav-item" href="#secao-governador">Gov. RJ</a>
     </div>
     <div class="pe-topbar__meta">
       <span id="badge-update">carregando...</span>
@@ -36,6 +36,27 @@
   </nav>
 
   <main class="pe-container pe-main">
+
+    <!-- Seção 0: Visão Geral -->
+    <section id="secao-visao-geral" class="pe-section">
+      <!-- KPI Cards -->
+      <div class="pe-kpi-grid" id="kpi-grid">
+        <!-- 4 cards: Total Pesquisas, Institutos Ativos, Líder Presidente, Líder Gov. RJ -->
+      </div>
+
+      <!-- Tendências -->
+      <div class="pe-card" style="margin-top: 16px;">
+        <div class="pe-kpi__label" style="margin-bottom: 12px;">Tendências — últimas pesquisas</div>
+        <div id="tendencias-container"></div>
+      </div>
+
+      <!-- Análise IA -->
+      <div class="pe-card pe-ia-block" style="margin-top: 16px;">
+        <div class="pe-kpi__label" style="margin-bottom: 8px;">Análise do Cenário</div>
+        <p id="ia-analise" class="pe-ia-block__text">Carregando análise...</p>
+        <div id="ia-meta" class="pe-ia-block__meta"></div>
+      </div>
+    </section>
     
     <!-- Seção 1: Presidente -->
     <section id="secao-presidente" class="pe-section">
@@ -488,10 +509,73 @@
       });
     }
 
+    async function carregarVisaoGeral() {
+      // Busca KPIs e tendências
+      const res = await fetch('/api/visao-geral');
+      const data = await res.json();
+      
+      // Renderiza KPI grid
+      const kpiGrid = document.getElementById('kpi-grid');
+      kpiGrid.innerHTML = `
+        <div class="pe-card pe-kpi">
+          <div class="pe-kpi__label">Total de Pesquisas</div>
+          <div class="pe-kpi__value">${data.kpis.total_pesquisas}</div>
+          <div class="pe-kpi__sub">desde jan/2026</div>
+        </div>
+        <div class="pe-card pe-kpi">
+          <div class="pe-kpi__label">Institutos Ativos</div>
+          <div class="pe-kpi__value">${data.kpis.institutos_ativos}</div>
+          <div class="pe-kpi__sub">últimos 30 dias</div>
+        </div>
+        <div class="pe-card pe-kpi">
+          <div class="pe-kpi__label">Líder Presidente</div>
+          <div class="pe-kpi__value" style="font-size:20px;">${data.lider_presidente?.candidato || '—'}</div>
+          <div class="pe-kpi__sub">${data.lider_presidente?.percentual || '—'}% · ${data.lider_presidente?.instituto || '—'}</div>
+        </div>
+        <div class="pe-card pe-kpi">
+          <div class="pe-kpi__label">Líder Gov. RJ</div>
+          <div class="pe-kpi__value" style="font-size:20px;">${data.lider_governador?.candidato || '—'}</div>
+          <div class="pe-kpi__sub">${data.lider_governador?.percentual || '—'}% · ${data.lider_governador?.instituto || '—'}</div>
+        </div>
+      `;
+
+      // Renderiza tendências
+      const tend = document.getElementById('tendencias-container');
+      tend.innerHTML = data.tendencias.map(t => {
+        const arrow = t.direcao === 'up' ? '▲' : t.direcao === 'down' ? '▼' : '—';
+        const cls = t.direcao === 'up' ? 'pe-tendencia__arrow-up' : 
+                    t.direcao === 'down' ? 'pe-tendencia__arrow-down' : 'pe-tendencia__arrow-flat';
+        const sinal = t.variacao > 0 ? '+' : '';
+        return `
+          <div class="pe-tendencia-row">
+            <span class="${cls}">${arrow}</span>
+            <span style="flex:1;font-size:13px;">${t.candidato}</span>
+            <span class="pe-mono">${t.percentual_atual.toFixed(1)}%</span>
+            <span class="${cls} pe-mono" style="font-size:11px;">${sinal}${t.variacao.toFixed(1)}pp</span>
+            <span class="pe-badge pe-badge--inst">${t.cargo === 'presidente' ? 'Pres.' : 'Gov. RJ'}</span>
+          </div>
+        `;
+      }).join('');
+
+      // Busca análise Gemini (async separado para não bloquear)
+      fetch('/api/visao-geral/analise')
+        .then(r => r.json())
+        .then(d => {
+          document.getElementById('ia-analise').textContent = d.analise;
+          document.getElementById('ia-meta').textContent = 
+            `gerado por gemini · ${d.gerado_em}`;
+        })
+        .catch(() => {
+          document.getElementById('ia-analise').textContent = 
+            'Análise indisponível no momento.';
+        });
+    }
+
     // Inicialização da página
     async function inicializar() {
       // Carrega informações globais em paralelo
       await Promise.all([
+        carregarVisaoGeral(),
         carregarPresidente(),
         carregarGovernador(),
         carregarInstitutos()
@@ -508,6 +592,48 @@
     }
 
     document.addEventListener('DOMContentLoaded', inicializar);
+  </script>
+  <script>
+   const sections = [
+     { id: 'secao-presidente', nav: 'nav-presidente' },
+     { id: 'secao-evolucao', nav: 'nav-evolucao' },
+     { id: 'secao-governador', nav: 'nav-governador' },
+   ];
+
+   const navItems = {
+     'nav-presidente': document.querySelector('a[href="#secao-presidente"]'),
+     'nav-evolucao': document.querySelector('a[href="#secao-evolucao"]'),
+     'nav-governador': document.querySelector('a[href="#secao-governador"]'),
+   };
+
+   const observer = new IntersectionObserver((entries) => {
+     entries.forEach(entry => {
+       const section = sections.find(s => s.id === entry.target.id);
+       if (!section) return;
+       const navItem = navItems[section.nav];
+       if (!navItem) return;
+       if (entry.isIntersecting) {
+         // Remove ativo de todos
+         Object.values(navItems).forEach(el => el && el.classList.remove('pe-topbar__nav-item--active'));
+         // Adiciona ativo no atual
+         navItem.classList.add('pe-topbar__nav-item--active');
+       }
+     });
+   }, { threshold: 0.3 });
+
+   sections.forEach(s => {
+     const el = document.getElementById(s.id);
+     if (el) observer.observe(el);
+   });
+
+   // "Visão Geral" ativo por padrão quando no topo
+   const navGeralItem = document.querySelector('a[href="#"]');
+   window.addEventListener('scroll', () => {
+     if (window.scrollY < 100) {
+       Object.values(navItems).forEach(el => el && el.classList.remove('pe-topbar__nav-item--active'));
+       if (navGeralItem) navGeralItem.classList.add('pe-topbar__nav-item--active');
+     }
+   });
   </script>
 </body>
 </html>

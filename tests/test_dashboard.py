@@ -151,3 +151,57 @@ def test_empty_database_handling(client):
     assert res_inst.json == {
         "institutos": []
     }
+
+from unittest.mock import patch, MagicMock
+
+def test_api_visao_geral(client):
+    """Testa o endpoint /api/visao-geral com dados do seed."""
+    setup_db_with_seed()
+    response = client.get('/api/visao-geral')
+    assert response.status_code == 200
+    data = response.json
+    assert 'kpis' in data
+    assert 'lider_presidente' in data
+    assert 'lider_governador' in data
+    assert 'tendencias' in data
+    
+    assert data['kpis']['total_pesquisas'] > 0
+    assert data['lider_presidente']['candidato'] is not None
+    assert len(data['tendencias']) > 0
+
+@patch('google.genai.Client')
+def test_api_analise_cache(mock_client_class, client):
+    """Testa o endpoint /api/visao-geral/analise com cache e mock do Gemini."""
+    setup_db_with_seed()
+    
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "Esta é uma análise de IA mockada para testes."
+    mock_client.models.generate_content.return_value = mock_response
+    mock_client_class.return_value = mock_client
+    
+    os.environ['GEMINI_API_KEY'] = 'fake-api-key-123'
+    
+    # 1. Primeira chamada: chama Gemini e salva em cache
+    response = client.get('/api/visao-geral/analise')
+    assert response.status_code == 200
+    data = response.json
+    assert 'analise' in data
+    assert data['analise'] == "Esta é uma análise de IA mockada para testes."
+    assert 'gerado_em' in data
+    
+    mock_client_class.assert_called_once()
+    mock_client.models.generate_content.assert_called_once()
+    
+    # 2. Segunda chamada: lê do cache SQLite diretamente
+    mock_client_class.reset_mock()
+    mock_client.models.generate_content.reset_mock()
+    
+    response2 = client.get('/api/visao-geral/analise')
+    assert response2.status_code == 200
+    data2 = response2.json
+    assert data2['analise'] == "Esta é uma análise de IA mockada para testes."
+    
+    mock_client_class.assert_not_called()
+    mock_client.models.generate_content.assert_not_called()
+

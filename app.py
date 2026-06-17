@@ -80,7 +80,8 @@ def require_login():
     allowed_endpoints = [
         'login', 'static', 'api_status', 'dashboard', 
         'api_pesquisas_presidente', 'api_pesquisas_historico', 
-        'api_pesquisas_governador_rj', 'api_institutos'
+        'api_pesquisas_governador_rj', 'api_institutos',
+        'api_visao_geral', 'api_visao_geral_analise'
     ]
     if request.endpoint in allowed_endpoints:
         return
@@ -260,6 +261,106 @@ def admin_logs():
         app.logger.error(f"Erro ao obter logs de execução: {e}")
         
     return jsonify({"logs": logs})
+
+@app.route('/api/visao-geral')
+def api_visao_geral():
+    """Retorna dados estatísticos e tendências consolidadas para a visão geral."""
+    from database import get_visao_geral
+    return jsonify(get_visao_geral())
+
+@app.route('/api/visao-geral/analise')
+def api_visao_geral_analise():
+    """Retorna análise do cenário político com cache de 6 horas."""
+    from database import get_db, get_visao_geral
+    import json
+    import datetime
+    
+    cargo = 'visao_geral'
+    
+    # 1. Verifica cache no SQLite
+    cached_analise = None
+    cached_data = None
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT texto, criado_em FROM analises_ia
+                WHERE cargo = ? AND criado_em >= datetime('now', 'localtime', '-6 hours')
+            """, (cargo,))
+            row = cursor.fetchone()
+            if row:
+                cached_analise = row['texto']
+                cached_data = row['criado_em']
+    except Exception as e:
+        app.logger.error(f"Erro ao ler cache de analise: {e}")
+        
+    if cached_analise:
+        try:
+            dt = datetime.datetime.strptime(cached_data, "%Y-%m-%d %H:%M:%S")
+            gerado_em = dt.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            gerado_em = cached_data
+        return jsonify({
+            "analise": cached_analise,
+            "gerado_em": gerado_em
+        })
+        
+    # 2. Se não estiver no cache, chama Gemini API
+    dados = get_visao_geral()
+    
+    prompt = f"Você é um analista político brasileiro. Com base nos dados abaixo de pesquisas eleitorais, escreva um parágrafo analítico conciso (máximo 3 frases) sobre o cenário eleitoral atual. Seja objetivo, factual e neutro politicamente.\n\nDados: {json.dumps(dados, ensure_ascii=False)}\n\nResponda apenas com o parágrafo, sem título nem formatação."
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return jsonify({"analise": "Gemini API Key não configurada.", "gerado_em": ""}), 500
+        
+    try:
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        
+        MODELOS = [
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash"
+        ]
+        
+        analise_texto = None
+        for modelo in MODELOS:
+            try:
+                response = client.models.generate_content(
+                    model=modelo,
+                    contents=prompt
+                )
+                analise_texto = response.text.strip()
+                if analise_texto:
+                    break
+            except Exception as e:
+                app.logger.warning(f"Erro ao gerar analise com {modelo}: {e}")
+                
+        if not analise_texto:
+            return jsonify({"analise": "Erro ao gerar análise de IA.", "gerado_em": ""}), 500
+            
+        # 3. Salva no banco analises_ia
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            with get_db() as conn:
+                conn.execute("""
+                    INSERT OR REPLACE INTO analises_ia (cargo, texto, criado_em)
+                    VALUES (?, ?, ?)
+                """, (cargo, analise_texto, now_str))
+                conn.commit()
+        except Exception as e:
+            app.logger.error(f"Erro ao salvar analise no banco: {e}")
+            
+        gerado_em = datetime.datetime.strptime(now_str, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M")
+        return jsonify({
+            "analise": analise_texto,
+            "gerado_em": gerado_em
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Erro na geração do Gemini: {e}")
+        return jsonify({"analise": "Serviço de análise de IA temporariamente indisponível.", "gerado_em": ""}), 500
 
 @app.route('/dashboard')
 def dashboard():
