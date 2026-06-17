@@ -52,6 +52,9 @@
         <div id="tendencias-container"></div>
       </div>
 
+      <!-- Alertas de variação -->
+      <div id="alertas-container" style="margin-top:12px;"></div>
+
       <!-- Análise IA -->
       <div class="pe-card pe-ia-block" style="margin-top: 16px;">
         <div class="pe-kpi__label" style="margin-bottom: 8px;">Análise do Cenário</div>
@@ -764,6 +767,36 @@
       select.addEventListener('change', e => carregarComparativo(e.target.value));
     }
 
+    async function carregarAlertas() {
+      const res = await fetch('/api/alertas?cargo=presidente&limiar=3.0');
+      const data = await res.json();
+
+      const container = document.getElementById('alertas-container');
+      if (!data.alertas || data.alertas.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = data.alertas.map(a => {
+        const cls = a.direcao === 'up' ? 'pe-alert--up' : 'pe-alert--down';
+        const seta = a.direcao === 'up' ? '▲' : '▼';
+        const sinal = a.variacao > 0 ? '+' : '';
+        return `
+          <div class="pe-alert ${cls}" style="margin-bottom:8px; padding:10px 12px; border-radius:4px; display:flex; align-items:center; gap:10px;">
+            <span style="font-size:16px;">${seta}</span>
+            <span style="flex:1; font-size:13px;">
+              <strong>${a.candidato}</strong>:
+              ${a.percentual_anterior}% → ${a.percentual_atual}%
+              <strong>(${sinal}${a.variacao}pp)</strong>
+              <span style="font-size:11px; opacity:.7; margin-left:6px;">
+                ${a.instituto_anterior} → ${a.instituto_atual}
+              </span>
+            </span>
+            <span class="pe-alert__time pe-mono" style="font-size:11px;">${formatarData(a.data_atual)}</span>
+          </div>`;
+      }).join('');
+    }
+
     async function carregarMediaAgregada() {
       const res = await fetch('/api/media-agregada?cargo=presidente');
       const data = await res.json();
@@ -808,6 +841,7 @@
       // Carrega informações globais em paralelo
       await Promise.all([
         carregarVisaoGeral(),
+        carregarAlertas(),
         carregarMediaAgregada(),
         carregarPresidente(),
         carregarGovernador(),

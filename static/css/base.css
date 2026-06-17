@@ -321,3 +321,7 @@ body {
 .pe-table tbody tr:hover {
   background: var(--pe-bg);
 }
+
+.pe-alert--up { background: #E8F5EE; border-left: 3px solid var(--pe-up); }
+.pe-alert--down { background: #FDECEA; border-left: 3px solid var(--pe-down); }
+.pe-alert__time { color: var(--pe-text-muted); }

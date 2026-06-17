@@ -179,6 +179,15 @@ def test_api_comparativo(client):
     # Seed tem Lula como candidato; deve retornar lista (pode ser vazia se seed não tiver dados)
     assert isinstance(data['institutos'], list)
 
+def test_api_alertas(client):
+    """Testa GET /api/alertas?cargo=presidente&limiar=3.0 retorna JSON com chave alertas."""
+    setup_db_with_seed()
+    response = client.get('/api/alertas?cargo=presidente&limiar=3.0')
+    assert response.status_code == 200
+    data = response.json
+    assert 'alertas' in data
+    assert isinstance(data['alertas'], list)
+
 def test_api_media_agregada(client):
     """Testa GET /api/media-agregada?cargo=presidente retorna candidatos."""
     setup_db_with_seed()

@@ -65,5 +65,29 @@ def montar_mensagem_coleta(resultados: list[dict],
     
     linhas.append(f"")
     linhas.append(f"🔗 <a href='http://localhost:5080/dashboard'>Ver Dashboard</a>")
-    
+
+    return "\n".join(linhas)
+
+
+def montar_mensagem_alerta(alertas: list[dict]) -> str:
+    if not alertas:
+        return ""
+
+    linhas = ["🚨 <b>ALERTA — Variação Brusca Detectada</b>", ""]
+
+    for a in alertas:
+        seta = "📈" if a['direcao'] == 'up' else "📉"
+        sinal = "+" if a['variacao'] > 0 else ""
+        linhas.append(
+            f"{seta} <b>{a['candidato']}</b>: "
+            f"{a['percentual_anterior']}% → {a['percentual_atual']}% "
+            f"(<b>{sinal}{a['variacao']}pp</b>)"
+        )
+        linhas.append(
+            f"   {a['instituto_anterior']} {a['data_anterior']} → "
+            f"{a['instituto_atual']} {a['data_atual']}"
+        )
+        linhas.append("")
+
+    linhas.append(f"🔗 <a href='https://pulso-eleitoral.fly.dev/dashboard'>Ver Dashboard</a>")
     return "\n".join(linhas)

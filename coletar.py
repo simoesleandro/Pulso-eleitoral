@@ -96,6 +96,17 @@ def main():
     else:
         logger.info("Sem dados novos — sync ignorado")
 
+    # Verifica variações bruscas
+    from database import detectar_variacoes_bruscas
+    from notifier import montar_mensagem_alerta
+    alertas = detectar_variacoes_bruscas(cargo='presidente', limiar_pp=3.0)
+    if alertas:
+        logger.info(f"{len(alertas)} alerta(s) de variação detectado(s)")
+        msg_alerta = montar_mensagem_alerta(alertas)
+        send_telegram(msg_alerta)
+    else:
+        logger.info("Nenhuma variação brusca detectada")
+
     logger.info(f"=== Coleta finalizada: {len(resultados)} coletores ===")
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from notifier import send_telegram, montar_mensagem_coleta
+from notifier import send_telegram, montar_mensagem_coleta, montar_mensagem_alerta
 
 def test_send_telegram_sem_config():
     """Testa que send_telegram retorna False e não crasha se não houver token ou chat id configurados."""
@@ -65,6 +65,35 @@ def test_montar_mensagem_sem_novidades():
     
     assert "⚪ Sem novidades" in msg
     assert "📊 Intenções salvas: 0" in msg
+
+def test_montar_mensagem_alerta_com_dados():
+    """Testa que montar_mensagem_alerta formata corretamente um alerta de queda."""
+    alertas = [
+        {
+            'candidato': 'Lula',
+            'percentual_atual': 36.0,
+            'percentual_anterior': 40.0,
+            'variacao': -4.0,
+            'direcao': 'down',
+            'data_atual': '2026-06-15',
+            'data_anterior': '2026-06-08',
+            'instituto_atual': 'Quaest',
+            'instituto_anterior': 'Datafolha',
+        }
+    ]
+    msg = montar_mensagem_alerta(alertas)
+    assert '🚨' in msg
+    assert 'Lula' in msg
+    assert '40.0%' in msg
+    assert '36.0%' in msg
+    assert '-4.0pp' in msg
+    assert '📉' in msg
+    assert 'pulso-eleitoral.fly.dev' in msg
+
+def test_montar_mensagem_alerta_vazio():
+    """Testa que montar_mensagem_alerta retorna string vazia para lista vazia."""
+    msg = montar_mensagem_alerta([])
+    assert msg == ""
 
 def test_montar_mensagem_com_erro():
     """Testa que a mensagem reporta erros se algum coletor falhar."""

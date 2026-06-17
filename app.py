@@ -83,7 +83,8 @@ def require_login():
         'api_pesquisas_governador_rj', 'api_institutos',
         'api_visao_geral', 'api_visao_geral_analise', 'api_comparativo',
         'api_pesquisas_historico_multi',
-        'api_media_agregada'
+        'api_media_agregada',
+        'api_alertas'
     ]
     if request.endpoint in allowed_endpoints:
         return
@@ -506,6 +507,15 @@ def api_pesquisas_governador_rj():
         "instituto": first['instituto'],
         "margem_erro": first['margem_erro']
     })
+
+@app.route('/api/alertas')
+def api_alertas():
+    """Retorna alertas de variações bruscas de percentual."""
+    from database import detectar_variacoes_bruscas
+    cargo = request.args.get('cargo', 'presidente')
+    limiar = float(request.args.get('limiar', 3.0))
+    janela = int(request.args.get('janela', 7))
+    return jsonify({"alertas": detectar_variacoes_bruscas(cargo, limiar, janela)})
 
 @app.route('/api/pesquisas/historico-multi')
 def api_pesquisas_historico_multi():
