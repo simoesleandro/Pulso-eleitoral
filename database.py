@@ -288,6 +288,7 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
             AND LOWER(i.candidato) NOT LIKE '%indecisos%'
             AND LOWER(i.candidato) NOT LIKE '%não sabe%'
             AND LOWER(i.candidato) NOT LIKE '%não respondeu%'
+            AND NOT (i.candidato IN ('Lula', 'Flávio Bolsonaro') AND i.percentual < 20)
             ORDER BY i.candidato, p.data_pesquisa
         """, (cargo, data_limite)).fetchall()
 

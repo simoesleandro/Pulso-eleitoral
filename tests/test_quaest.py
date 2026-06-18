@@ -82,7 +82,7 @@ def test_fetch_with_mock_requests(mock_get_page):
     # Primeira chamada do fetch: obtém listagem
     # Segunda chamada do fetch: obtém o release 1
     mock_get_page.side_effect = [
-        # Listagem
+        # Listagem página 1
         """
         <html>
           <body>
@@ -90,6 +90,8 @@ def test_fetch_with_mock_requests(mock_get_page):
           </body>
         </html>
         """,
+        # Listagem página 2 (vazia)
+        """<html><body></body></html>""",
         # Release 1
         """
         <html>

@@ -58,13 +58,13 @@ def test_extract_links_url_absoluta(coletor):
 
 
 def test_extract_links_max_10(coletor):
-    """Não retorna mais de 15 links."""
+    """Não retorna mais de 20 links."""
     html = "<html><body>" + "".join(
         f'<a href="/eleicoes/2026/pesquisa-eleitoral-2026/real-time-presidente-{i}/">Real Time presidente {i}</a>'
-        for i in range(20)
+        for i in range(25)
     ) + "</body></html>"
     links = coletor._extract_links(html)
-    assert len(links) <= 15
+    assert len(links) <= 20
 
 
 def test_detectar_instituto_real_time(coletor):
@@ -113,7 +113,7 @@ def test_fetch_com_mock(coletor):
     """fetch() com _get_page mockado deve retornar lista de resultados."""
     mock_dados = [{'candidato': 'Lula', 'percentual': 45.0, 'instituto_id': 7, 'data_divulgacao': '2026-06-12'}]
 
-    with patch.object(coletor, '_get_page', side_effect=[MOCK_LISTING_HTML, MOCK_RELEASE_HTML, MOCK_RELEASE_HTML, MOCK_RELEASE_HTML]):
+    with patch.object(coletor, '_get_page', side_effect=[MOCK_LISTING_HTML, MOCK_LISTING_HTML, MOCK_RELEASE_HTML, MOCK_RELEASE_HTML, MOCK_RELEASE_HTML]):
         with patch.object(coletor, '_parse_release', return_value=mock_dados):
             resultado = coletor.fetch()
 
