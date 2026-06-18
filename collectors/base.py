@@ -96,10 +96,10 @@ class BaseCollector(ABC):
 
             # 2. Para cada grupo
             for (inst_id, cargo, dt_coleta, url), group_items in groups.items():
-                # a. Verifica se já existe registro em pesquisas com mesmo instituto_id + cargo + data_pesquisa + fonte_url
+                # a. Verifica se já existe registro em pesquisas com mesmo instituto_id + cargo + fonte_url
                 cursor.execute(
-                    "SELECT id FROM pesquisas WHERE instituto_id=? AND cargo=? AND date(data_pesquisa)=? AND fonte_url=?",
-                    (inst_id, cargo, dt_coleta, url)
+                    "SELECT id FROM pesquisas WHERE instituto_id=? AND cargo=? AND fonte_url=?",
+                    (inst_id, cargo, url)
                 )
                 row = cursor.fetchone()
                 

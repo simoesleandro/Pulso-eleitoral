@@ -5,6 +5,13 @@ from .base import BaseCollector, logger
 from .playwright_base import PlaywrightCollector
 
 BASE_URL = "https://datafolha.folha.uol.com.br"
+RELEASES_BLOQUEADOS = [
+    'lula-e-flavio-bolsonaro-empatam',
+    'lula-pt-amplia-de-3-para-9-pontos',
+    'lula-se-destaca-por-experiencia',
+    'lula-tem-39-no-1o-turno',
+    'um-terco-dos-eleitores',
+]
 LISTING_URLS = [
     "https://datafolha.folha.uol.com.br/eleicoes/",
     "https://datafolha.folha.uol.com.br/eleicoes/?page=2",
@@ -104,6 +111,9 @@ class DatafolhaCollector(PlaywrightCollector, BaseCollector):
                 if l not in seen:
                     seen.add(l)
                     unique.append(l)
+
+            # Remove releases com dados inconsistentes
+            unique = [l for l in unique if not any(b in l for b in RELEASES_BLOQUEADOS)]
 
             return unique[:15]
 
