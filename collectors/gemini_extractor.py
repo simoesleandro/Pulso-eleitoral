@@ -120,6 +120,9 @@ MAPA_NOMES = {
     'acm neto': None,
     'jeronimo rodrigues': None,
     'jerônimo rodrigues': None,
+    'ratinho junior': None,
+    'ratinho': None,
+    'carlos massa ratinho junior': None,
     'joaquim barbosa': None,
     # Abreviações comuns
     'ciro': 'Ciro Gomes',
