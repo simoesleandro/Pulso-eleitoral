@@ -338,6 +338,44 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
     }
 
 
+def get_dados_regionais() -> dict:
+    """Retorna percentuais mais recentes por candidato e UF da tabela pesquisas_regionais."""
+    try:
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT uf, candidato, percentual, data_coleta "
+                "FROM pesquisas_regionais ORDER BY uf, candidato, data_coleta DESC"
+            ).fetchall()
+    except Exception:
+        return {"candidatos": [], "estados": {}}
+
+    estados: dict = {}
+    seen: set = set()
+    candidato_totals: dict = {}
+
+    for row in rows:
+        key = (row["uf"], row["candidato"])
+        if key in seen:
+            continue
+        seen.add(key)
+        uf = row["uf"]
+        if uf not in estados:
+            estados[uf] = {}
+        estados[uf][row["candidato"]] = {
+            "percentual": row["percentual"],
+            "data": row["data_coleta"],
+        }
+        candidato_totals.setdefault(row["candidato"], []).append(row["percentual"])
+
+    candidatos = sorted(
+        candidato_totals,
+        key=lambda c: sum(candidato_totals[c]) / len(candidato_totals[c]),
+        reverse=True,
+    )
+
+    return {"candidatos": candidatos, "estados": estados}
+
+
 def get_kpis_avancados(cargo: str) -> dict:
     """Calcula 6 KPIs analíticos avançados com base na média agregada dos últimos 30 dias."""
     from statistics import stdev

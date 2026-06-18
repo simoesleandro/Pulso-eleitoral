@@ -30,6 +30,7 @@
       <a class="pe-topbar__nav-item" href="#secao-evolucao">Evolução</a>
       <a class="pe-topbar__nav-item" href="#secao-comparativo">Comparativo</a>
       <a class="pe-topbar__nav-item" href="#secao-governador">Gov. RJ</a>
+      <a class="pe-topbar__nav-item" href="#secao-regional">Regional</a>
     </div>
     <div class="pe-topbar__meta">
       <span id="badge-update">carregando...</span>
@@ -200,7 +201,17 @@
       </div>
     </section>
 
-    <!-- Seção 4: Institutos -->
+    <!-- Seção 4: Regional -->
+    <section id="secao-regional" class="pe-section">
+      <h2 class="pe-section__title">Intenção de Voto por Estado — Presidente</h2>
+      <div class="pe-card">
+        <div id="regional-container">
+          <p class="pe-mono" style="color:var(--pe-text-muted);">Coletando dados regionais...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção 5: Institutos -->
     <section id="secao-institutos" class="pe-section">
       <h2 class="pe-section__title">Integridade dos Coletores</h2>
       <div class="pe-grid-institutos" id="lista-institutos">
@@ -843,6 +854,63 @@
       }).join('');
     }
 
+    async function carregarRegional() {
+      const res = await fetch('/api/regional/presidente');
+      const data = await res.json();
+      const container = document.getElementById('regional-container');
+
+      if (!data.estados || Object.keys(data.estados).length === 0) {
+        container.innerHTML = '<p class="pe-mono" style="color:var(--pe-text-muted);">Sem dados regionais disponíveis. Aguardando próxima coleta.</p>';
+        return;
+      }
+
+      const estados = Object.keys(data.estados).sort();
+      const candidatos = data.candidatos.slice(0, 2);
+
+      const html = `
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--pe-surface);">
+              <th style="text-align:left; padding:8px; color:var(--pe-text-muted); font-size:11px; font-weight:500; text-transform:uppercase;">Estado</th>
+              ${candidatos.map(c => `
+                <th style="text-align:center; padding:8px; color:var(--pe-text-muted); font-size:11px; font-weight:500; text-transform:uppercase;">${c}</th>
+              `).join('')}
+              <th style="text-align:center; padding:8px; color:var(--pe-text-muted); font-size:11px; font-weight:500; text-transform:uppercase;">Líder</th>
+              <th style="text-align:right; padding:8px; color:var(--pe-text-muted); font-size:11px; font-weight:500; text-transform:uppercase;">Data</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${estados.map(uf => {
+              const estado = data.estados[uf];
+              const vals = candidatos.map(c => estado[c] ? estado[c].percentual : null);
+              const lider = (vals[0] || 0) >= (vals[1] || 0) ? candidatos[0] : candidatos[1];
+              const liderCor = lider === candidatos[0] ? 'var(--pe-navy)' : 'var(--pe-red)';
+              const data_uf = (estado[candidatos[0]] || estado[candidatos[1]] || {}).data || '';
+              return `
+                <tr style="border-bottom:1px solid var(--pe-surface);">
+                  <td style="padding:10px 8px; font-weight:500;">${uf}</td>
+                  ${candidatos.map((c, i) => {
+                    const pct = vals[i];
+                    const cor = i === 0 ? 'var(--pe-navy)' : 'var(--pe-red)';
+                    return `<td style="text-align:center; padding:10px 8px; font-family:'JetBrains Mono',monospace; color:${cor}; font-weight:500;">
+                      ${pct !== null ? pct.toFixed(1) + '%' : '—'}
+                    </td>`;
+                  }).join('')}
+                  <td style="text-align:center; padding:10px 8px;">
+                    <span style="font-size:11px; font-weight:500; color:${liderCor};">${lider}</span>
+                  </td>
+                  <td style="text-align:right; padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--pe-text-muted);">
+                    ${formatarData(data_uf)}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+      container.innerHTML = html;
+    }
+
     async function carregarKpisAvancados() {
       const res = await fetch('/api/kpis-avancados?cargo=presidente');
       const d = await res.json();
@@ -976,7 +1044,8 @@
         carregarInstitutos(),
         inicializarComparativo(),
         carregarHistoricoMulti(),
-        carregarKpisAvancados()
+        carregarKpisAvancados(),
+        carregarRegional()
       ]);
     }
 
@@ -988,6 +1057,7 @@
      { id: 'secao-evolucao', nav: 'nav-evolucao' },
      { id: 'secao-comparativo', nav: 'nav-comparativo' },
      { id: 'secao-governador', nav: 'nav-governador' },
+     { id: 'secao-regional', nav: 'nav-regional' },
    ];
 
    const navItems = {
@@ -995,6 +1065,7 @@
      'nav-evolucao': document.querySelector('a[href="#secao-evolucao"]'),
      'nav-comparativo': document.querySelector('a[href="#secao-comparativo"]'),
      'nav-governador': document.querySelector('a[href="#secao-governador"]'),
+     'nav-regional': document.querySelector('a[href="#secao-regional"]'),
    };
 
    const observer = new IntersectionObserver((entries) => {

@@ -87,7 +87,8 @@ def require_login():
         'api_pesquisas_historico_multi',
         'api_media_agregada',
         'api_alertas',
-        'api_kpis_avancados'
+        'api_kpis_avancados',
+        'api_regional_presidente'
     ]
     if request.endpoint in allowed_endpoints:
         return
@@ -547,6 +548,12 @@ def api_kpis_avancados():
     from database import get_kpis_avancados
     cargo = request.args.get('cargo', 'presidente')
     return jsonify(get_kpis_avancados(cargo))
+
+@app.route('/api/regional/presidente')
+def api_regional_presidente():
+    """Retorna dados regionais de intenção de voto por UF para mapa de calor."""
+    from database import get_dados_regionais
+    return jsonify(get_dados_regionais())
 
 @app.route('/api/pesquisas/historico')
 def api_pesquisas_historico():

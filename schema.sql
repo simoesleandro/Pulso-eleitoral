@@ -84,7 +84,17 @@ CREATE INDEX IF NOT EXISTS idx_pesquisas_cargo ON pesquisas(cargo);
 CREATE INDEX IF NOT EXISTS idx_pesquisas_data_pesquisa ON pesquisas(data_pesquisa);
 CREATE INDEX IF NOT EXISTS idx_alertas_cargo ON alertas(cargo);
 
--- 8. Tabela de usuários para controle de acesso
+-- 8. Dados regionais de intenção de voto por UF
+CREATE TABLE IF NOT EXISTS pesquisas_regionais (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pesquisa_id INTEGER REFERENCES pesquisas(id),
+    uf TEXT NOT NULL,
+    candidato TEXT NOT NULL,
+    percentual REAL NOT NULL,
+    data_coleta TEXT NOT NULL
+);
+
+-- 9. Tabela de usuários para controle de acesso
 CREATE TABLE IF NOT EXISTS usuarios (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,

@@ -30,10 +30,18 @@ INSTITUTO_ID_MAP = {
     'verita':     9,
 }
 
-EXCLUIR_ESTADOS = [
-    'governador', 'senador', 'senado', 'deputado',
-    'prefeito', 'vereador',
-]
+UF_MAP = {
+    'sao-paulo': 'SP', 'sao paulo': 'SP', 'sp': 'SP',
+    'rio-de-janeiro': 'RJ', 'rio de janeiro': 'RJ', 'rj': 'RJ',
+    'minas-gerais': 'MG', 'minas gerais': 'MG', 'mg': 'MG',
+    'bahia': 'BA', 'ba': 'BA',
+    'rio-grande-do-sul': 'RS', 'rio grande do sul': 'RS', 'rs': 'RS',
+    'parana': 'PR', 'pr': 'PR',
+    'goias': 'GO', 'go': 'GO',
+    'ceara': 'CE', 'ce': 'CE',
+    'pernambuco': 'PE', 'pe': 'PE',
+    'para': 'PA', 'pa': 'PA',
+}
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -81,9 +89,8 @@ class GazetaDoPovoColetor(PlaywrightCollector, BaseCollector):
                 if not any(_norm(inst) in combinado for inst in INSTITUTOS_ALVO):
                     continue
 
-                # Exclui links que claramente são estaduais pelo slug
-                # (mantém links ambíguos para o Gemini decidir)
-                if any(excluir in combinado for excluir in EXCLUIR_ESTADOS):
+                # Mantém apenas links presidenciais (nacionais ou estaduais)
+                if 'presidente' not in combinado:
                     continue
 
                 url_abs = href if href.startswith('http') else BASE_URL + href
@@ -122,9 +129,38 @@ class GazetaDoPovoColetor(PlaywrightCollector, BaseCollector):
         self.logger.warning("[GazetaDoPovo] Instituto não identificado em %s — usando fallback 7", url[:60])
         return 7
 
+    def _detectar_uf(self, url: str, html_inicio: str) -> str | None:
+        texto = _norm(url + ' ' + html_inicio)
+        for chave in sorted(UF_MAP, key=len, reverse=True):
+            if _norm(chave) in texto:
+                return UF_MAP[chave]
+        return None
+
+    def _salvar_regional(self, dados: list[dict], uf: str) -> None:
+        import database
+        try:
+            with database.get_db() as conn:
+                for d in dados:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO pesquisas_regionais "
+                        "(uf, candidato, percentual, data_coleta) VALUES (?, ?, ?, ?)",
+                        (uf, d['candidato'], d['percentual'], d.get('data_coleta', ''))
+                    )
+                conn.commit()
+            self.logger.info("[GazetaDoPovo] Regional %s: %d intenções salvas", uf, len(dados))
+        except Exception as e:
+            self.logger.error("[GazetaDoPovo] Erro ao salvar regional %s: %s", uf, e)
+
     def _parse_release(self, html: str, url: str) -> list[dict]:
+        uf = self._detectar_uf(url, html[:1000])
         instituto_id = self._detectar_instituto_id(html[:2000], url)
-        return self._parse_com_gemini(html, url, instituto_id=instituto_id)
+        dados = self._parse_com_gemini(html, url, instituto_id=instituto_id)
+
+        if uf and dados:
+            self._salvar_regional(dados, uf)
+            return []
+
+        return dados
 
     def fetch(self) -> list[dict]:
         html = self._get_page(LISTING_URL)

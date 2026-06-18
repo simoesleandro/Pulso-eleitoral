@@ -241,6 +241,17 @@ def test_api_kpis_avancados(client):
     assert isinstance(data['volatilidade']['candidatos'], list)
     assert data['volatilidade']['cenario_geral'] in ('estavel', 'moderado', 'volatil')
 
+def test_api_regional(client):
+    """Testa GET /api/regional/presidente retorna JSON com chaves candidatos e estados."""
+    setup_db_with_seed()
+    response = client.get('/api/regional/presidente')
+    assert response.status_code == 200
+    data = response.json
+    assert 'candidatos' in data
+    assert 'estados' in data
+    assert isinstance(data['candidatos'], list)
+    assert isinstance(data['estados'], dict)
+
 @patch('google.genai.Client')
 def test_api_analise_cache(mock_client_class, client):
     """Testa o endpoint /api/visao-geral/analise com cache e mock do Gemini."""
