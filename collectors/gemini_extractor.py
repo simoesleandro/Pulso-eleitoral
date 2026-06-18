@@ -28,6 +28,11 @@ REGRAS CRÍTICAS:
 - IGNORE: cenários de 2º turno, cenários hipotéticos com candidatos
   que ainda não declararam candidatura (Michelle Bolsonaro, Aécio Neves, etc.)
 - Percentuais válidos para presidente: entre 1% e 60% por candidato
+- Candidatos NACIONAIS principais (Lula, Flávio Bolsonaro) têm percentuais
+  entre 25% e 50% em 1º turno nacional — se aparecerem com menos de 25%,
+  provavelmente são dados estaduais — IGNORE esse cenário inteiro
+- Candidatos menores (Ciro Gomes, Ronaldo Caiado, Romeu Zema, etc.) podem
+  ter percentuais entre 1% e 20% — esses são válidos
 - A soma dos percentuais dos candidatos deve ser <= 100%
 - Se a soma ultrapassar 100%, os percentuais provavelmente são de
   cenários diferentes — retorne {"candidatos": []}
