@@ -10,7 +10,10 @@ from .playwright_base import PlaywrightCollector
 from .utils import fetch_with_retry
 
 BASE_URL = "https://quaest.com.br"
-LISTING_URL = "https://quaest.com.br/blog/"
+LISTING_URLS = [
+    "https://quaest.com.br/category/politica/",
+    "https://quaest.com.br/category/politica/page/2/",
+]
 INSTITUTO_ID = 3
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -82,24 +85,28 @@ class QuaestCollector(PlaywrightCollector, BaseCollector):
         return self._parse_com_gemini(html, url, instituto_id=self.instituto_id)
 
     def fetch(self) -> list[dict]:
-        """Consulta a listagem da Quaest, extrai os links e processa os releases."""
-        html = self._get_page(LISTING_URL)
-        if not html:
-            return []
-            
-        links = self._extract_links(html)
-        
-        # Limita a no máximo 5 links
-        links = links[:5]
-        
+        """Consulta as listagens da Quaest, extrai os links e processa os releases."""
+        todos_links = []
+        for listing_url in LISTING_URLS:
+            html = self._get_page(listing_url)
+            if html:
+                todos_links.extend(self._extract_links(html))
+
+        seen = set()
+        unique_links = []
+        for l in todos_links:
+            if l not in seen:
+                seen.add(l)
+                unique_links.append(l)
+        unique_links = unique_links[:10]
+
         resultados = []
-        for idx, link in enumerate(links):
-            self.logger.info("[%s] Raspando release %d/%d: %s", self.name, idx + 1, len(links), link)
+        for idx, link in enumerate(unique_links):
+            self.logger.info("[%s] Raspando release %d/%d: %s", self.name, idx + 1, len(unique_links), link)
             html_release = self._get_page(link)
             dados = self._parse_release(html_release, link)
             resultados.extend(dados)
-            # Respeita o servidor
             time.sleep(2)
-            
-        self.logger.info("[%s] %d registros extraídos de %d releases", self.name, len(resultados), len(links))
+
+        self.logger.info("[%s] %d registros de %d releases", self.name, len(resultados), len(unique_links))
         return resultados

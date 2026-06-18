@@ -5,7 +5,10 @@ from .base import BaseCollector, logger
 from .playwright_base import PlaywrightCollector
 
 BASE_URL = "https://datafolha.folha.uol.com.br"
-LISTING_URL = "https://datafolha.folha.uol.com.br/eleicoes/"
+LISTING_URLS = [
+    "https://datafolha.folha.uol.com.br/eleicoes/",
+    "https://datafolha.folha.uol.com.br/eleicoes/?page=2",
+]
 INSTITUTO_ID = 1
 
 FILTRO_NACIONAL = [
@@ -102,7 +105,7 @@ class DatafolhaCollector(PlaywrightCollector, BaseCollector):
                     seen.add(l)
                     unique.append(l)
 
-            return unique[:6]
+            return unique[:15]
 
         except Exception as e:
             logger.warning("[Datafolha] Erro ao extrair links: %s", e)
@@ -112,16 +115,27 @@ class DatafolhaCollector(PlaywrightCollector, BaseCollector):
         return self._parse_com_gemini(html, url, instituto_id=self.instituto_id)
 
     def fetch(self) -> list[dict]:
-        html = self._get_page(LISTING_URL)
-        links = self._extract_links(html)
+        todos_links = []
+        for listing_url in LISTING_URLS:
+            html = self._get_page(listing_url)
+            if html:
+                todos_links.extend(self._extract_links(html))
+
+        seen = set()
+        unique_links = []
+        for l in todos_links:
+            if l not in seen:
+                seen.add(l)
+                unique_links.append(l)
+        unique_links = unique_links[:15]
 
         resultados = []
-        for idx, link in enumerate(links):
-            self.logger.info("[Datafolha] Raspando release %d/%d: %s", idx + 1, len(links), link)
+        for idx, link in enumerate(unique_links):
+            self.logger.info("[Datafolha] Raspando release %d/%d: %s", idx + 1, len(unique_links), link)
             html_release = self._get_page(link)
             dados = self._parse_release(html_release, link)
             resultados.extend(dados)
             time.sleep(2)
 
-        self.logger.info("[Datafolha] %d registros extraídos de %d releases", len(resultados), len(links))
+        self.logger.info("[Datafolha] %d registros de %d releases", len(resultados), len(unique_links))
         return resultados

@@ -35,16 +35,26 @@ def sync_para_fly(force: bool = False) -> bool:
     logger.info(f"Iniciando sync banco → Fly.io ({APP_NAME})")
 
     try:
-        # 1. Garante que a máquina está rodando
+        # 1. Inicia máquina e aguarda estar pronta com retry
         subprocess.run(
             ['flyctl', 'machines', 'start', '--app', APP_NAME],
             capture_output=True, text=True, timeout=30
         )
 
-        # 2. Aguarda máquina estar pronta
-        time.sleep(20)
+        for tentativa in range(5):
+            time.sleep(10)
+            result = subprocess.run(
+                ['flyctl', 'status', '--app', APP_NAME],
+                capture_output=True, text=True, timeout=15
+            )
+            if 'started' in result.stdout.lower():
+                logger.info(f"Máquina pronta após {(tentativa+1)*10}s")
+                break
+            logger.info(f"Aguardando máquina iniciar... tentativa {tentativa+1}/5")
+        else:
+            logger.warning("Máquina não iniciou em 50s — tentando sync mesmo assim")
 
-        # 3. Remove banco remoto
+        # 2. Remove banco remoto
         result = subprocess.run(
             ['flyctl', 'ssh', 'console', '--app', APP_NAME, '-C', 'rm -f /data/pulso.db'],
             capture_output=True, text=True, timeout=30

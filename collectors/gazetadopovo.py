@@ -6,7 +6,10 @@ from .playwright_base import PlaywrightCollector
 from .utils import fetch_with_retry
 
 BASE_URL = "https://www.gazetadopovo.com.br"
-LISTING_URL = "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/"
+LISTING_URLS = [
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/?pagina=2",
+]
 
 INSTITUTOS_ALVO = [
     'real time', 'real-time', 'realtimebigdata',
@@ -105,7 +108,7 @@ class GazetaDoPovoColetor(PlaywrightCollector, BaseCollector):
                     seen.add(link)
                     unique.append(link)
 
-            return unique[:15]
+            return unique[:20]
         except Exception as e:
             self.logger.warning("[GazetaDoPovo] Erro ao extrair links: %s", e)
             return []
@@ -163,19 +166,27 @@ class GazetaDoPovoColetor(PlaywrightCollector, BaseCollector):
         return dados
 
     def fetch(self) -> list[dict]:
-        html = self._get_page(LISTING_URL)
-        if not html:
-            return []
+        todos_links = []
+        for listing_url in LISTING_URLS:
+            html = self._get_page(listing_url)
+            if html:
+                todos_links.extend(self._extract_links(html))
 
-        links = self._extract_links(html)
+        seen = set()
+        unique_links = []
+        for l in todos_links:
+            if l not in seen:
+                seen.add(l)
+                unique_links.append(l)
+        unique_links = unique_links[:20]
+
         resultados = []
-
-        for idx, link in enumerate(links):
-            self.logger.info("[GazetaDoPovo] Release %d/%d: %s", idx + 1, len(links), link)
+        for idx, link in enumerate(unique_links):
+            self.logger.info("[GazetaDoPovo] Release %d/%d: %s", idx + 1, len(unique_links), link)
             html_release = self._get_page(link)
             dados = self._parse_release(html_release, link)
             resultados.extend(dados)
             time.sleep(1)
 
-        self.logger.info("[GazetaDoPovo] %d registros de %d releases", len(resultados), len(links))
+        self.logger.info("[GazetaDoPovo] %d registros de %d releases", len(resultados), len(unique_links))
         return resultados
