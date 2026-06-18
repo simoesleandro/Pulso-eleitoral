@@ -88,7 +88,8 @@ def require_login():
         'api_media_agregada',
         'api_alertas',
         'api_kpis_avancados',
-        'api_regional_presidente'
+        'api_regional_presidente',
+        'api_simulacao_segundo_turno'
     ]
     if request.endpoint in allowed_endpoints:
         return
@@ -548,6 +549,12 @@ def api_kpis_avancados():
     from database import get_kpis_avancados
     cargo = request.args.get('cargo', 'presidente')
     return jsonify(get_kpis_avancados(cargo))
+
+@app.route('/api/simulacao-segundo-turno')
+def api_simulacao_segundo_turno():
+    """Retorna simulação de 2º turno com redistribuição proporcional de votos."""
+    from database import get_simulacao_segundo_turno
+    return jsonify(get_simulacao_segundo_turno())
 
 @app.route('/api/regional/presidente')
 def api_regional_presidente():

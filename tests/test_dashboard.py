@@ -241,6 +241,22 @@ def test_api_kpis_avancados(client):
     assert isinstance(data['volatilidade']['candidatos'], list)
     assert data['volatilidade']['cenario_geral'] in ('estavel', 'moderado', 'volatil')
 
+def test_api_simulacao(client):
+    """Testa GET /api/simulacao-segundo-turno retorna JSON com chaves corretas."""
+    setup_db_with_seed()
+    response = client.get('/api/simulacao-segundo-turno')
+    assert response.status_code == 200
+    data = response.json
+    assert 'primeiro_turno' in data
+    assert 'segundo_turno' in data
+    assert 'candidatos' in data['primeiro_turno']
+    assert isinstance(data['primeiro_turno']['candidatos'], list)
+    st = data['segundo_turno']
+    for chave in ('lula', 'flavio', 'indefinido', 'nota'):
+        assert chave in st, f"Chave ausente em segundo_turno: {chave}"
+    assert 'total_estimado' in st['lula']
+    assert 'total_estimado' in st['flavio']
+
 def test_api_regional(client):
     """Testa GET /api/regional/presidente retorna JSON com chaves candidatos e estados."""
     setup_db_with_seed()

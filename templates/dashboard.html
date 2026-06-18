@@ -31,6 +31,7 @@
       <a class="pe-topbar__nav-item" href="#secao-comparativo">Comparativo</a>
       <a class="pe-topbar__nav-item" href="#secao-governador">Gov. RJ</a>
       <a class="pe-topbar__nav-item" href="#secao-regional">Regional</a>
+      <a class="pe-topbar__nav-item" href="#secao-simulacao">Simulação</a>
     </div>
     <div class="pe-topbar__meta">
       <span id="badge-update">carregando...</span>
@@ -211,7 +212,13 @@
       </div>
     </section>
 
-    <!-- Seção 5: Institutos -->
+    <!-- Seção 5: Simulação 2º Turno -->
+    <section id="secao-simulacao" class="pe-section">
+      <h2 class="pe-section__title">Simulação de 2º Turno</h2>
+      <div id="simulacao-container"></div>
+    </section>
+
+    <!-- Seção 6: Institutos -->
     <section id="secao-institutos" class="pe-section">
       <h2 class="pe-section__title">Integridade dos Coletores</h2>
       <div class="pe-grid-institutos" id="lista-institutos">
@@ -854,6 +861,62 @@
       }).join('');
     }
 
+    async function carregarSimulacao() {
+      const res = await fetch('/api/simulacao-segundo-turno');
+      const d = await res.json();
+      const container = document.getElementById('simulacao-container');
+      const st = d.segundo_turno;
+
+      const lulaCor = st.lula.vencedor ? 'var(--pe-up)' : 'var(--pe-text-muted)';
+      const flavioCor = st.flavio.vencedor ? 'var(--pe-up)' : 'var(--pe-text-muted)';
+      const lulaBadge = st.lula.vencedor ? '🏆' : '';
+      const flavioBadge = st.flavio.vencedor ? '🏆' : '';
+
+      container.innerHTML = `
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+
+          <div class="pe-card" style="border-left:3px solid var(--pe-navy);">
+            <div class="pe-kpi__label">Lula (PT) ${lulaBadge}</div>
+            <div style="font-size:32px; font-weight:500; color:${lulaCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">
+              ${st.lula.total_estimado.toFixed(1)}%
+            </div>
+            <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">estimativa 2º turno</div>
+            <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
+              Votos diretos: ${st.lula.votos_diretos.toFixed(1)}%<br>
+              Redistribuídos: +${st.lula.votos_redistribuidos.toFixed(1)}%
+            </div>
+            <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
+              <div style="width:${Math.min(st.lula.total_estimado, 100)}%; height:100%; background:var(--pe-navy); border-radius:2px;"></div>
+            </div>
+          </div>
+
+          <div class="pe-card" style="border-left:3px solid var(--pe-red);">
+            <div class="pe-kpi__label">Flávio Bolsonaro (PL) ${flavioBadge}</div>
+            <div style="font-size:32px; font-weight:500; color:${flavioCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">
+              ${st.flavio.total_estimado.toFixed(1)}%
+            </div>
+            <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">estimativa 2º turno</div>
+            <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
+              Votos diretos: ${st.flavio.votos_diretos.toFixed(1)}%<br>
+              Redistribuídos: +${st.flavio.votos_redistribuidos.toFixed(1)}%
+            </div>
+            <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
+              <div style="width:${Math.min(st.flavio.total_estimado, 100)}%; height:100%; background:var(--pe-red); border-radius:2px;"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="pe-card" style="background:var(--pe-surface); border:none;">
+          <div class="pe-mono" style="font-size:11px; color:var(--pe-text-muted);">
+            ⚠️ ${st.nota} ·
+            Indefinidos não redistribuídos: ${st.indefinido.toFixed(1)}% ·
+            Atualizado em: ${d.primeiro_turno.data_atualizacao}
+          </div>
+        </div>
+      `;
+    }
+
     async function carregarRegional() {
       const res = await fetch('/api/regional/presidente');
       const data = await res.json();
@@ -1045,7 +1108,8 @@
         inicializarComparativo(),
         carregarHistoricoMulti(),
         carregarKpisAvancados(),
-        carregarRegional()
+        carregarRegional(),
+        carregarSimulacao()
       ]);
     }
 
@@ -1058,6 +1122,7 @@
      { id: 'secao-comparativo', nav: 'nav-comparativo' },
      { id: 'secao-governador', nav: 'nav-governador' },
      { id: 'secao-regional', nav: 'nav-regional' },
+     { id: 'secao-simulacao', nav: 'nav-simulacao' },
    ];
 
    const navItems = {
@@ -1066,6 +1131,7 @@
      'nav-comparativo': document.querySelector('a[href="#secao-comparativo"]'),
      'nav-governador': document.querySelector('a[href="#secao-governador"]'),
      'nav-regional': document.querySelector('a[href="#secao-regional"]'),
+     'nav-simulacao': document.querySelector('a[href="#secao-simulacao"]'),
    };
 
    const observer = new IntersectionObserver((entries) => {

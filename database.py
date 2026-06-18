@@ -338,6 +338,68 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
     }
 
 
+def get_simulacao_segundo_turno() -> dict:
+    """Simula resultado de 2º turno Lula x Flávio com redistribuição proporcional de votos."""
+    DIREITA = {'Flávio Bolsonaro', 'Ronaldo Caiado', 'Romeu Zema',
+               'Cabo Daciolo', 'Renan Santos', 'Tarcísio de Freitas'}
+    ESQUERDA_CENTRO = {'Lula', 'Ciro Gomes', 'Simone Tebet',
+                       'Rui Costa Pimenta', 'Augusto Cury'}
+
+    media = get_media_agregada('presidente', dias=30)
+    candidatos = media.get('candidatos', [])
+
+    lula_direto = next((c['media'] for c in candidatos if c['candidato'] == 'Lula'), 0.0)
+    flavio_direto = next((c['media'] for c in candidatos if c['candidato'] == 'Flávio Bolsonaro'), 0.0)
+
+    lula_redist = 0.0
+    flavio_redist = 0.0
+    indefinido = 0.0
+
+    for c in candidatos:
+        nome = c['candidato']
+        pct = c['media']
+        if nome in ('Lula', 'Flávio Bolsonaro'):
+            continue
+        if nome in DIREITA:
+            flavio_redist += pct * 0.70
+            lula_redist += pct * 0.30
+        elif nome in ESQUERDA_CENTRO:
+            lula_redist += pct * 0.70
+            flavio_redist += pct * 0.30
+        else:
+            indefinido += pct
+
+    lula_total = lula_direto + lula_redist
+    flavio_total = flavio_direto + flavio_redist
+
+    return {
+        "primeiro_turno": {
+            "candidatos": [
+                {"candidato": c['candidato'], "media": c['media'], "variacao": c.get('variacao_30d')}
+                for c in candidatos[:5]
+            ],
+            "segundo_turno_provavel": lula_direto < 50,
+            "data_atualizacao": date.today().strftime('%d/%m/%Y'),
+        },
+        "segundo_turno": {
+            "lula": {
+                "votos_diretos": round(lula_direto, 1),
+                "votos_redistribuidos": round(lula_redist, 1),
+                "total_estimado": round(lula_total, 1),
+                "vencedor": lula_total > flavio_total,
+            },
+            "flavio": {
+                "votos_diretos": round(flavio_direto, 1),
+                "votos_redistribuidos": round(flavio_redist, 1),
+                "total_estimado": round(flavio_total, 1),
+                "vencedor": flavio_total > lula_total,
+            },
+            "indefinido": round(indefinido, 1),
+            "nota": "Simulação baseada em redistribuição histórica de votos",
+        },
+    }
+
+
 def get_dados_regionais() -> dict:
     """Retorna percentuais mais recentes por candidato e UF da tabela pesquisas_regionais."""
     try:
