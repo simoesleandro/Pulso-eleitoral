@@ -46,6 +46,13 @@
         <!-- 4 cards: Total Pesquisas, Institutos Ativos, Líder Presidente, Líder Gov. RJ -->
       </div>
 
+      <!-- KPIs Avançados -->
+      <section id="secao-kpis-avancados" style="margin-bottom: 24px; margin-top: 16px;">
+        <div class="pe-kpi-grid" style="grid-template-columns: repeat(3, 1fr); gap: 16px;" id="kpis-avancados-grid">
+          <!-- gerado via JS -->
+        </div>
+      </section>
+
       <!-- Tendências -->
       <div class="pe-card" style="margin-top: 16px;">
         <div class="pe-kpi__label" style="margin-bottom: 12px;">Tendências — últimas pesquisas</div>
@@ -836,6 +843,127 @@
       }).join('');
     }
 
+    async function carregarKpisAvancados() {
+      const res = await fetch('/api/kpis-avancados?cargo=presidente');
+      const d = await res.json();
+      const grid = document.getElementById('kpis-avancados-grid');
+
+      const margemCor = d.margem_lideranca.classificacao === 'empate_tecnico'
+        ? 'var(--pe-warn)'
+        : d.margem_lideranca.classificacao === 'lideranca_confortavel'
+        ? 'var(--pe-up)' : 'var(--pe-navy)';
+      const margemLabel = {
+        'empate_tecnico': '⚠️ Empate Técnico',
+        'lideranca_moderada': '📊 Liderança Moderada',
+        'lideranca_confortavel': '✅ Liderança Confortável'
+      }[d.margem_lideranca.classificacao];
+
+      const turnoLabel = d.probabilidade_segundo_turno.provavel
+        ? '🔄 2º Turno Provável' : '✅ Possível 1º Turno';
+      const turnoCor = d.probabilidade_segundo_turno.provavel
+        ? 'var(--pe-warn)' : 'var(--pe-up)';
+
+      const concLabel = {
+        'bipolar': '⚡ Cenário Bipolar',
+        'moderado': '📊 Cenário Moderado',
+        'fragmentado': '🔀 Cenário Fragmentado'
+      }[d.concentracao_voto.classificacao];
+
+      const volLabel = {
+        estavel: '🟢 Estável',
+        moderado: '🟡 Moderada',
+        volatil: '🔴 Alta'
+      }[d.volatilidade.cenario_geral];
+
+      grid.innerHTML = `
+        <div class="pe-card">
+          <div class="pe-kpi__label">Margem de Liderança</div>
+          <div style="font-size:22px; font-weight:500; color:${margemCor}; font-family:'JetBrains Mono',monospace; margin: 8px 0;">
+            ${d.margem_lideranca.margem.toFixed(1)}pp
+          </div>
+          <div style="font-size:12px; color:var(--pe-text-muted);">${margemLabel}</div>
+          <div style="font-size:11px; color:var(--pe-text-muted); margin-top:4px; font-family:'JetBrains Mono',monospace;">
+            ${d.margem_lideranca.primeiro} ${d.margem_lideranca.percentual_primeiro.toFixed(1)}%
+            vs ${d.margem_lideranca.segundo} ${d.margem_lideranca.percentual_segundo.toFixed(1)}%
+          </div>
+        </div>
+
+        <div class="pe-card">
+          <div class="pe-kpi__label">Perspectiva de Turno</div>
+          <div style="font-size:18px; font-weight:500; color:${turnoCor}; margin: 8px 0;">
+            ${turnoLabel}
+          </div>
+          <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
+            Líder com ${d.probabilidade_segundo_turno.lider_percentual.toFixed(1)}%
+            (mín. 50% para 1º turno)
+          </div>
+        </div>
+
+        <div class="pe-card">
+          <div class="pe-kpi__label">Concentração do Voto</div>
+          <div style="font-size:22px; font-weight:500; color:var(--pe-navy); font-family:'JetBrains Mono',monospace; margin: 8px 0;">
+            ${d.concentracao_voto.top2_soma.toFixed(1)}%
+          </div>
+          <div style="font-size:12px; color:var(--pe-text-muted);">${concLabel}</div>
+          <div style="font-size:11px; color:var(--pe-text-muted); margin-top:4px;">
+            ${d.concentracao_voto.terceira_via_possivel ? '🟡 Terceira via tem espaço' : '🔴 Terceira via improvável'}
+          </div>
+        </div>
+
+        <div class="pe-card">
+          <div class="pe-kpi__label">Campo Minado — Em Ascensão</div>
+          ${d.campo_minado.length === 0
+            ? '<div style="font-size:13px; color:var(--pe-text-muted); margin-top:8px;">Nenhum candidato em ascensão</div>'
+            : d.campo_minado.slice(0,2).map(c => `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--pe-surface);">
+                <span style="font-size:13px;">${c.candidato}</span>
+                <span style="font-size:12px; font-family:'JetBrains Mono',monospace; color:var(--pe-up);">
+                  +${c.crescimento_relativo.toFixed(0)}%
+                  <span style="color:var(--pe-text-muted);">(${c.percentual_atual.toFixed(1)}%)</span>
+                </span>
+              </div>
+            `).join('')
+          }
+        </div>
+
+        <div class="pe-card">
+          <div class="pe-kpi__label">Volatilidade do Cenário</div>
+          <div style="font-size:18px; font-weight:500; color:var(--pe-navy); margin: 8px 0;">
+            ${volLabel}
+          </div>
+          ${d.volatilidade.candidatos.slice(0,2).map(c => `
+            <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
+              ${c.candidato}: σ${c.desvio_padrao.toFixed(1)}pp
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="pe-card">
+          <div class="pe-kpi__label">Aceleração da Tendência</div>
+          ${d.tendencia_aceleracao.slice(0,3).map(t => {
+            const label = {
+              'acelerando_alta': '📈↑',
+              'desacelerando_alta': '📈↓',
+              'acelerando_queda': '📉↑',
+              'desacelerando_queda': '📉↓',
+              'estavel': '➡️'
+            }[t.aceleracao] || '➡️';
+            return `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
+                <span style="font-size:12px;">${t.candidato}</span>
+                <span style="font-size:12px;">${label}
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--pe-text-muted);">
+                    15d:${t.tendencia_15d > 0 ? '+' : ''}${t.tendencia_15d.toFixed(1)}
+                    30d:${t.tendencia_30d > 0 ? '+' : ''}${t.tendencia_30d.toFixed(1)}
+                  </span>
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
     // Inicialização da página
     async function inicializar() {
       // Carrega informações globais em paralelo
@@ -847,7 +975,8 @@
         carregarGovernador(),
         carregarInstitutos(),
         inicializarComparativo(),
-        carregarHistoricoMulti()
+        carregarHistoricoMulti(),
+        carregarKpisAvancados()
       ]);
     }
 

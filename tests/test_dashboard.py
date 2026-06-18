@@ -226,6 +226,21 @@ def test_api_visao_geral(client):
     assert data['lider_presidente']['candidato'] is not None
     assert len(data['tendencias']) > 0
 
+def test_api_kpis_avancados(client):
+    """Testa GET /api/kpis-avancados?cargo=presidente retorna as 6 chaves esperadas."""
+    setup_db_with_seed()
+    response = client.get('/api/kpis-avancados?cargo=presidente')
+    assert response.status_code == 200
+    data = response.json
+    for chave in ('margem_lideranca', 'probabilidade_segundo_turno',
+                  'tendencia_aceleracao', 'campo_minado',
+                  'concentracao_voto', 'volatilidade'):
+        assert chave in data, f"Chave ausente: {chave}"
+    assert isinstance(data['tendencia_aceleracao'], list)
+    assert isinstance(data['campo_minado'], list)
+    assert isinstance(data['volatilidade']['candidatos'], list)
+    assert data['volatilidade']['cenario_geral'] in ('estavel', 'moderado', 'volatil')
+
 @patch('google.genai.Client')
 def test_api_analise_cache(mock_client_class, client):
     """Testa o endpoint /api/visao-geral/analise com cache e mock do Gemini."""

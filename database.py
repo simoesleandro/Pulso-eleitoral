@@ -338,6 +338,171 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
     }
 
 
+def get_kpis_avancados(cargo: str) -> dict:
+    """Calcula 6 KPIs analíticos avançados com base na média agregada dos últimos 30 dias."""
+    from statistics import stdev
+    hoje = date.today()
+    d15 = (hoje - timedelta(days=15)).isoformat()
+    d30 = (hoje - timedelta(days=30)).isoformat()
+    d60 = (hoje - timedelta(days=60)).isoformat()
+
+    media_data = get_media_agregada(cargo, dias=30)
+    candidatos = media_data.get("candidatos", [])
+
+    # --- margem_lideranca ---
+    if len(candidatos) >= 2:
+        p1, p2 = candidatos[0], candidatos[1]
+        margem = round(p1["media"] - p2["media"], 1)
+        if margem < 5:
+            clf = "empate_tecnico"
+        elif margem <= 10:
+            clf = "lideranca_moderada"
+        else:
+            clf = "lideranca_confortavel"
+        margem_lideranca = {
+            "primeiro": p1["candidato"],
+            "segundo": p2["candidato"],
+            "percentual_primeiro": p1["media"],
+            "percentual_segundo": p2["media"],
+            "margem": margem,
+            "classificacao": clf,
+        }
+    else:
+        margem_lideranca = {}
+
+    # --- probabilidade_segundo_turno ---
+    lider_pct = candidatos[0]["media"] if candidatos else 0.0
+    probabilidade_segundo_turno = {
+        "provavel": lider_pct < 50,
+        "lider_percentual": lider_pct,
+        "explicacao": "Nenhum candidato supera 50%" if lider_pct < 50 else f"Líder com {lider_pct}% pode vencer no 1º turno",
+    }
+
+    # --- tendencia_aceleracao (top 3) ---
+    top3_nomes = [c["candidato"] for c in candidatos[:3]]
+    tendencia_aceleracao = []
+    with get_db() as conn:
+        for nome in top3_nomes:
+            def _avg(cand, c_start, c_end=None):
+                if c_end:
+                    r = conn.execute(
+                        "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
+                        "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? AND p.data_pesquisa<?",
+                        (cand, cargo, c_start, c_end)
+                    ).fetchone()
+                else:
+                    r = conn.execute(
+                        "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
+                        "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=?",
+                        (cand, cargo, c_start)
+                    ).fetchone()
+                return r["m"] if r and r["m"] is not None else 0.0
+
+            m_rec15 = _avg(nome, d15)
+            m_ant15 = _avg(nome, d30, d15)
+            m_rec30 = _avg(nome, d30)
+            m_ant30 = _avg(nome, d60, d30)
+
+            t15 = round(m_rec15 - m_ant15, 1)
+            t30 = round(m_rec30 - m_ant30, 1)
+
+            if abs(t15) < 0.5 and abs(t30) < 0.5:
+                acel = "estavel"
+            elif t15 >= 0 and t30 >= 0:
+                acel = "acelerando_alta" if t15 >= t30 else "desacelerando_alta"
+            elif t15 < 0 and t30 < 0:
+                acel = "acelerando_queda" if t15 <= t30 else "desacelerando_queda"
+            elif t15 > 0:
+                acel = "acelerando_alta"
+            else:
+                acel = "acelerando_queda"
+
+            tendencia_aceleracao.append({
+                "candidato": nome,
+                "tendencia_15d": t15,
+                "tendencia_30d": t30,
+                "aceleracao": acel,
+            })
+
+    # --- campo_minado (candidatos fora do top 2, entre 2% e 15%) ---
+    campo_minado = []
+    with get_db() as conn:
+        for c in candidatos[2:]:
+            if not (2.0 <= c["media"] <= 15.0):
+                continue
+            r_rec = conn.execute(
+                "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
+                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=?",
+                (c["candidato"], cargo, d15)
+            ).fetchone()
+            r_ant = conn.execute(
+                "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
+                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? AND p.data_pesquisa<?",
+                (c["candidato"], cargo, d30, d15)
+            ).fetchone()
+            pct_atual = round(r_rec["m"] if r_rec and r_rec["m"] is not None else c["media"], 1)
+            pct_ant = r_ant["m"] if r_ant and r_ant["m"] is not None else None
+            if pct_ant and pct_ant > 0:
+                cresc = round((pct_atual - pct_ant) / pct_ant * 100, 1)
+            else:
+                cresc = 0.0
+            campo_minado.append({
+                "candidato": c["candidato"],
+                "percentual_atual": pct_atual,
+                "percentual_anterior": round(pct_ant, 1) if pct_ant else pct_atual,
+                "crescimento_relativo": cresc,
+                "em_ascensao": cresc > 20,
+            })
+    campo_minado.sort(key=lambda x: x["crescimento_relativo"], reverse=True)
+    campo_minado = campo_minado[:3]
+
+    # --- concentracao_voto ---
+    if len(candidatos) >= 2:
+        top2_soma = round(candidatos[0]["media"] + candidatos[1]["media"], 1)
+        if top2_soma > 70:
+            conc_clf = "bipolar"
+        elif top2_soma >= 55:
+            conc_clf = "moderado"
+        else:
+            conc_clf = "fragmentado"
+        concentracao_voto = {
+            "top2_soma": top2_soma,
+            "classificacao": conc_clf,
+            "terceira_via_possivel": top2_soma < 65,
+        }
+    else:
+        concentracao_voto = {"top2_soma": 0.0, "classificacao": "fragmentado", "terceira_via_possivel": True}
+
+    # --- volatilidade (top 3) ---
+    vol_candidatos = []
+    with get_db() as conn:
+        for c in candidatos[:3]:
+            rows = conn.execute(
+                "SELECT i.percentual FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
+                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? ORDER BY p.data_pesquisa",
+                (c["candidato"], cargo, d30)
+            ).fetchall()
+            pcts = [r["percentual"] for r in rows]
+            dp = round(stdev(pcts), 1) if len(pcts) >= 2 else 0.0
+            vol_candidatos.append({
+                "candidato": c["candidato"],
+                "desvio_padrao": dp,
+                "classificacao": "baixa" if dp < 2 else ("media" if dp <= 4 else "alta"),
+            })
+
+    media_dp = mean([v["desvio_padrao"] for v in vol_candidatos]) if vol_candidatos else 0.0
+    cenario_geral = "estavel" if media_dp < 2 else ("moderado" if media_dp <= 4 else "volatil")
+
+    return {
+        "margem_lideranca": margem_lideranca,
+        "probabilidade_segundo_turno": probabilidade_segundo_turno,
+        "tendencia_aceleracao": tendencia_aceleracao,
+        "campo_minado": campo_minado,
+        "concentracao_voto": concentracao_voto,
+        "volatilidade": {"candidatos": vol_candidatos, "cenario_geral": cenario_geral},
+    }
+
+
 def _e_candidato(nome: str) -> bool:
     nome_lower = nome.lower()
     return not any(excluir in nome_lower for excluir in _EXCLUIR_CATEGORIAS)

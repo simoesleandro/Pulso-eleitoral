@@ -86,7 +86,8 @@ def require_login():
         'api_visao_geral', 'api_visao_geral_analise', 'api_comparativo',
         'api_pesquisas_historico_multi',
         'api_media_agregada',
-        'api_alertas'
+        'api_alertas',
+        'api_kpis_avancados'
     ]
     if request.endpoint in allowed_endpoints:
         return
@@ -539,6 +540,13 @@ def api_media_agregada():
     cargo = request.args.get('cargo', 'presidente')
     dias = int(request.args.get('dias', 30))
     return jsonify(get_media_agregada(cargo, dias))
+
+@app.route('/api/kpis-avancados')
+def api_kpis_avancados():
+    """Retorna 6 KPIs analíticos avançados para o cargo."""
+    from database import get_kpis_avancados
+    cargo = request.args.get('cargo', 'presidente')
+    return jsonify(get_kpis_avancados(cargo))
 
 @app.route('/api/pesquisas/historico')
 def api_pesquisas_historico():
