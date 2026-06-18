@@ -196,8 +196,9 @@ def extrair_com_gemini(texto: str, fonte_url: str = "") -> dict:
         
         candidatos = resultado.get("candidatos", [])
 
-        # Remove percentuais acima de 60% (são 2º turno ou aprovação)
-        candidatos = [c for c in candidatos if c.get("percentual", 0) <= 60]
+        # Cenário multipolar (1º turno): percentuais > 50% são inválidos
+        if len(candidatos) > 2:
+            candidatos = [c for c in candidatos if c.get("percentual", 0) <= 50]
 
         # Descarta candidatos com nome mapeado para None (hipotéticos / não declarados)
         candidatos = [c for c in candidatos if normalizar_nome(c["nome"]) is not None]

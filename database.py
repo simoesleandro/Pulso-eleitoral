@@ -239,6 +239,7 @@ def detectar_variacoes_bruscas(cargo: str = 'presidente',
         AND p3.cargo = ?
         AND p3.data_pesquisa <= ?
     )
+    AND p_anterior.instituto_id = p_recente.instituto_id
     AND ABS(i_recente.percentual - i_anterior.percentual) >= ?
     AND LOWER(i_recente.candidato) NOT LIKE '%outros%'
     AND LOWER(i_recente.candidato) NOT LIKE '%nulos%'

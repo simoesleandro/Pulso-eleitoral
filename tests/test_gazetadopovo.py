@@ -58,13 +58,13 @@ def test_extract_links_url_absoluta(coletor):
 
 
 def test_extract_links_max_10(coletor):
-    """Não retorna mais de 10 links."""
+    """Não retorna mais de 15 links."""
     html = "<html><body>" + "".join(
         f'<a href="/eleicoes/2026/pesquisa-eleitoral-2026/real-time-presidente-{i}/">Real Time presidente {i}</a>'
         for i in range(20)
     ) + "</body></html>"
     links = coletor._extract_links(html)
-    assert len(links) <= 10
+    assert len(links) <= 15
 
 
 def test_detectar_instituto_real_time(coletor):

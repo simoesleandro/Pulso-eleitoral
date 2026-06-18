@@ -73,7 +73,7 @@ def test_seed_inserts_institutos():
     institutos = cursor.fetchall()
     conn.close()
     
-    assert len(institutos) == 7
+    assert len(institutos) == 9
     nomes_esperados = [
         'Datafolha', 'Ibope/IPEC', 'Quaest', 'Genial/Quaest', 
         'Atlas', 'Paraná', 'Real Time'

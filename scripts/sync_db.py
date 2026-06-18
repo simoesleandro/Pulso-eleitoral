@@ -42,7 +42,7 @@ def sync_para_fly(force: bool = False) -> bool:
         )
 
         # 2. Aguarda máquina estar pronta
-        time.sleep(5)
+        time.sleep(20)
 
         # 3. Remove banco remoto
         result = subprocess.run(
