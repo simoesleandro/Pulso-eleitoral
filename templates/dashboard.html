@@ -12,7 +12,6 @@
 </head>
 <body class="pe-page">
 
-  <!-- Topbar -->
   <nav class="pe-topbar">
     <a class="pe-topbar__logo" href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pe-red)" stroke-width="2">
@@ -20,18 +19,14 @@
         <circle cx="12" cy="12" r="7" stroke="var(--pe-red)" stroke-width="1.5" stroke-dasharray="2 2"/>
         <circle cx="12" cy="12" r="10" stroke="var(--pe-red)" stroke-width="1"/>
       </svg>
-      <!-- PULSO ELEITORAL -->
       <span class="pe-topbar__name">Pulso Eleitoral</span>
     </a>
     <div class="pe-topbar__nav">
-      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="#">Visão Geral</a>
-      <a class="pe-topbar__nav-item" href="#secao-media">Média</a>
-      <a class="pe-topbar__nav-item" href="#secao-presidente">Presidente</a>
-      <a class="pe-topbar__nav-item" href="#secao-evolucao">Evolução</a>
-      <a class="pe-topbar__nav-item" href="#secao-comparativo">Comparativo</a>
-      <a class="pe-topbar__nav-item" href="#secao-governador">Gov. RJ</a>
-      <a class="pe-topbar__nav-item" href="#secao-regional">Regional</a>
-      <a class="pe-topbar__nav-item" href="#secao-simulacao">Simulação</a>
+      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="#secao-visao-geral" id="nav-visao-geral">Visão Geral</a>
+      <a class="pe-topbar__nav-item" href="#secao-presidente" id="nav-presidente">Presidente</a>
+      <a class="pe-topbar__nav-item" href="#secao-governador" id="nav-governador">Gov. RJ</a>
+      <a class="pe-topbar__nav-item" href="#secao-analise" id="nav-analise">Análise</a>
+      <a class="pe-topbar__nav-item" href="#secao-dados" id="nav-dados">Dados</a>
     </div>
     <div class="pe-topbar__meta">
       <span id="badge-update">carregando...</span>
@@ -41,219 +36,173 @@
 
   <main class="pe-container pe-main">
 
-    <!-- Seção 0: Visão Geral -->
+    <!-- SEÇÃO 1: VISÃO GERAL -->
     <section id="secao-visao-geral" class="pe-section">
-      <!-- KPI Cards -->
-      <div class="pe-kpi-grid" id="kpi-grid">
-        <!-- 4 cards: Total Pesquisas, Institutos Ativos, Líder Presidente, Líder Gov. RJ -->
-      </div>
 
-      <!-- KPIs Avançados -->
-      <section id="secao-kpis-avancados" style="margin-bottom: 24px; margin-top: 16px;">
-        <div class="pe-kpi-grid" style="grid-template-columns: repeat(3, 1fr); gap: 16px;" id="kpis-avancados-grid">
-          <!-- gerado via JS -->
-        </div>
-      </section>
+      <!-- KPI grid 4 cards -->
+      <div class="pe-kpi-grid" id="kpi-grid"></div>
+
+      <!-- KPI grid analíticos 3 cards: margem, turno, concentração -->
+      <div class="pe-kpi-grid" style="grid-template-columns: repeat(3,1fr); gap:16px; margin-top:16px;" id="kpis-avancados-grid"></div>
 
       <!-- Tendências -->
-      <div class="pe-card" style="margin-top: 16px;">
-        <div class="pe-kpi__label" style="margin-bottom: 12px;">Tendências — últimas pesquisas</div>
+      <div class="pe-card" style="margin-top:16px;">
+        <div class="pe-kpi__label" style="margin-bottom:12px;">Tendências — últimas pesquisas</div>
         <div id="tendencias-container"></div>
       </div>
 
-      <!-- Alertas de variação -->
+      <!-- Alertas -->
       <div id="alertas-container" style="margin-top:12px;"></div>
 
       <!-- Análise IA -->
-      <div class="pe-card pe-ia-block" style="margin-top: 16px;">
-        <div class="pe-kpi__label" style="margin-bottom: 8px;">Análise do Cenário</div>
+      <div class="pe-card pe-ia-block" style="margin-top:16px;">
+        <div class="pe-kpi__label" style="margin-bottom:8px;">Análise do Cenário</div>
         <p id="ia-analise" class="pe-ia-block__text">Carregando análise...</p>
         <div id="ia-meta" class="pe-ia-block__meta"></div>
       </div>
+
     </section>
-    
-    <!-- Seção 1: Média Agregada -->
-    <section id="secao-media" class="pe-section">
-      <h2 class="pe-section__title">Média Agregada — Últimos 30 dias</h2>
-      <div class="pe-card">
+
+    <!-- SEÇÃO 2: PRESIDENTE -->
+    <section id="secao-presidente" class="pe-section">
+      <h2 class="pe-section__title">Presidente</h2>
+
+      <!-- Média Agregada -->
+      <div class="pe-card" style="margin-bottom:24px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
           <div style="display:flex; gap:12px;">
             <span class="pe-badge pe-badge--inst" id="media-institutos">carregando...</span>
-            <span class="pe-badge pe-badge--inst" id="media-pesquisas">— pesquisas</span>
+            <span class="pe-badge pe-badge--inst" id="media-pesquisas">—</span>
           </div>
           <span class="pe-mono" id="media-atualizado" style="color:var(--pe-text-muted);">—</span>
         </div>
         <div id="media-container"></div>
       </div>
-    </section>
 
-    <!-- Seção 2: Presidente -->
-    <section id="secao-presidente" class="pe-section">
-      <h2 class="pe-section__title">Corrida Presidencial 2026</h2>
-      <div class="pe-grid-2">
-        <!-- Gráfico -->
+      <!-- Pesquisa Mais Recente -->
+      <h3 class="pe-section__title" style="font-size:13px;">Pesquisa Mais Recente</h3>
+      <div class="pe-grid-2" style="margin-bottom:24px;">
         <div class="pe-card">
-          <div class="pe-chart-container">
-            <canvas id="chart-presidente"></canvas>
-          </div>
+          <div class="pe-chart-container"><canvas id="chart-presidente"></canvas></div>
         </div>
-        <!-- Painel Info -->
         <div class="pe-card pe-info-card">
           <div class="pe-kpi">
             <div class="pe-kpi__label">Instituto mais recente</div>
             <div id="pres-instituto" class="pe-kpi__value">—</div>
           </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
             <div class="pe-kpi">
               <div class="pe-kpi__label">Margem de Erro</div>
-              <div id="pres-margem" class="pe-kpi__value" style="font-size: 20px;">—</div>
+              <div id="pres-margem" class="pe-kpi__value" style="font-size:20px;">—</div>
             </div>
             <div class="pe-kpi">
               <div class="pe-kpi__label">Data de Coleta</div>
-              <div id="pres-data" class="pe-kpi__value" style="font-size: 20px;">—</div>
+              <div id="pres-data" class="pe-kpi__value" style="font-size:20px;">—</div>
             </div>
           </div>
-          <div id="pres-fonte" class="pe-mono" style="margin-top: 8px;">
-            Fonte: —
-          </div>
+          <div id="pres-fonte" class="pe-mono" style="margin-top:8px;">Fonte: —</div>
         </div>
       </div>
-    </section>
 
-    <!-- Seção 2: Evolução Temporal -->
-    <section id="secao-evolucao" class="pe-section">
-      <h2 class="pe-section__title">Evolução nas Pesquisas</h2>
+      <!-- Comparativo -->
+      <h3 class="pe-section__title" style="font-size:13px;">Comparativo entre Institutos</h3>
+      <div class="pe-card" style="margin-bottom:24px;">
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
+          <select id="select-comp-candidato" class="pe-select-candidato" style="max-width:200px;"></select>
+          <span class="pe-kpi__label" style="margin:0;">pesquisa mais recente por instituto</span>
+        </div>
+        <div id="comparativo-container"></div>
+      </div>
+
+      <!-- Evolução -->
+      <h3 class="pe-section__title" style="font-size:13px;">Evolução nas Pesquisas</h3>
       <div class="pe-card">
-
-        <!-- Controles -->
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-
-          <!-- Checkboxes de candidatos -->
-          <div id="candidatos-toggle" style="display:flex; gap:12px; flex-wrap:wrap;">
-            <!-- gerado via JS -->
-          </div>
-
-          <!-- Legenda de institutos -->
+          <div id="candidatos-toggle" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
           <div style="display:flex; gap:8px; align-items:center;">
             <span class="pe-kpi__label" style="margin:0;">institutos:</span>
             <span class="pe-badge pe-badge--inst">Datafolha ●</span>
             <span class="pe-badge pe-badge--inst">Quaest ○</span>
           </div>
-
         </div>
-
-        <!-- Gráfico -->
-        <div class="pe-chart-container" style="height:380px;">
-          <canvas id="chart-historico-multi"></canvas>
-        </div>
-
-        <!-- Nota -->
+        <div class="pe-chart-container" style="height:380px;"><canvas id="chart-historico-multi"></canvas></div>
         <div class="pe-mono" style="margin-top:8px; color:var(--pe-text-muted); font-size:11px;">
           Pontos sólidos = Datafolha · Pontos vazios = Quaest · Linha contínua conecta pesquisas do mesmo instituto
         </div>
-
       </div>
     </section>
 
-    <!-- Seção 2b: Comparativo entre Institutos -->
-    <section id="secao-comparativo" class="pe-section">
-      <h2 class="pe-section__title">Comparativo entre Institutos</h2>
-      <div class="pe-card">
-        <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-          <select id="select-comp-candidato" class="pe-select-candidato" style="max-width: 200px;">
-            <!-- preenchido via JS -->
-          </select>
-          <span class="pe-kpi__label" style="margin: 0;">pesquisa mais recente por instituto</span>
-        </div>
-        <div id="comparativo-container"></div>
-      </div>
-    </section>
-
-    <!-- Seção 3: Governador RJ -->
+    <!-- SEÇÃO 3: GOV. RJ -->
     <section id="secao-governador" class="pe-section">
       <h2 class="pe-section__title">Governo do Estado — RJ 2026</h2>
       <div class="pe-grid-2">
-        <!-- Gráfico -->
         <div class="pe-card">
-          <div class="pe-chart-container">
-            <canvas id="chart-governador"></canvas>
-          </div>
+          <div class="pe-chart-container"><canvas id="chart-governador"></canvas></div>
         </div>
-        <!-- Painel Info -->
         <div class="pe-card pe-info-card">
           <div class="pe-kpi">
             <div class="pe-kpi__label">Instituto mais recente</div>
             <div id="gov-instituto" class="pe-kpi__value">—</div>
           </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
             <div class="pe-kpi">
               <div class="pe-kpi__label">Margem de Erro</div>
-              <div id="gov-margem" class="pe-kpi__value" style="font-size: 20px;">—</div>
+              <div id="gov-margem" class="pe-kpi__value" style="font-size:20px;">—</div>
             </div>
             <div class="pe-kpi">
               <div class="pe-kpi__label">Data de Coleta</div>
-              <div id="gov-data" class="pe-kpi__value" style="font-size: 20px;">—</div>
+              <div id="gov-data" class="pe-kpi__value" style="font-size:20px;">—</div>
             </div>
           </div>
-          <div id="gov-fonte" class="pe-mono" style="margin-top: 8px;">
-            Fonte: —
-          </div>
+          <div id="gov-fonte" class="pe-mono" style="margin-top:8px;">Fonte: —</div>
         </div>
       </div>
     </section>
 
-    <!-- Seção 4: Regional -->
-    <section id="secao-regional" class="pe-section">
-      <h2 class="pe-section__title">Intenção de Voto por Estado — Presidente</h2>
-      <div class="pe-card">
-        <div id="regional-container">
-          <p class="pe-mono" style="color:var(--pe-text-muted);">Coletando dados regionais...</p>
-        </div>
-      </div>
+    <!-- SEÇÃO 4: ANÁLISE -->
+    <section id="secao-analise" class="pe-section">
+      <h2 class="pe-section__title">Análise do Cenário</h2>
+
+      <!-- KPIs campo minado + volatilidade + aceleração -->
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px;" id="kpis-analise-grid"></div>
+
+      <!-- Simulação 2º turno -->
+      <h3 class="pe-section__title" style="font-size:13px; margin-bottom:16px;">Simulação de 2º Turno</h3>
+      <div id="simulacao-container" style="margin-bottom:24px;"></div>
+
+      <!-- Regional -->
+      <h3 class="pe-section__title" style="font-size:13px; margin-bottom:16px;">Intenção de Voto por Estado</h3>
+      <div class="pe-card"><div id="regional-container"></div></div>
     </section>
 
-    <!-- Seção 5: Simulação 2º Turno -->
-    <section id="secao-simulacao" class="pe-section">
-      <h2 class="pe-section__title">Simulação de 2º Turno</h2>
-      <div id="simulacao-container"></div>
-    </section>
-
-    <!-- Seção 6: Institutos -->
-    <section id="secao-institutos" class="pe-section">
+    <!-- SEÇÃO 5: DADOS -->
+    <section id="secao-dados" class="pe-section">
       <h2 class="pe-section__title">Integridade dos Coletores</h2>
-      <div class="pe-grid-institutos" id="lista-institutos">
-        <!-- Inserido via JS -->
-      </div>
+      <div class="pe-grid-institutos" id="lista-institutos"></div>
     </section>
 
   </main>
 
-  <!-- Footer -->
   <footer class="pe-footer">
     <p>Pulso Eleitoral · dados públicos · 2026</p>
     <a href="/admin">Painel Administrativo</a>
   </footer>
 
-  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
   <script src="/static/js/charts.js"></script>
   <script>
     Chart.register(ChartDataLabels);
-
-    // Configurações globais do Chart.js
     Chart.defaults.color = '#5a7184';
     Chart.defaults.borderColor = 'rgba(10,34,64,0.06)';
     Chart.defaults.font.family = "'Inter', sans-serif";
 
-    // Estado da aplicação para instâncias dos gráficos
     let chartPres = null;
     let chartGov = null;
     let chartHist = null;
 
-    // Fallbacks inteligentes
     const fallbackPres = {
-      candidatos: ["Lula", "Bolsonaro", "Ciro", "Simone"],
+      candidatos: ["Lula", "Flávio Bolsonaro", "Ciro Gomes", "Simone Tebet"],
       percentuais: [44.2, 37.5, 4.8, 3.5],
       data_coleta: "2026-06-08",
       instituto: "Atlas (Fallback)",
@@ -268,242 +217,123 @@
       margem_erro: 2.5
     };
 
-    const fallbackHist = {
-      candidato: "Candidato",
-      historico: [
-        {data: "2026-01-15", percentual: 40.0, instituto: "Datafolha"},
-        {data: "2026-03-22", percentual: 40.5, instituto: "Paraná"},
-        {data: "2026-06-08", percentual: 44.2, instituto: "Atlas"}
-      ]
-    };
-
-    // Helper para formatar data ISO -> DD/MM/AAAA
     function formatarData(isoStr) {
       if (!isoStr) return "—";
       const parts = isoStr.split(" ")[0].split("-");
-      if (parts.length === 3) {
-        return `${parts[2]}/${parts[1]}/${parts[0]}`;
-      }
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
       return isoStr;
     }
 
-    // Helper para retornar cor do candidato
     function getCandidateColor(name) {
       if (name === 'Lula') return PE_CANDIDATE_COLORS[0];
-      if (name === 'Bolsonaro') return PE_CANDIDATE_COLORS[1];
-      if (name === 'Tarcísio') return PE_CANDIDATE_COLORS[2];
-      if (name === 'Ciro') return PE_CANDIDATE_COLORS[3];
-      if (name === 'Simone') return PE_CANDIDATE_COLORS[4];
-      return '#5a7184'; // fallback
+      if (name === 'Flávio Bolsonaro') return PE_CANDIDATE_COLORS[1];
+      if (name === 'Tarcísio de Freitas') return PE_CANDIDATE_COLORS[2];
+      if (name === 'Ciro Gomes') return PE_CANDIDATE_COLORS[3];
+      if (name === 'Simone Tebet') return PE_CANDIDATE_COLORS[4];
+      return '#5a7184';
     }
 
-    // Carrega dados da Corrida Presidencial
+    // ─── Presidente ───────────────────────────────────────────
     async function carregarPresidente() {
       let data = fallbackPres;
       try {
         const res = await fetch('/api/pesquisas/presidente');
         if (res.ok) {
           const json = await res.json();
-          if (json.candidatos && json.candidatos.length > 0) {
-            data = json;
-          }
+          if (json.candidatos && json.candidatos.length > 0) data = json;
         }
-      } catch (err) {
-        console.warn('Erro ao buscar presidente, usando fallback:', err);
-      }
+      } catch (err) { console.warn('Erro presidente:', err); }
 
-      // Preenche metadados
       document.getElementById('pres-instituto').textContent = data.instituto;
-      const margem = data.margem_erro && data.margem_erro > 0
-          ? `±${data.margem_erro}%`
-          : '—';
-      document.getElementById('pres-margem').textContent = margem;
+      document.getElementById('pres-margem').textContent = data.margem_erro && data.margem_erro > 0 ? `±${data.margem_erro}%` : '—';
       document.getElementById('pres-data').textContent = formatarData(data.data_coleta);
       document.getElementById('pres-fonte').textContent = `Fonte: ${data.instituto} | ${formatarData(data.data_coleta)}`;
-
-      // Badge de última atualização no Header
       document.getElementById('badge-update').textContent = `atualizado em: ${formatarData(data.data_coleta)}`;
 
-      // Renderiza gráfico
       const ctx = document.getElementById('chart-presidente');
       if (chartPres) chartPres.destroy();
-
       chartPres = new Chart(ctx, {
         type: 'bar',
         data: {
           labels: data.candidatos,
-          datasets: [{
-            data: data.percentuais,
-            backgroundColor: function(context) {
-              const idx = context.dataIndex;
-              return PE_CANDIDATE_COLORS[idx % PE_CANDIDATE_COLORS.length];
-            },
-            borderRadius: 4,
-            barThickness: 16
-          }]
+          datasets: [{ data: data.percentuais, backgroundColor: ctx2 => PE_CANDIDATE_COLORS[ctx2.dataIndex % PE_CANDIDATE_COLORS.length], borderRadius: 4, barThickness: 16 }]
         },
         options: {
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
           layout: { padding: { right: 44 } },
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#FFFFFF',
-              titleColor: '#0A2240',
-              bodyColor: '#5a7184',
-              borderColor: 'rgba(10,34,64,0.06)',
-              borderWidth: 0.5,
-              padding: 10,
-              callbacks: {
-                label: function(context) {
-                  const m = data.margem_erro && data.margem_erro > 0 ? ` (margem: ±${data.margem_erro}%)` : '';
-                  return ` ${context.parsed.x.toFixed(1)}%${m}`;
-                }
-              }
+              backgroundColor: '#FFFFFF', titleColor: '#0A2240', bodyColor: '#5a7184',
+              borderColor: 'rgba(10,34,64,0.06)', borderWidth: 0.5, padding: 10,
+              callbacks: { label: c => ` ${c.parsed.x.toFixed(1)}%${data.margem_erro > 0 ? ` (±${data.margem_erro}%)` : ''}` }
             },
-            datalabels: {
-              anchor: 'end',
-              align: 'end',
-              formatter: (value) => value.toFixed(1) + '%',
-              color: '#0A2240',
-              font: {
-                family: "'JetBrains Mono', monospace",
-                size: 11,
-                weight: '500'
-              },
-              padding: { left: 4 }
-            }
+            datalabels: { anchor: 'end', align: 'end', formatter: v => v.toFixed(1) + '%', color: '#0A2240', font: { family: "'JetBrains Mono', monospace", size: 11, weight: '500' }, padding: { left: 4 } }
           },
           scales: {
-            x: {
-              suggestedMax: 60,
-              grid: { color: 'rgba(10,34,64,0.06)' },
-              ticks: { color: '#5a7184', font: { size: 11, family: 'JetBrains Mono' } }
-            },
-            y: {
-              grid: { display: false },
-              ticks: { color: '#0A2240', font: { weight: 500, family: 'Inter' } }
-            }
+            x: { suggestedMax: 60, grid: { color: 'rgba(10,34,64,0.06)' }, ticks: { color: '#5a7184', font: { size: 11, family: 'JetBrains Mono' } } },
+            y: { grid: { display: false }, ticks: { color: '#0A2240', font: { weight: 500, family: 'Inter' } } }
           }
         }
       });
     }
 
-    // Carrega dados de Governador RJ
+    // ─── Governador ───────────────────────────────────────────
     async function carregarGovernador() {
       let data = fallbackGov;
       try {
         const res = await fetch('/api/pesquisas/governador-rj');
         if (res.ok) {
           const json = await res.json();
-          if (json.candidatos && json.candidatos.length > 0) {
-            data = json;
-          }
+          if (json.candidatos && json.candidatos.length > 0) data = json;
         }
-      } catch (err) {
-        console.warn('Erro ao buscar governador, usando fallback:', err);
-      }
+      } catch (err) { console.warn('Erro governador:', err); }
 
-      // Preenche metadados
       document.getElementById('gov-instituto').textContent = data.instituto;
-      const margemGov = data.margem_erro && data.margem_erro > 0
-          ? `±${data.margem_erro}%`
-          : '—';
-      document.getElementById('gov-margem').textContent = margemGov;
+      document.getElementById('gov-margem').textContent = data.margem_erro && data.margem_erro > 0 ? `±${data.margem_erro}%` : '—';
       document.getElementById('gov-data').textContent = formatarData(data.data_coleta);
       document.getElementById('gov-fonte').textContent = `Fonte: ${data.instituto} | ${formatarData(data.data_coleta)}`;
 
-      // Renderiza gráfico
       const ctx = document.getElementById('chart-governador');
       if (chartGov) chartGov.destroy();
-
       chartGov = new Chart(ctx, {
         type: 'bar',
         data: {
           labels: data.candidatos,
-          datasets: [{
-            data: data.percentuais,
-            backgroundColor: function(context) {
-              const idx = context.dataIndex;
-              return PE_CANDIDATE_COLORS[idx % PE_CANDIDATE_COLORS.length];
-            },
-            borderRadius: 4,
-            barThickness: 16
-          }]
+          datasets: [{ data: data.percentuais, backgroundColor: ctx2 => PE_CANDIDATE_COLORS[ctx2.dataIndex % PE_CANDIDATE_COLORS.length], borderRadius: 4, barThickness: 16 }]
         },
         options: {
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
           layout: { padding: { right: 44 } },
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#FFFFFF',
-              titleColor: '#0A2240',
-              bodyColor: '#5a7184',
-              borderColor: 'rgba(10,34,64,0.06)',
-              borderWidth: 0.5,
-              padding: 10,
-              callbacks: {
-                label: function(context) {
-                  const mg = data.margem_erro && data.margem_erro > 0 ? ` (margem: ±${data.margem_erro}%)` : '';
-                  return ` ${context.parsed.x.toFixed(1)}%${mg}`;
-                }
-              }
+              backgroundColor: '#FFFFFF', titleColor: '#0A2240', bodyColor: '#5a7184',
+              borderColor: 'rgba(10,34,64,0.06)', borderWidth: 0.5, padding: 10,
+              callbacks: { label: c => ` ${c.parsed.x.toFixed(1)}%${data.margem_erro > 0 ? ` (±${data.margem_erro}%)` : ''}` }
             },
-            datalabels: {
-              anchor: 'end',
-              align: 'end',
-              formatter: (value) => value.toFixed(1) + '%',
-              color: '#0A2240',
-              font: {
-                family: "'JetBrains Mono', monospace",
-                size: 11,
-                weight: '500'
-              },
-              padding: { left: 4 }
-            }
+            datalabels: { anchor: 'end', align: 'end', formatter: v => v.toFixed(1) + '%', color: '#0A2240', font: { family: "'JetBrains Mono', monospace", size: 11, weight: '500' }, padding: { left: 4 } }
           },
           scales: {
-            x: {
-              suggestedMax: 60,
-              grid: { color: 'rgba(10,34,64,0.06)' },
-              ticks: { color: '#5a7184', font: { size: 11, family: 'JetBrains Mono' } }
-            },
-            y: {
-              grid: { display: false },
-              ticks: { color: '#0A2240', font: { weight: 500, family: 'Inter' } }
-            }
+            x: { suggestedMax: 60, grid: { color: 'rgba(10,34,64,0.06)' }, ticks: { color: '#5a7184', font: { size: 11, family: 'JetBrains Mono' } } },
+            y: { grid: { display: false }, ticks: { color: '#0A2240', font: { weight: 500, family: 'Inter' } } }
           }
         }
       });
     }
 
-    const CANDIDATE_COLORS = {
-      'Lula': '#0A2240',
-      'Flávio Bolsonaro': '#C0392B',
-      'Ronaldo Caiado': '#5a7184',
-      'Romeu Zema': '#B4B2A9',
-      'Renan Santos': '#1D9E75',
-    };
-
+    // ─── Histórico multi-candidato ─────────────────────────────
     let chartHistoricoMulti = null;
     let ultimasSeries = [];
 
     async function carregarHistoricoMulti() {
-      const res = await fetch('/api/pesquisas/historico-multi?cargo=presidente');
+      const res = await fetch('/api/pesquisas/historico-multi?cargo=presidente&candidatos=Lula,Fl%C3%A1vio%20Bolsonaro');
       const data = await res.json();
       ultimasSeries = data.series;
 
-      const toggleDiv = document.getElementById('candidatos-toggle');
-      toggleDiv.innerHTML = data.series.map(s => `
+      document.getElementById('candidatos-toggle').innerHTML = data.series.map(s => `
         <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
-          <input type="checkbox" value="${s.candidato}" checked
-            style="accent-color:${s.cor};"
-            onchange="toggleCandidato()">
+          <input type="checkbox" value="${s.candidato}" checked style="accent-color:${s.cor};" onchange="toggleCandidato()">
           <span style="color:${s.cor}; font-weight:500;">${s.candidato}</span>
         </label>
       `).join('');
@@ -515,175 +345,94 @@
       const ctx = document.getElementById('chart-historico-multi');
       if (chartHistoricoMulti) chartHistoricoMulti.destroy();
 
-      const todasDatas = [...new Set(
-        series.flatMap(s => s.dados.map(d => d.data))
-      )].sort();
-
-      const datasets = series.map(s => {
-        const pontos = todasDatas.map(data => {
-          const ponto = s.dados.find(d => d.data === data);
-          return ponto ? ponto.percentual : null;
-        });
-        return {
-          label: s.candidato,
-          data: pontos,
-          borderColor: s.cor,
-          backgroundColor: s.cor + '18',
-          borderWidth: 2,
-          pointBackgroundColor: s.cor,
-          pointBorderColor: '#FFFFFF',
-          pointBorderWidth: 2,
-          pointRadius: 5,
-          pointHoverRadius: 7,
-          tension: 0.2,
-          spanGaps: false,
-        };
-      });
+      const todasDatas = [...new Set(series.flatMap(s => s.dados.map(d => d.data)))].sort();
+      const datasets = series.map(s => ({
+        label: s.candidato,
+        data: todasDatas.map(dt => { const p = s.dados.find(d => d.data === dt); return p ? p.percentual : null; }),
+        borderColor: s.cor, backgroundColor: s.cor + '18', borderWidth: 2,
+        pointBackgroundColor: s.cor, pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
+        pointRadius: 5, pointHoverRadius: 7, tension: 0.2, spanGaps: false,
+      }));
 
       chartHistoricoMulti = new Chart(ctx, {
         type: 'line',
         data: { labels: todasDatas.map(formatarData), datasets },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
+          responsive: true, maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
             datalabels: { display: false },
-            legend: {
-              display: true,
-              position: 'top',
-              labels: {
-                color: '#0A2240',
-                font: { family: "'Inter', sans-serif", size: 12 },
-                usePointStyle: true,
-                padding: 16
-              }
-            },
+            legend: { display: true, position: 'top', labels: { color: '#0A2240', font: { family: "'Inter', sans-serif", size: 12 }, usePointStyle: true, padding: 16 } },
             tooltip: {
-              backgroundColor: '#FFFFFF',
-              titleColor: '#0A2240',
-              bodyColor: '#5a7184',
-              borderColor: 'rgba(10,34,64,0.1)',
-              borderWidth: 1,
-              padding: 12,
-              callbacks: {
-                label: ctx => {
-                  const val = ctx.parsed.y;
-                  return val !== null ? ` ${ctx.dataset.label}: ${val.toFixed(1)}%` : null;
-                }
-              }
+              backgroundColor: '#FFFFFF', titleColor: '#0A2240', bodyColor: '#5a7184',
+              borderColor: 'rgba(10,34,64,0.1)', borderWidth: 1, padding: 12,
+              callbacks: { label: c => c.parsed.y !== null ? ` ${c.dataset.label}: ${c.parsed.y.toFixed(1)}%` : null }
             }
           },
           scales: {
-            x: {
-              grid: { color: 'rgba(10,34,64,0.06)' },
-              ticks: {
-                color: '#5a7184',
-                font: { size: 10, family: "'JetBrains Mono', monospace" },
-                maxRotation: 45,
-                maxTicksLimit: 12
-              }
-            },
-            y: {
-              grid: { color: 'rgba(10,34,64,0.06)' },
-              ticks: {
-                color: '#5a7184',
-                font: { size: 11, family: "'JetBrains Mono', monospace" },
-                callback: v => v + '%'
-              },
-              suggestedMin: 0,
-              suggestedMax: 60
-            }
+            x: { grid: { color: 'rgba(10,34,64,0.06)' }, ticks: { color: '#5a7184', font: { size: 10, family: "'JetBrains Mono', monospace" }, maxRotation: 45, maxTicksLimit: 12 } },
+            y: { grid: { color: 'rgba(10,34,64,0.06)' }, ticks: { color: '#5a7184', font: { size: 11, family: "'JetBrains Mono', monospace" }, callback: v => v + '%' }, suggestedMin: 0, suggestedMax: 60 }
           }
         }
       });
     }
 
     function toggleCandidato() {
-      const seriesFiltradas = ultimasSeries.filter(s => {
+      renderizarHistoricoMulti(ultimasSeries.filter(s => {
         const cb = document.querySelector(`#candidatos-toggle input[value="${s.candidato}"]`);
         return cb && cb.checked;
-      });
-      renderizarHistoricoMulti(seriesFiltradas);
+      }));
     }
 
-    // Carrega os cards de institutos e volumetria
+    // ─── Institutos ────────────────────────────────────────────
     async function carregarInstitutos() {
-      let insts = [
-        {nome: "Datafolha", total: 0, ultima_coleta: null},
-        {nome: "Ibope/IPEC", total: 0, ultima_coleta: null},
-        {nome: "Quaest", total: 0, ultima_coleta: null},
-        {nome: "Genial/Quaest", total: 0, ultima_coleta: null},
-        {nome: "Atlas", total: 0, ultima_coleta: null},
-        {nome: "Paraná", total: 0, ultima_coleta: null},
-        {nome: "Real Time", total: 0, ultima_coleta: null}
-      ];
-
+      let insts = [];
       try {
         const res = await fetch('/api/institutos');
         if (res.ok) {
           const json = await res.json();
-          if (json.institutos && json.institutos.length > 0) {
-            insts = json.institutos;
-          }
+          if (json.institutos && json.institutos.length > 0) insts = json.institutos;
         }
-      } catch (err) {
-        console.warn('Erro ao buscar institutos, usando defaults:', err);
-      }
+      } catch (err) { console.warn('Erro institutos:', err); }
+
+      // Exibe apenas institutos com coletas registradas
+      insts = insts.filter(i => i.total > 0);
 
       const container = document.getElementById('lista-institutos');
       container.innerHTML = '';
-
       const hoje = new Date();
 
       insts.forEach(inst => {
-        let badgeClass = 'pe-badge--inst';
-        let badgeText = 'Sem coletas';
-
+        let badgeClass = 'pe-badge--inst', badgeText = 'Sem coletas';
         if (inst.ultima_coleta) {
-          const dataColeta = new Date(inst.ultima_coleta);
-          const diffTime = Math.abs(hoje - dataColeta);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          if (diffDays < 7) {
-            badgeClass = 'pe-badge--new';
-            badgeText = 'Atualizado';
-          } else if (diffDays < 30) {
-            badgeClass = 'pe-badge--inst';
-            badgeText = 'Atenção';
-          } else {
-            badgeClass = 'pe-badge--inst';
-            badgeText = 'Defasado';
-          }
+          const diffDays = Math.ceil(Math.abs(hoje - new Date(inst.ultima_coleta)) / (1000 * 60 * 60 * 24));
+          if (diffDays < 7)  { badgeClass = 'pe-badge--new'; badgeText = 'Atualizado'; }
+          else if (diffDays < 30) { badgeText = 'Atenção'; }
+          else { badgeText = 'Defasado'; }
         }
-
         const card = document.createElement('div');
         card.className = 'pe-card pe-inst-card';
         card.innerHTML = `
           <div class="pe-inst-header">
-            <span class="pe-heading" style="font-weight: 500; color: var(--pe-navy);">${inst.nome}</span>
+            <span class="pe-heading" style="font-weight:500; color:var(--pe-navy);">${inst.nome}</span>
             <span class="pe-badge ${badgeClass}">${badgeText}</span>
           </div>
           <div class="pe-kpi">
             <div class="pe-kpi__value">${inst.total}</div>
-            <div class="pe-kpi__label" style="margin-top: 4px;">Pesquisas registradas</div>
+            <div class="pe-kpi__label" style="margin-top:4px;">Pesquisas registradas</div>
           </div>
-          <div class="pe-mono">
-            Última coleta: ${inst.ultima_coleta ? formatarData(inst.ultima_coleta) : '—'}
-          </div>
+          <div class="pe-mono">Última coleta: ${inst.ultima_coleta ? formatarData(inst.ultima_coleta) : '—'}</div>
         `;
         container.appendChild(card);
       });
     }
 
+    // ─── Visão Geral ──────────────────────────────────────────
     async function carregarVisaoGeral() {
-      // Busca KPIs e tendências
       const res = await fetch('/api/visao-geral');
       const data = await res.json();
-      
-      // Renderiza KPI grid
-      const kpiGrid = document.getElementById('kpi-grid');
-      kpiGrid.innerHTML = `
+
+      document.getElementById('kpi-grid').innerHTML = `
         <div class="pe-card pe-kpi">
           <div class="pe-kpi__label">Total de Pesquisas</div>
           <div class="pe-kpi__value">${data.kpis.total_pesquisas}</div>
@@ -706,12 +455,10 @@
         </div>
       `;
 
-      // Renderiza tendências
       const tend = document.getElementById('tendencias-container');
       tend.innerHTML = data.tendencias.map(t => {
         const arrow = t.direcao === 'up' ? '▲' : t.direcao === 'down' ? '▼' : '—';
-        const cls = t.direcao === 'up' ? 'pe-tendencia__arrow-up' : 
-                    t.direcao === 'down' ? 'pe-tendencia__arrow-down' : 'pe-tendencia__arrow-flat';
+        const cls = t.direcao === 'up' ? 'pe-tendencia__arrow-up' : t.direcao === 'down' ? 'pe-tendencia__arrow-down' : 'pe-tendencia__arrow-flat';
         const sinal = t.variacao > 0 ? '+' : '';
         return `
           <div class="pe-tendencia-row">
@@ -720,39 +467,33 @@
             <span class="pe-mono">${t.percentual_atual.toFixed(1)}%</span>
             <span class="${cls} pe-mono" style="font-size:11px;">${sinal}${t.variacao.toFixed(1)}pp</span>
             <span class="pe-badge pe-badge--inst">${t.cargo === 'presidente' ? 'Pres.' : 'Gov. RJ'}</span>
-          </div>
-        `;
+          </div>`;
       }).join('');
 
-      // Busca análise Gemini (async separado para não bloquear)
       fetch('/api/visao-geral/analise')
         .then(r => r.json())
         .then(d => {
           document.getElementById('ia-analise').textContent = d.analise;
-          document.getElementById('ia-meta').textContent = 
-            `gerado por gemini · ${d.gerado_em}`;
+          document.getElementById('ia-meta').textContent = `gerado por gemini · ${d.gerado_em}`;
         })
-        .catch(() => {
-          document.getElementById('ia-analise').textContent = 
-            'Análise indisponível no momento.';
-        });
+        .catch(() => { document.getElementById('ia-analise').textContent = 'Análise indisponível no momento.'; });
     }
 
+    // ─── Comparativo ──────────────────────────────────────────
     async function carregarComparativo(candidato) {
       const res = await fetch(`/api/comparativo?candidato=${encodeURIComponent(candidato)}&cargo=presidente`);
       const data = await res.json();
-
       const container = document.getElementById('comparativo-container');
 
       if (!data.institutos || data.institutos.length === 0) {
-        container.innerHTML = '<p class="pe-mono" style="color: var(--pe-text-muted)">Sem dados comparativos disponíveis.</p>';
+        container.innerHTML = '<p class="pe-mono" style="color:var(--pe-text-muted)">Sem dados comparativos disponíveis.</p>';
         return;
       }
 
       container.innerHTML = `
         <table style="width:100%; border-collapse:collapse;">
           <thead>
-            <tr style="border-bottom: 2px solid var(--pe-surface);">
+            <tr style="border-bottom:2px solid var(--pe-surface);">
               <th style="text-align:left; padding:8px; font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--pe-text-muted);">Instituto</th>
               <th style="text-align:left; padding:8px; font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--pe-text-muted);">Percentual</th>
               <th style="text-align:left; padding:8px; font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--pe-text-muted);">Margem</th>
@@ -762,7 +503,7 @@
           </thead>
           <tbody>
             ${data.institutos.map(inst => `
-              <tr style="border-bottom: 1px solid var(--pe-surface);">
+              <tr style="border-bottom:1px solid var(--pe-surface);">
                 <td style="padding:10px 8px; font-size:13px; font-weight:500; color:var(--pe-navy);">${inst.instituto}</td>
                 <td style="padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:500; color:var(--pe-navy);">${inst.percentual.toFixed(1)}%</td>
                 <td style="padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--pe-text-muted);">${inst.margem_erro ? '±' + inst.margem_erro + 'pp' : '—'}</td>
@@ -784,23 +525,18 @@
       const data = await res.json();
       const select = document.getElementById('select-comp-candidato');
       if (data.candidatos) {
-        select.innerHTML = data.candidatos.map(c =>
-          `<option value="${c}">${c}</option>`
-        ).join('');
+        select.innerHTML = data.candidatos.map(c => `<option value="${c}">${c}</option>`).join('');
         carregarComparativo(data.candidatos[0]);
       }
       select.addEventListener('change', e => carregarComparativo(e.target.value));
     }
 
+    // ─── Alertas ──────────────────────────────────────────────
     async function carregarAlertas() {
       const res = await fetch('/api/alertas?cargo=presidente&limiar=3.0');
       const data = await res.json();
-
       const container = document.getElementById('alertas-container');
-      if (!data.alertas || data.alertas.length === 0) {
-        container.innerHTML = '';
-        return;
-      }
+      if (!data.alertas || data.alertas.length === 0) { container.innerHTML = ''; return; }
 
       container.innerHTML = data.alertas.map(a => {
         const cls = a.direcao === 'up' ? 'pe-alert--up' : 'pe-alert--down';
@@ -813,25 +549,22 @@
               <strong>${a.candidato}</strong>:
               ${a.percentual_anterior}% → ${a.percentual_atual}%
               <strong>(${sinal}${a.variacao}pp)</strong>
-              <span style="font-size:11px; opacity:.7; margin-left:6px;">
-                ${a.instituto_anterior} → ${a.instituto_atual}
-              </span>
+              <span style="font-size:11px; opacity:.7; margin-left:6px;">${a.instituto_anterior} → ${a.instituto_atual}</span>
             </span>
             <span class="pe-alert__time pe-mono" style="font-size:11px;">${formatarData(a.data_atual)}</span>
           </div>`;
       }).join('');
     }
 
+    // ─── Média Agregada ───────────────────────────────────────
     async function carregarMediaAgregada() {
       const res = await fetch('/api/media-agregada?cargo=presidente');
       const data = await res.json();
 
       document.getElementById('media-institutos').textContent =
         data.institutos_incluidos.length ? data.institutos_incluidos.join(' + ') : '—';
-      document.getElementById('media-pesquisas').textContent =
-        `${data.total_pesquisas} pesquisas`;
-      document.getElementById('media-atualizado').textContent =
-        `atualizado em: ${data.atualizado_em}`;
+      document.getElementById('media-pesquisas').textContent = `${data.total_pesquisas} pesquisas`;
+      document.getElementById('media-atualizado').textContent = `atualizado em: ${data.atualizado_em}`;
 
       const container = document.getElementById('media-container');
       if (!data.candidatos || data.candidatos.length === 0) {
@@ -842,17 +575,12 @@
       container.innerHTML = data.candidatos.map((c, idx) => {
         const cor = PE_CANDIDATE_COLORS[idx % PE_CANDIDATE_COLORS.length];
         const variacaoStr = c.variacao_30d !== null && c.variacao_30d !== undefined
-          ? (c.variacao_30d > 0 ? `+${c.variacao_30d.toFixed(1)}pp` : `${c.variacao_30d.toFixed(1)}pp`)
-          : '—';
-        const variacaoCls = c.variacao_30d > 0 ? 'color:var(--pe-up)'
-                          : c.variacao_30d < 0 ? 'color:var(--pe-down)'
-                          : 'color:var(--pe-text-muted)';
+          ? (c.variacao_30d > 0 ? `+${c.variacao_30d.toFixed(1)}pp` : `${c.variacao_30d.toFixed(1)}pp`) : '—';
+        const variacaoCls = c.variacao_30d > 0 ? 'color:var(--pe-up)' : c.variacao_30d < 0 ? 'color:var(--pe-down)' : 'color:var(--pe-text-muted)';
         return `
-          <div class="pe-poll__row" style="padding: 10px 0;">
+          <div class="pe-poll__row" style="padding:10px 0;">
             <span class="pe-poll__name" style="width:160px; font-weight:500;">${c.candidato}</span>
-            <div class="pe-poll__bar-wrap">
-              <div class="pe-poll__bar" style="width:${c.media}%; background:${cor};"></div>
-            </div>
+            <div class="pe-poll__bar-wrap"><div class="pe-poll__bar" style="width:${c.media}%; background:${cor};"></div></div>
             <span class="pe-poll__pct" style="width:50px; font-size:15px; font-weight:500;">${c.media.toFixed(1)}%</span>
             <span style="width:70px; font-size:12px; font-family:'JetBrains Mono',monospace; ${variacaoCls};">${variacaoStr}</span>
             <span style="width:80px; font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">${c.min.toFixed(1)}–${c.max.toFixed(1)}%</span>
@@ -861,25 +589,21 @@
       }).join('');
     }
 
+    // ─── Simulação 2º Turno ───────────────────────────────────
     async function carregarSimulacao() {
       const res = await fetch('/api/simulacao-segundo-turno');
       const d = await res.json();
-      const container = document.getElementById('simulacao-container');
       const st = d.segundo_turno;
+      const container = document.getElementById('simulacao-container');
 
       const lulaCor = st.lula.vencedor ? 'var(--pe-up)' : 'var(--pe-text-muted)';
       const flavioCor = st.flavio.vencedor ? 'var(--pe-up)' : 'var(--pe-text-muted)';
-      const lulaBadge = st.lula.vencedor ? '🏆' : '';
-      const flavioBadge = st.flavio.vencedor ? '🏆' : '';
 
       container.innerHTML = `
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
-
           <div class="pe-card" style="border-left:3px solid var(--pe-navy);">
-            <div class="pe-kpi__label">Lula (PT) ${lulaBadge}</div>
-            <div style="font-size:32px; font-weight:500; color:${lulaCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">
-              ${st.lula.total_estimado.toFixed(1)}%
-            </div>
+            <div class="pe-kpi__label">Lula (PT) ${st.lula.vencedor ? '🏆' : ''}</div>
+            <div style="font-size:32px; font-weight:500; color:${lulaCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${st.lula.total_estimado.toFixed(1)}%</div>
             <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">estimativa 2º turno</div>
             <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
               Votos diretos: ${st.lula.votos_diretos.toFixed(1)}%<br>
@@ -889,12 +613,9 @@
               <div style="width:${Math.min(st.lula.total_estimado, 100)}%; height:100%; background:var(--pe-navy); border-radius:2px;"></div>
             </div>
           </div>
-
           <div class="pe-card" style="border-left:3px solid var(--pe-red);">
-            <div class="pe-kpi__label">Flávio Bolsonaro (PL) ${flavioBadge}</div>
-            <div style="font-size:32px; font-weight:500; color:${flavioCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">
-              ${st.flavio.total_estimado.toFixed(1)}%
-            </div>
+            <div class="pe-kpi__label">Flávio Bolsonaro (PL) ${st.flavio.vencedor ? '🏆' : ''}</div>
+            <div style="font-size:32px; font-weight:500; color:${flavioCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${st.flavio.total_estimado.toFixed(1)}%</div>
             <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">estimativa 2º turno</div>
             <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
               Votos diretos: ${st.flavio.votos_diretos.toFixed(1)}%<br>
@@ -904,19 +625,16 @@
               <div style="width:${Math.min(st.flavio.total_estimado, 100)}%; height:100%; background:var(--pe-red); border-radius:2px;"></div>
             </div>
           </div>
-
         </div>
-
         <div class="pe-card" style="background:var(--pe-surface); border:none;">
           <div class="pe-mono" style="font-size:11px; color:var(--pe-text-muted);">
-            ⚠️ ${st.nota} ·
-            Indefinidos não redistribuídos: ${st.indefinido.toFixed(1)}% ·
-            Atualizado em: ${d.primeiro_turno.data_atualizacao}
+            ⚠️ ${st.nota} · Indefinidos não redistribuídos: ${st.indefinido.toFixed(1)}% · Atualizado em: ${d.primeiro_turno.data_atualizacao}
           </div>
         </div>
       `;
     }
 
+    // ─── Regional ─────────────────────────────────────────────
     async function carregarRegional() {
       const res = await fetch('/api/regional/presidente');
       const data = await res.json();
@@ -930,14 +648,12 @@
       const estados = Object.keys(data.estados).sort();
       const candidatos = data.candidatos.slice(0, 2);
 
-      const html = `
+      container.innerHTML = `
         <table style="width:100%; border-collapse:collapse; font-size:13px;">
           <thead>
             <tr style="border-bottom:2px solid var(--pe-surface);">
               <th style="text-align:left; padding:8px; color:var(--pe-text-muted); font-size:11px; font-weight:500; text-transform:uppercase;">Estado</th>
-              ${candidatos.map(c => `
-                <th style="text-align:center; padding:8px; color:var(--pe-text-muted); font-size:11px; font-weight:500; text-transform:uppercase;">${c}</th>
-              `).join('')}
+              ${candidatos.map(c => `<th style="text-align:center; padding:8px; color:var(--pe-text-muted); font-size:11px; font-weight:500; text-transform:uppercase;">${c}</th>`).join('')}
               <th style="text-align:center; padding:8px; color:var(--pe-text-muted); font-size:11px; font-weight:500; text-transform:uppercase;">Líder</th>
               <th style="text-align:right; padding:8px; color:var(--pe-text-muted); font-size:11px; font-weight:500; text-transform:uppercase;">Data</th>
             </tr>
@@ -955,213 +671,139 @@
                   ${candidatos.map((c, i) => {
                     const pct = vals[i];
                     const cor = i === 0 ? 'var(--pe-navy)' : 'var(--pe-red)';
-                    return `<td style="text-align:center; padding:10px 8px; font-family:'JetBrains Mono',monospace; color:${cor}; font-weight:500;">
-                      ${pct !== null ? pct.toFixed(1) + '%' : '—'}
-                    </td>`;
+                    return `<td style="text-align:center; padding:10px 8px; font-family:'JetBrains Mono',monospace; color:${cor}; font-weight:500;">${pct !== null ? pct.toFixed(1) + '%' : '—'}</td>`;
                   }).join('')}
-                  <td style="text-align:center; padding:10px 8px;">
-                    <span style="font-size:11px; font-weight:500; color:${liderCor};">${lider}</span>
-                  </td>
-                  <td style="text-align:right; padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--pe-text-muted);">
-                    ${formatarData(data_uf)}
-                  </td>
-                </tr>
-              `;
+                  <td style="text-align:center; padding:10px 8px;"><span style="font-size:11px; font-weight:500; color:${liderCor};">${lider}</span></td>
+                  <td style="text-align:right; padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--pe-text-muted);">${formatarData(data_uf)}</td>
+                </tr>`;
             }).join('')}
           </tbody>
         </table>
       `;
-      container.innerHTML = html;
     }
 
+    // ─── KPIs Avançados ───────────────────────────────────────
     async function carregarKpisAvancados() {
       const res = await fetch('/api/kpis-avancados?cargo=presidente');
       const d = await res.json();
-      const grid = document.getElementById('kpis-avancados-grid');
 
-      const margemCor = d.margem_lideranca.classificacao === 'empate_tecnico'
-        ? 'var(--pe-warn)'
-        : d.margem_lideranca.classificacao === 'lideranca_confortavel'
-        ? 'var(--pe-up)' : 'var(--pe-navy)';
-      const margemLabel = {
-        'empate_tecnico': '⚠️ Empate Técnico',
-        'lideranca_moderada': '📊 Liderança Moderada',
-        'lideranca_confortavel': '✅ Liderança Confortável'
-      }[d.margem_lideranca.classificacao];
+      // Visão Geral: margem, turno, concentração → #kpis-avancados-grid
+      const margemCor = d.margem_lideranca.classificacao === 'empate_tecnico' ? 'var(--pe-warn)'
+        : d.margem_lideranca.classificacao === 'lideranca_confortavel' ? 'var(--pe-up)' : 'var(--pe-navy)';
+      const margemLabel = { empate_tecnico: '⚠️ Empate Técnico', lideranca_moderada: '📊 Liderança Moderada', lideranca_confortavel: '✅ Liderança Confortável' }[d.margem_lideranca.classificacao];
+      const turnoLabel = d.probabilidade_segundo_turno.provavel ? '🔄 2º Turno Provável' : '✅ Possível 1º Turno';
+      const turnoCor = d.probabilidade_segundo_turno.provavel ? 'var(--pe-warn)' : 'var(--pe-up)';
+      const concLabel = { bipolar: '⚡ Cenário Bipolar', moderado: '📊 Cenário Moderado', fragmentado: '🔀 Cenário Fragmentado' }[d.concentracao_voto.classificacao];
 
-      const turnoLabel = d.probabilidade_segundo_turno.provavel
-        ? '🔄 2º Turno Provável' : '✅ Possível 1º Turno';
-      const turnoCor = d.probabilidade_segundo_turno.provavel
-        ? 'var(--pe-warn)' : 'var(--pe-up)';
-
-      const concLabel = {
-        'bipolar': '⚡ Cenário Bipolar',
-        'moderado': '📊 Cenário Moderado',
-        'fragmentado': '🔀 Cenário Fragmentado'
-      }[d.concentracao_voto.classificacao];
-
-      const volLabel = {
-        estavel: '🟢 Estável',
-        moderado: '🟡 Moderada',
-        volatil: '🔴 Alta'
-      }[d.volatilidade.cenario_geral];
-
-      grid.innerHTML = `
+      document.getElementById('kpis-avancados-grid').innerHTML = `
         <div class="pe-card">
           <div class="pe-kpi__label">Margem de Liderança</div>
-          <div style="font-size:22px; font-weight:500; color:${margemCor}; font-family:'JetBrains Mono',monospace; margin: 8px 0;">
-            ${d.margem_lideranca.margem.toFixed(1)}pp
-          </div>
+          <div style="font-size:22px; font-weight:500; color:${margemCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${d.margem_lideranca.margem.toFixed(1)}pp</div>
           <div style="font-size:12px; color:var(--pe-text-muted);">${margemLabel}</div>
-          <div style="font-size:11px; color:var(--pe-text-muted); margin-top:4px; font-family:'JetBrains Mono',monospace;">
-            ${d.margem_lideranca.primeiro} ${d.margem_lideranca.percentual_primeiro.toFixed(1)}%
-            vs ${d.margem_lideranca.segundo} ${d.margem_lideranca.percentual_segundo.toFixed(1)}%
-          </div>
+          <div style="font-size:11px; color:var(--pe-text-muted); margin-top:4px; font-family:'JetBrains Mono',monospace;">${d.margem_lideranca.primeiro} ${d.margem_lideranca.percentual_primeiro.toFixed(1)}% vs ${d.margem_lideranca.segundo} ${d.margem_lideranca.percentual_segundo.toFixed(1)}%</div>
         </div>
-
         <div class="pe-card">
           <div class="pe-kpi__label">Perspectiva de Turno</div>
-          <div style="font-size:18px; font-weight:500; color:${turnoCor}; margin: 8px 0;">
-            ${turnoLabel}
-          </div>
-          <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
-            Líder com ${d.probabilidade_segundo_turno.lider_percentual.toFixed(1)}%
-            (mín. 50% para 1º turno)
-          </div>
+          <div style="font-size:18px; font-weight:500; color:${turnoCor}; margin:8px 0;">${turnoLabel}</div>
+          <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">Líder com ${d.probabilidade_segundo_turno.lider_percentual.toFixed(1)}% (mín. 50% para 1º turno)</div>
         </div>
-
         <div class="pe-card">
           <div class="pe-kpi__label">Concentração do Voto</div>
-          <div style="font-size:22px; font-weight:500; color:var(--pe-navy); font-family:'JetBrains Mono',monospace; margin: 8px 0;">
-            ${d.concentracao_voto.top2_soma.toFixed(1)}%
-          </div>
+          <div style="font-size:22px; font-weight:500; color:var(--pe-navy); font-family:'JetBrains Mono',monospace; margin:8px 0;">${d.concentracao_voto.top2_soma.toFixed(1)}%</div>
           <div style="font-size:12px; color:var(--pe-text-muted);">${concLabel}</div>
-          <div style="font-size:11px; color:var(--pe-text-muted); margin-top:4px;">
-            ${d.concentracao_voto.terceira_via_possivel ? '🟡 Terceira via tem espaço' : '🔴 Terceira via improvável'}
-          </div>
+          <div style="font-size:11px; color:var(--pe-text-muted); margin-top:4px;">${d.concentracao_voto.terceira_via_possivel ? '🟡 Terceira via tem espaço' : '🔴 Terceira via improvável'}</div>
         </div>
+      `;
 
+      // Análise: campo minado, volatilidade, aceleração → #kpis-analise-grid
+      const volLabel = { estavel: '🟢 Estável', moderado: '🟡 Moderada', volatil: '🔴 Alta' }[d.volatilidade.cenario_geral];
+
+      document.getElementById('kpis-analise-grid').innerHTML = `
         <div class="pe-card">
           <div class="pe-kpi__label">Campo Minado — Em Ascensão</div>
           ${d.campo_minado.length === 0
             ? '<div style="font-size:13px; color:var(--pe-text-muted); margin-top:8px;">Nenhum candidato em ascensão</div>'
-            : d.campo_minado.slice(0,2).map(c => `
+            : d.campo_minado.slice(0, 2).map(c => `
               <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--pe-surface);">
                 <span style="font-size:13px;">${c.candidato}</span>
-                <span style="font-size:12px; font-family:'JetBrains Mono',monospace; color:var(--pe-up);">
-                  +${c.crescimento_relativo.toFixed(0)}%
-                  <span style="color:var(--pe-text-muted);">(${c.percentual_atual.toFixed(1)}%)</span>
-                </span>
-              </div>
-            `).join('')
+                <span style="font-size:12px; font-family:'JetBrains Mono',monospace; color:var(--pe-up);">+${c.crescimento_relativo.toFixed(0)}% <span style="color:var(--pe-text-muted);">(${c.percentual_atual.toFixed(1)}%)</span></span>
+              </div>`).join('')
           }
         </div>
-
         <div class="pe-card">
           <div class="pe-kpi__label">Volatilidade do Cenário</div>
-          <div style="font-size:18px; font-weight:500; color:var(--pe-navy); margin: 8px 0;">
-            ${volLabel}
-          </div>
-          ${d.volatilidade.candidatos.slice(0,2).map(c => `
-            <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
-              ${c.candidato}: σ${c.desvio_padrao.toFixed(1)}pp
-            </div>
+          <div style="font-size:18px; font-weight:500; color:var(--pe-navy); margin:8px 0;">${volLabel}</div>
+          ${d.volatilidade.candidatos.slice(0, 2).map(c => `
+            <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">${c.candidato}: σ${c.desvio_padrao.toFixed(1)}pp</div>
           `).join('')}
         </div>
-
         <div class="pe-card">
           <div class="pe-kpi__label">Aceleração da Tendência</div>
-          ${d.tendencia_aceleracao.slice(0,3).map(t => {
-            const label = {
-              'acelerando_alta': '📈↑',
-              'desacelerando_alta': '📈↓',
-              'acelerando_queda': '📉↑',
-              'desacelerando_queda': '📉↓',
-              'estavel': '➡️'
-            }[t.aceleracao] || '➡️';
+          ${d.tendencia_aceleracao.slice(0, 3).map(t => {
+            const lbl = { acelerando_alta: '📈↑', desacelerando_alta: '📈↓', acelerando_queda: '📉↑', desacelerando_queda: '📉↓', estavel: '➡️' }[t.aceleracao] || '➡️';
             return `
               <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
                 <span style="font-size:12px;">${t.candidato}</span>
-                <span style="font-size:12px;">${label}
-                  <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--pe-text-muted);">
-                    15d:${t.tendencia_15d > 0 ? '+' : ''}${t.tendencia_15d.toFixed(1)}
-                    30d:${t.tendencia_30d > 0 ? '+' : ''}${t.tendencia_30d.toFixed(1)}
-                  </span>
-                </span>
-              </div>
-            `;
+                <span style="font-size:12px;">${lbl} <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--pe-text-muted);">15d:${t.tendencia_15d > 0 ? '+' : ''}${t.tendencia_15d.toFixed(1)} 30d:${t.tendencia_30d > 0 ? '+' : ''}${t.tendencia_30d.toFixed(1)}</span></span>
+              </div>`;
           }).join('')}
         </div>
       `;
     }
 
-    // Inicialização da página
+    // ─── Inicialização ────────────────────────────────────────
     async function inicializar() {
-      // Carrega informações globais em paralelo
       await Promise.all([
         carregarVisaoGeral(),
-        carregarAlertas(),
-        carregarMediaAgregada(),
+        carregarKpisAvancados(),
         carregarPresidente(),
         carregarGovernador(),
         carregarInstitutos(),
+        carregarMediaAgregada(),
         inicializarComparativo(),
         carregarHistoricoMulti(),
-        carregarKpisAvancados(),
+        carregarAlertas(),
+        carregarSimulacao(),
         carregarRegional(),
-        carregarSimulacao()
       ]);
     }
 
     document.addEventListener('DOMContentLoaded', inicializar);
   </script>
   <script>
-   const sections = [
-     { id: 'secao-presidente', nav: 'nav-presidente' },
-     { id: 'secao-evolucao', nav: 'nav-evolucao' },
-     { id: 'secao-comparativo', nav: 'nav-comparativo' },
-     { id: 'secao-governador', nav: 'nav-governador' },
-     { id: 'secao-regional', nav: 'nav-regional' },
-     { id: 'secao-simulacao', nav: 'nav-simulacao' },
-   ];
+    const sections = [
+      { id: 'secao-visao-geral', nav: 'nav-visao-geral' },
+      { id: 'secao-presidente',  nav: 'nav-presidente' },
+      { id: 'secao-governador',  nav: 'nav-governador' },
+      { id: 'secao-analise',     nav: 'nav-analise' },
+      { id: 'secao-dados',       nav: 'nav-dados' },
+    ];
 
-   const navItems = {
-     'nav-presidente': document.querySelector('a[href="#secao-presidente"]'),
-     'nav-evolucao': document.querySelector('a[href="#secao-evolucao"]'),
-     'nav-comparativo': document.querySelector('a[href="#secao-comparativo"]'),
-     'nav-governador': document.querySelector('a[href="#secao-governador"]'),
-     'nav-regional': document.querySelector('a[href="#secao-regional"]'),
-     'nav-simulacao': document.querySelector('a[href="#secao-simulacao"]'),
-   };
+    const navItems = {
+      'nav-visao-geral': document.getElementById('nav-visao-geral'),
+      'nav-presidente':  document.getElementById('nav-presidente'),
+      'nav-governador':  document.getElementById('nav-governador'),
+      'nav-analise':     document.getElementById('nav-analise'),
+      'nav-dados':       document.getElementById('nav-dados'),
+    };
 
-   const observer = new IntersectionObserver((entries) => {
-     entries.forEach(entry => {
-       const section = sections.find(s => s.id === entry.target.id);
-       if (!section) return;
-       const navItem = navItems[section.nav];
-       if (!navItem) return;
-       if (entry.isIntersecting) {
-         // Remove ativo de todos
-         Object.values(navItems).forEach(el => el && el.classList.remove('pe-topbar__nav-item--active'));
-         // Adiciona ativo no atual
-         navItem.classList.add('pe-topbar__nav-item--active');
-       }
-     });
-   }, { threshold: 0.3 });
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const section = sections.find(s => s.id === entry.target.id);
+        if (!section) return;
+        const navItem = navItems[section.nav];
+        if (!navItem) return;
+        if (entry.isIntersecting) {
+          Object.values(navItems).forEach(el => el && el.classList.remove('pe-topbar__nav-item--active'));
+          navItem.classList.add('pe-topbar__nav-item--active');
+        }
+      });
+    }, { threshold: 0.3 });
 
-   sections.forEach(s => {
-     const el = document.getElementById(s.id);
-     if (el) observer.observe(el);
-   });
-
-   // "Visão Geral" ativo por padrão quando no topo
-   const navGeralItem = document.querySelector('a[href="#"]');
-   window.addEventListener('scroll', () => {
-     if (window.scrollY < 100) {
-       Object.values(navItems).forEach(el => el && el.classList.remove('pe-topbar__nav-item--active'));
-       if (navGeralItem) navGeralItem.classList.add('pe-topbar__nav-item--active');
-     }
-   });
+    sections.forEach(s => {
+      const el = document.getElementById(s.id);
+      if (el) observer.observe(el);
+    });
   </script>
 </body>
 </html>
