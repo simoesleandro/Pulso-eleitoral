@@ -91,7 +91,8 @@ CREATE TABLE IF NOT EXISTS pesquisas_regionais (
     uf TEXT NOT NULL,
     candidato TEXT NOT NULL,
     percentual REAL NOT NULL,
-    data_coleta TEXT NOT NULL
+    data_coleta TEXT NOT NULL,
+    UNIQUE(uf, candidato, data_coleta)
 );
 
 -- 9. Tabela de usuários para controle de acesso
