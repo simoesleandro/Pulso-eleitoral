@@ -506,7 +506,7 @@
               <tr style="border-bottom:1px solid var(--pe-surface);">
                 <td style="padding:10px 8px; font-size:13px; font-weight:500; color:var(--pe-navy);">${inst.instituto}</td>
                 <td style="padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:500; color:var(--pe-navy);">${inst.percentual.toFixed(1)}%</td>
-                <td style="padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--pe-text-muted);">${inst.margem_erro ? '±' + inst.margem_erro + 'pp' : '—'}</td>
+                <td style="padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--pe-text-muted);">${(() => { const n = parseFloat(String(inst.margem_erro ?? '').replace(',', '.').match(/[\d.,]+/)?.[0] ?? ''); return isNaN(n) ? '—' : '±' + n + 'pp'; })()}</td>
                 <td style="padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--pe-text-muted);">${formatarData(inst.data)}</td>
                 <td style="padding:10px 8px; width:200px;">
                   <div style="background:var(--pe-surface); border-radius:2px; height:16px; overflow:hidden;">

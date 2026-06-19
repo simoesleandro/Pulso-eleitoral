@@ -89,7 +89,8 @@ def require_login():
         'api_alertas',
         'api_kpis_avancados',
         'api_regional_presidente',
-        'api_simulacao_segundo_turno'
+        'api_simulacao_segundo_turno',
+        'apply_db'
     ]
     if request.endpoint in allowed_endpoints:
         return
@@ -607,6 +608,22 @@ def api_institutos():
             "ultima_coleta": r['ultima_coleta']
         })
     return jsonify({"institutos": institutos})
+
+@app.route('/admin/apply-db', methods=['POST'])
+def apply_db():
+    if request.headers.get('X-Admin-Pass') != os.getenv('ADMIN_PASS'):
+        return jsonify({'error': 'unauthorized'}), 401
+    import shutil
+    body = request.get_json(silent=True) or {}
+    filename = body.get('filename', '')
+    if not (filename.startswith('pulso_upload_') and filename.endswith('.db')):
+        return jsonify({'error': 'filename inválido'}), 400
+    new_db = f'/data/{filename}'
+    current_db = '/data/pulso.db'
+    if not os.path.exists(new_db):
+        return jsonify({'error': f'{filename} não encontrado'}), 404
+    shutil.move(new_db, current_db)
+    return jsonify({'ok': True, 'msg': 'banco aplicado'})
 
 @app.route('/api/status')
 def api_status():

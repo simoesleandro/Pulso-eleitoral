@@ -111,8 +111,10 @@ class BaseCollector(ABC):
                     # b. Se não existe: INSERT INTO pesquisas
                     first = group_items[0]
                     margem_erro = first.get("margem_erro")
-                    if margem_erro is None:
-                        margem_erro = 0.0
+                    if margem_erro is not None:
+                        import re as _re
+                        _m = _re.search(r'[\d]+[.,]?[\d]*', str(margem_erro))
+                        margem_erro = float(_m.group().replace(',', '.')) if _m else None
                     tamanho_amostra = first.get("tamanho_amostra")
                     if tamanho_amostra is None:
                         tamanho_amostra = 0
