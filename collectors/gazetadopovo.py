@@ -1,3 +1,4 @@
+import re
 import time
 import unicodedata
 from bs4 import BeautifulSoup
@@ -17,6 +18,9 @@ INSTITUTOS_ALVO = [
     'ipespe', 'paraná', 'parana pesquisas',
     'vox populi', 'nexus', 'btg', 'nexus pesquisas',
     'doxa', 'verita',
+    'futura', 'futura inteligencia', 'futurainteligencia',
+    'poderdata', 'poder data', 'poderdata/aya', 'aya',
+    'meio', 'ideia', 'meio/ideia', 'canal meio',
 ]
 
 INSTITUTO_ID_MAP = {
@@ -31,6 +35,13 @@ INSTITUTO_ID_MAP = {
     'nexus':      8,
     'btg':        8,
     'verita':     9,
+    'futura':           10,
+    'futurainteligencia': 10,
+    'poderdata':        11,
+    'poder data':       11,
+    'aya':              11,
+    'meio':             12,
+    'ideia':            12,
 }
 
 UF_MAP = {
@@ -129,14 +140,22 @@ class GazetaDoPovoColetor(PlaywrightCollector, BaseCollector):
             return 9
         if 'doxa' in combinado:
             return 4
+        if 'futura' in combinado:
+            return 10
+        if 'poderdata' in combinado or 'poder data' in combinado or 'aya' in combinado:
+            return 11
+        if 'meio' in combinado or 'ideia' in combinado:
+            return 12
         self.logger.warning("[GazetaDoPovo] Instituto não identificado em %s — usando fallback 7", url[:60])
         return 7
 
-    def _detectar_uf(self, url: str, html_inicio: str) -> str | None:
-        texto = _norm(url + ' ' + html_inicio)
-        for chave in sorted(UF_MAP, key=len, reverse=True):
-            if _norm(chave) in texto:
-                return UF_MAP[chave]
+    def _detectar_uf(self, url: str, texto: str = '') -> str | None:
+        combinado = _norm(url + ' ' + texto)
+        tokens = set(re.split(r'[-/\s_]', combinado))
+        for chave, uf in UF_MAP.items():
+            chave_tokens = set(_norm(chave).split())
+            if chave_tokens.issubset(tokens):
+                return uf
         return None
 
     def _salvar_regional(self, dados: list[dict], uf: str) -> None:
