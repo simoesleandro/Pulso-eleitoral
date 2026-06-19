@@ -605,13 +605,41 @@
 
     // ─── Simulação 2º Turno ───────────────────────────────────
     async function carregarSimulacao() {
-      const res = await fetch('/api/simulacao-segundo-turno');
-      const d = await res.json();
+      const [resSim, resMC] = await Promise.all([
+        fetch('/api/simulacao-segundo-turno'),
+        fetch('/api/monte-carlo'),
+      ]);
+      const d = await resSim.json();
+      const mc = resMC.ok ? await resMC.json() : null;
       const st = d.segundo_turno;
       const container = document.getElementById('simulacao-container');
 
       const lulaCor = st.lula.vencedor ? 'var(--pe-up)' : 'var(--pe-text-muted)';
       const flavioCor = st.flavio.vencedor ? 'var(--pe-up)' : 'var(--pe-text-muted)';
+
+      function mcBloco(lado) {
+        if (!mc) return '';
+        const prob = mc[lado].prob_vitoria;
+        const favorito = mc[lado].favorito;
+        const badgeCor = favorito ? 'var(--pe-up)' : 'var(--pe-down)';
+        const badgeBg  = favorito ? '#e6f4ec' : '#fdecea';
+        const badgeTexto = favorito ? 'FAVORITO' : 'ADVERSÁRIO';
+        const barCor = lado === 'lula' ? 'var(--pe-navy)' : 'var(--pe-red)';
+        return `
+          <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--pe-surface);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:11px; color:var(--pe-text-muted); text-transform:uppercase; letter-spacing:.06em;">Monte Carlo</span>
+              <span style="font-size:10px; font-weight:700; color:${badgeCor}; background:${badgeBg}; padding:3px 8px; border-radius:3px; letter-spacing:.05em;">${badgeTexto}</span>
+            </div>
+            <div style="font-size:20px; font-weight:500; color:${badgeCor}; font-family:'JetBrains Mono',monospace; margin-bottom:4px;">${prob.toFixed(1)}%</div>
+            <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">de chance de vencer</div>
+            <div style="background:var(--pe-surface); border-radius:2px; height:6px; overflow:hidden;">
+              <div style="width:${Math.min(prob, 100)}%; height:100%; background:${barCor}; border-radius:2px; transition:width .6s ease;"></div>
+            </div>
+          </div>`;
+      }
+
+      const nSim = mc ? mc.n_simulacoes.toLocaleString('pt-BR') : null;
 
       container.innerHTML = `
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
@@ -626,6 +654,7 @@
             <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
               <div style="width:${Math.min(st.lula.total_estimado, 100)}%; height:100%; background:var(--pe-navy); border-radius:2px;"></div>
             </div>
+            ${mcBloco('lula')}
           </div>
           <div class="pe-card" style="border-left:3px solid var(--pe-red);">
             <div class="pe-kpi__label">Flávio Bolsonaro (PL) ${st.flavio.vencedor ? '🏆' : ''}</div>
@@ -638,11 +667,16 @@
             <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
               <div style="width:${Math.min(st.flavio.total_estimado, 100)}%; height:100%; background:var(--pe-red); border-radius:2px;"></div>
             </div>
+            ${mcBloco('flavio')}
           </div>
         </div>
         <div class="pe-card" style="background:var(--pe-surface); border:none;">
+          ${nSim ? `
+          <div class="pe-mono" style="font-size:12px; color:var(--pe-navy); margin-bottom:6px; font-weight:500;">
+            Baseado em ${nSim} simulações Monte Carlo · atualizado em ${d.primeiro_turno.data_atualizacao}
+          </div>` : ''}
           <div class="pe-mono" style="font-size:11px; color:var(--pe-text-muted);">
-            ⚠️ ${st.nota} · Indefinidos não redistribuídos: ${st.indefinido.toFixed(1)}% · Atualizado em: ${d.primeiro_turno.data_atualizacao}
+            ⚠️ ${st.nota} · Indefinidos não redistribuídos: ${st.indefinido.toFixed(1)}%
           </div>
         </div>
       `;

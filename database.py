@@ -401,6 +401,105 @@ def get_simulacao_segundo_turno() -> dict:
     }
 
 
+def get_simulacao_monte_carlo(n_simulacoes: int = 10000) -> dict:
+    """
+    Simula 2º turno Lula x Flávio via Monte Carlo.
+    Cada simulação sorteia percentuais dentro de média ± margem (distribuição normal).
+    Retorna probabilidade de vitória baseada em n_simulacoes iterações.
+    """
+    import random
+
+    DIREITA = {'Flávio Bolsonaro', 'Ronaldo Caiado', 'Romeu Zema',
+               'Cabo Daciolo', 'Renan Santos', 'Tarcísio de Freitas'}
+    ESQUERDA_CENTRO = {'Lula', 'Ciro Gomes', 'Simone Tebet',
+                       'Rui Costa Pimenta', 'Augusto Cury'}
+    MARGEM_DEFAULT = 2.0
+
+    media = get_media_agregada('presidente', dias=30)
+    candidatos = media.get('candidatos', [])
+
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT i.candidato, p.margem_erro
+        FROM intencoes i
+        JOIN pesquisas p ON i.pesquisa_id = p.id
+        WHERE p.cargo = 'presidente' AND p.margem_erro > 0
+        ORDER BY p.data_pesquisa DESC
+    """).fetchall()
+    conn.close()
+
+    margens = {}
+    for candidato, margem in rows:
+        if candidato not in margens:
+            margens[candidato] = margem
+
+    lula_media = next((c['media'] for c in candidatos if c['candidato'] == 'Lula'), 0)
+    flavio_media = next((c['media'] for c in candidatos if c['candidato'] == 'Flávio Bolsonaro'), 0)
+    # pesos para redistribuição proporcional dos indefinidos
+    _peso_total = lula_media + flavio_media if (lula_media + flavio_media) > 0 else 1
+    _peso_lula = lula_media / _peso_total
+    _peso_flavio = flavio_media / _peso_total
+
+    lula_vitorias = 0
+
+    for _ in range(n_simulacoes):
+        simulado = {}
+        for c in candidatos:
+            nome = c['candidato']
+            media_val = c['media']
+            margem = margens.get(nome, MARGEM_DEFAULT)
+            sigma = margem * 2.0  # captura incerteza metodológica entre institutos
+            percentual = random.gauss(media_val, sigma)
+            simulado[nome] = max(0, percentual)
+
+        lula = simulado.get('Lula', 0)
+        flavio = simulado.get('Flávio Bolsonaro', 0)
+
+        for nome, pct in simulado.items():
+            if nome in ('Lula', 'Flávio Bolsonaro'):
+                continue
+            if nome in DIREITA:
+                split = min(0.90, max(0.50, random.gauss(0.70, 0.08)))
+                flavio += pct * split
+                lula += pct * (1 - split)
+            elif nome in ESQUERDA_CENTRO:
+                split = min(0.90, max(0.50, random.gauss(0.70, 0.08)))
+                lula += pct * split
+                flavio += pct * (1 - split)
+            else:
+                # 40% ao líder, 30% ao segundo, 30% redistribuído proporcionalmente
+                if lula_media >= flavio_media:
+                    lula += pct * 0.40
+                    flavio += pct * 0.30
+                else:
+                    flavio += pct * 0.40
+                    lula += pct * 0.30
+                abstain = pct * 0.30
+                lula += abstain * _peso_lula
+                flavio += abstain * _peso_flavio
+
+        if lula > flavio:
+            lula_vitorias += 1
+
+    prob_lula = round(lula_vitorias / n_simulacoes * 100, 1)
+    prob_flavio = round(100 - prob_lula, 1)
+
+    return {
+        'lula': {
+            'media_direto': lula_media,
+            'prob_vitoria': prob_lula,
+            'favorito': prob_lula > prob_flavio,
+        },
+        'flavio': {
+            'media_direto': flavio_media,
+            'prob_vitoria': prob_flavio,
+            'favorito': prob_flavio > prob_lula,
+        },
+        'n_simulacoes': n_simulacoes,
+        'margem_default_usada': MARGEM_DEFAULT,
+    }
+
+
 def get_dados_regionais() -> dict:
     """Retorna percentuais mais recentes por candidato e UF da tabela pesquisas_regionais."""
     try:

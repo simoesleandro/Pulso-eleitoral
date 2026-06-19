@@ -557,6 +557,11 @@ def api_simulacao_segundo_turno():
     from database import get_simulacao_segundo_turno
     return jsonify(get_simulacao_segundo_turno())
 
+@app.route('/api/monte-carlo')
+def api_monte_carlo():
+    from database import get_simulacao_monte_carlo
+    return jsonify(get_simulacao_monte_carlo())
+
 @app.route('/api/regional/presidente')
 def api_regional_presidente():
     """Retorna dados regionais de intenção de voto por UF para mapa de calor."""
