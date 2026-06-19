@@ -83,6 +83,8 @@ class AtlasCollector(PlaywrightCollector, BaseCollector):
 
     def fetch(self) -> list[dict]:
         """Consulta a listagem do Atlas, extrai os links e processa os releases."""
+        logger.warning("Atlas: domínio atlaspolitico.com.br fora do ar (DNS não resolve) — coletor desabilitado")
+        return None
         html = self._get_page(LISTING_URL)
         if not html:
             return []
