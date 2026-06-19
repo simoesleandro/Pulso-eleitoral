@@ -9,6 +9,19 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/tokens.css">
   <link rel="stylesheet" href="/static/css/base.css">
+  <style>
+    .pe-tooltip-wrap { position:relative; display:inline-flex; align-items:center; cursor:default; }
+    .pe-tooltip-wrap .pe-tooltip {
+      visibility:hidden; opacity:0; pointer-events:none;
+      position:absolute; bottom:calc(100% + 6px); left:0;
+      background:#0A2240; color:#fff;
+      font-size:11px; font-weight:400; line-height:1.5;
+      font-family:'Inter',sans-serif; letter-spacing:0; text-transform:none;
+      padding:7px 10px; border-radius:4px; width:240px; z-index:100;
+      transition:opacity .15s;
+    }
+    .pe-tooltip-wrap:hover .pe-tooltip { visibility:visible; opacity:1; }
+  </style>
 </head>
 <body class="pe-page">
 
@@ -628,7 +641,11 @@
         return `
           <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--pe-surface);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <span style="font-size:11px; color:var(--pe-text-muted); text-transform:uppercase; letter-spacing:.06em;">Monte Carlo</span>
+              <span class="pe-tooltip-wrap" style="font-size:11px; color:var(--pe-text-muted); text-transform:uppercase; letter-spacing:.06em;">
+                Monte Carlo
+                <span style="margin-left:4px; font-size:13px; cursor:help; opacity:.7;">ⓘ</span>
+                <span class="pe-tooltip">Probabilidade calculada com 10.000 simulações. Cada simulação sorteia percentuais dentro da margem de erro e redistribui votos com variação aleatória.</span>
+              </span>
               <span style="font-size:10px; font-weight:700; color:${badgeCor}; background:${badgeBg}; padding:3px 8px; border-radius:3px; letter-spacing:.05em;">${badgeTexto}</span>
             </div>
             <div style="font-size:20px; font-weight:500; color:${badgeCor}; font-family:'JetBrains Mono',monospace; margin-bottom:4px;">${prob.toFixed(1)}%</div>
@@ -675,9 +692,6 @@
           <div class="pe-mono" style="font-size:12px; color:var(--pe-navy); margin-bottom:6px; font-weight:500;">
             Baseado em ${nSim} simulações Monte Carlo · atualizado em ${d.primeiro_turno.data_atualizacao}
           </div>` : ''}
-          <div class="pe-mono" style="font-size:11px; color:var(--pe-text-muted);">
-            ⚠️ ${st.nota} · Indefinidos não redistribuídos: ${st.indefinido.toFixed(1)}%
-          </div>
         </div>
       `;
     }
