@@ -4,6 +4,7 @@ import atexit
 import json
 from functools import wraps
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
+from flask_caching import Cache
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -16,6 +17,8 @@ app = Flask(__name__)
 
 # Configurações do Flask
 app.secret_key = os.getenv('SECRET_KEY', 'default-session-secret-key-9999')
+
+cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 
 # Inicializa o banco de dados
 init_db()
@@ -558,6 +561,7 @@ def api_simulacao_segundo_turno():
     return jsonify(get_simulacao_segundo_turno())
 
 @app.route('/api/monte-carlo')
+@cache.cached(timeout=300)
 def api_monte_carlo():
     from database import get_simulacao_monte_carlo
     return jsonify(get_simulacao_monte_carlo())
