@@ -12,7 +12,6 @@ from .utils import fetch_with_retry
 BASE_URL = "https://quaest.com.br"
 LISTING_URLS = [
     "https://quaest.com.br/category/politica/",
-    "https://quaest.com.br/category/politica/page/2/",
 ]
 INSTITUTO_ID = 3
 HEADERS = {

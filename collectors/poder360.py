@@ -100,7 +100,7 @@ class Poder360Collector(PlaywrightCollector, BaseCollector):
     def fetch(self) -> list[dict]:
         """Consulta a listagem do Poder360, extrai os links e processa os releases."""
         logger.warning("Poder360: agregador migrou para produto pago (Poder Drive) — coletor desabilitado")
-        return None
+        return []
         html = self._get_page(LISTING_URL)
         if not html:
             return []
