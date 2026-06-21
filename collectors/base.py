@@ -115,6 +115,8 @@ class BaseCollector(ABC):
                         import re as _re
                         _m = _re.search(r'[\d]+[.,]?[\d]*', str(margem_erro))
                         margem_erro = float(_m.group().replace(',', '.')) if _m else 0.0
+                    else:
+                        margem_erro = 0.0
                     tamanho_amostra = first.get("tamanho_amostra")
                     if tamanho_amostra is None:
                         tamanho_amostra = 0
