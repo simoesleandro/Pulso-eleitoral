@@ -105,6 +105,14 @@ class BaseCollector(ABC):
                 
                 if row:
                     pesquisa_id = row[0]
+                    # Atualiza data_pesquisa se o item traz uma data real (não apenas hoje)
+                    first = group_items[0]
+                    data_pesquisa_real = first.get("data_pesquisa")
+                    if data_pesquisa_real and data_pesquisa_real != dt_coleta:
+                        cursor.execute(
+                            "UPDATE pesquisas SET data_pesquisa=? WHERE id=?",
+                            (data_pesquisa_real, pesquisa_id)
+                        )
                     # Limpa as intenções anteriores para evitar duplicação
                     cursor.execute("DELETE FROM intencoes WHERE pesquisa_id = ?", (pesquisa_id,))
                 else:
@@ -124,14 +132,16 @@ class BaseCollector(ABC):
                     data_divulgacao = first.get("data_divulgacao") or dt_coleta
                     registro_tse = first.get("registro_tse") or f"GEN-{inst_id}-{cargo}-{dt_coleta}-{hash(url)}"
 
+                    data_pesquisa = first.get("data_pesquisa") or dt_coleta
+
                     cursor.execute("""
-                        INSERT INTO pesquisas 
+                        INSERT INTO pesquisas
                         (instituto_id, cargo, data_pesquisa, data_publicacao, tamanho_amostra, margem_erro, contratante, registro_tse, fonte_url)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         inst_id,
                         cargo,
-                        dt_coleta,
+                        data_pesquisa,
                         data_divulgacao,
                         tamanho_amostra,
                         margem_erro,
@@ -212,14 +222,17 @@ class BaseCollector(ABC):
                     inst_id = idx
                     break
                     
+        data_real = resultado.get("data")  # YYYY-MM-DD extraída pelo Gemini, ou None
+
         return [
             {
                 "instituto_id": inst_id,
                 "cargo": resultado.get("cargo", "presidente"),
                 "candidato": c["nome"],
                 "percentual": float(c["percentual"]),
+                "data_pesquisa": data_real or hoje,
                 "data_coleta": hoje,
-                "data_divulgacao": resultado.get("data"),
+                "data_divulgacao": data_real,
                 "tamanho_amostra": resultado.get("tamanho_amostra"),
                 "margem_erro": resultado.get("margem_erro"),
                 "fonte_url": url,

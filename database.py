@@ -448,7 +448,7 @@ def get_simulacao_monte_carlo(n_simulacoes: int = 10000) -> dict:
             nome = c['candidato']
             media_val = c['media']
             margem = margens.get(nome, MARGEM_DEFAULT)
-            sigma = margem * 2.0  # captura incerteza metodológica entre institutos
+            sigma = max(margem * 2.0, 6.0)  # piso de 6pp: incerteza eleitoral com ~9 meses até a eleição
             percentual = random.gauss(media_val, sigma)
             simulado[nome] = max(0, percentual)
 
@@ -478,7 +478,14 @@ def get_simulacao_monte_carlo(n_simulacoes: int = 10000) -> dict:
                 lula += abstain * _peso_lula
                 flavio += abstain * _peso_flavio
 
-        if lula > flavio:
+        total = lula + flavio
+        if total > 0:
+            lula_norm = lula / total
+            flavio_norm = flavio / total
+        else:
+            lula_norm = flavio_norm = 0.0
+
+        if lula_norm > flavio_norm:
             lula_vitorias += 1
 
     prob_lula = round(lula_vitorias / n_simulacoes * 100, 1)
