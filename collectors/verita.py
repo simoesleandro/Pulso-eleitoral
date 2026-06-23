@@ -6,6 +6,10 @@
 #   2. requests baixa o PDF do Supabase
 #   3. pdfplumber extrai o texto do PDF
 #   4. _parse_com_gemini() estrutura os dados
+#
+# PDFs estaduais (Relatorio_{Estado}_...) são ignorados silenciosamente —
+# contêm pesquisas de governador/senador, não presidenciais.
+# Somente PDFs nacionais (nome contém 'Brasil' ou 'Nacional') são processados.
 
 import io
 import time
@@ -28,6 +32,63 @@ HEADERS = {
     "Accept": "application/pdf,*/*",
     "Referer": BASE_URL,
 }
+
+
+def _is_pdf_nacional(pdf_url: str) -> bool:
+    filename = pdf_url.split('/')[-1]
+    return 'Brasil' in filename or 'Nacional' in filename
+
+
+# --- Infraestrutura futura: pesquisas_regionais presidenciais por UF ---
+# Os PDFs estaduais do Verita cobrem governador/senador, não presidente.
+# Quando o Verita publicar pesquisas presidenciais por UF, descomentar abaixo.
+#
+# import sqlite3
+#
+# ESTADO_UF = {
+#     'Acre': 'AC', 'Alagoas': 'AL', 'Amapa': 'AP', 'Amazonas': 'AM',
+#     'Bahia': 'BA', 'Ceara': 'CE', 'Distrito_Federal': 'DF',
+#     'Espirito_Santo': 'ES', 'Goias': 'GO', 'Maranhao': 'MA',
+#     'Mato_Grosso_do_Sul': 'MS', 'Mato_Grosso': 'MT', 'Minas_Gerais': 'MG',
+#     'Para': 'PA', 'Paraiba': 'PB', 'Parana': 'PR', 'Pernambuco': 'PE',
+#     'Piaui': 'PI', 'Rio_de_Janeiro': 'RJ', 'Rio_Grande_do_Norte': 'RN',
+#     'Rio_Grande_do_Sul': 'RS', 'Rondonia': 'RO', 'Roraima': 'RR',
+#     'Santa_Catarina': 'SC', 'Sao_Paulo': 'SP', 'Sergipe': 'SE',
+#     'Tocantins': 'TO',
+# }
+# # Ordenados longest-first: Mato_Grosso_do_Sul antes de Mato_Grosso,
+# # Rio_de_Janeiro antes de Janeiro (confundido como mês pelo regex).
+# _ESTADO_LIST = sorted(ESTADO_UF.keys(), key=len, reverse=True)
+#
+# def _detectar_uf_verita(pdf_url: str) -> str | None:
+#     filename = pdf_url.split('/')[-1]
+#     if 'Brasil' in filename or 'Nacional' in filename:
+#         return None
+#     for estado in _ESTADO_LIST:
+#         if estado in filename:
+#             return ESTADO_UF[estado]
+#     return None
+#
+# def _salvar_regional(self, dados: list[dict], uf: str) -> None:
+#     if not dados:
+#         return
+#     try:
+#         conn = sqlite3.connect(self.db_path)
+#         for d in dados:
+#             conn.execute(
+#                 "INSERT OR REPLACE INTO pesquisas_regionais "
+#                 "(instituto_id, data_pesquisa, uf, candidato, percentual) "
+#                 "VALUES (?, ?, ?, ?, ?)",
+#                 (d.get('instituto_id', self.instituto_id),
+#                  d.get('data_pesquisa', ''),
+#                  uf, d['candidato'], d['percentual'])
+#             )
+#         conn.commit()
+#         conn.close()
+#         self.logger.info("[Verita] Regional %s: %d intenções salvas", uf, len(dados))
+#     except Exception as e:
+#         self.logger.error("[Verita] Erro ao salvar regional %s: %s", uf, e)
+# --- fim infraestrutura futura ---
 
 
 class VeritaCollector(PlaywrightCollector, BaseCollector):
@@ -96,7 +157,11 @@ class VeritaCollector(PlaywrightCollector, BaseCollector):
             self.logger.warning("[Verita] PDF não encontrado em %s", url)
             return []
 
-        self.logger.info("[Verita] PDF encontrado: %s", pdf_url)
+        if not _is_pdf_nacional(pdf_url):
+            return []
+
+        self.logger.info("[Verita] PDF nacional: %s", pdf_url.split('/')[-1])
+
         texto = self._download_pdf_text(pdf_url)
         if not texto:
             self.logger.warning("[Verita] Texto vazio do PDF em %s", pdf_url)

@@ -168,17 +168,27 @@ class GazetaDoPovoColetor(PlaywrightCollector, BaseCollector):
         return None
 
     def _salvar_regional(self, dados: list[dict], uf: str) -> None:
-        import database
+        if not dados:
+            return
         try:
-            with database.get_db() as conn:
-                for d in dados:
-                    conn.execute(
-                        "INSERT OR REPLACE INTO pesquisas_regionais "
-                        "(uf, candidato, percentual, data_coleta) VALUES (?, ?, ?, ?)",
-                        (uf, d['candidato'], d['percentual'], d.get('data_coleta', ''))
-                    )
-                conn.commit()
-            self.logger.info("[GazetaDoPovo] Regional %s: %d intenções salvas", uf, len(dados))
+            import sqlite3 as _sqlite3
+            conn = _sqlite3.connect(self.db_path)
+            inseridos = 0
+            for d in dados:
+                conn.execute(
+                    "INSERT OR REPLACE INTO pesquisas_regionais "
+                    "(instituto_id, data_pesquisa, uf, candidato, percentual) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (d.get('instituto_id', self.instituto_id),
+                     d.get('data_pesquisa', ''),
+                     uf,
+                     d['candidato'],
+                     d['percentual'])
+                )
+                inseridos += 1
+            conn.commit()
+            conn.close()
+            self.logger.info("[GazetaDoPovo] Regional %s: %d intenções salvas", uf, inseridos)
         except Exception as e:
             self.logger.error("[GazetaDoPovo] Erro ao salvar regional %s: %s", uf, e)
 

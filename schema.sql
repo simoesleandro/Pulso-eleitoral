@@ -86,13 +86,14 @@ CREATE INDEX IF NOT EXISTS idx_alertas_cargo ON alertas(cargo);
 
 -- 8. Dados regionais de intenção de voto por UF
 CREATE TABLE IF NOT EXISTS pesquisas_regionais (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    pesquisa_id INTEGER REFERENCES pesquisas(id),
-    uf TEXT NOT NULL,
-    candidato TEXT NOT NULL,
-    percentual REAL NOT NULL,
-    data_coleta TEXT NOT NULL,
-    UNIQUE(uf, candidato, data_coleta)
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    pesquisa_id  INTEGER REFERENCES pesquisas(id),
+    instituto_id INTEGER,
+    uf           TEXT NOT NULL,
+    candidato    TEXT NOT NULL,
+    percentual   REAL NOT NULL,
+    data_pesquisa TEXT NOT NULL,
+    UNIQUE(instituto_id, data_pesquisa, uf, candidato)
 );
 
 -- 9. Tabela de usuários para controle de acesso

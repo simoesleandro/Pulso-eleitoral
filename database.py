@@ -512,8 +512,8 @@ def get_dados_regionais() -> dict:
     try:
         with get_db() as conn:
             rows = conn.execute(
-                "SELECT uf, candidato, percentual, data_coleta "
-                "FROM pesquisas_regionais ORDER BY uf, candidato, data_coleta DESC"
+                "SELECT uf, candidato, percentual, data_pesquisa "
+                "FROM pesquisas_regionais ORDER BY uf, candidato, data_pesquisa DESC"
             ).fetchall()
     except Exception:
         return {"candidatos": [], "estados": {}}
@@ -532,7 +532,7 @@ def get_dados_regionais() -> dict:
             estados[uf] = {}
         estados[uf][row["candidato"]] = {
             "percentual": row["percentual"],
-            "data": row["data_coleta"],
+            "data": row["data_pesquisa"],
         }
         candidato_totals.setdefault(row["candidato"], []).append(row["percentual"])
 
