@@ -14,7 +14,9 @@ INSERT INTO institutos (id, nome, sigla, site, ativo) VALUES
 (9, 'Verita', 'VERITA', 'verita.com.br', 1),
 (10, 'Futura Inteligência', 'Futura', 'futurainteligencia.com.br', 1),
 (11, 'PoderData', 'PoderData', 'poderdata.com.br', 1),
-(12, 'Meio/Ideia', 'Ideia', 'institutoideia.com.br', 1);
+(12, 'Meio/Ideia', 'Ideia', 'institutoideia.com.br', 1),
+(13, 'Vox Populi', 'Vox Populi', 'voxpopuli.com.br', 1),
+(14, 'Instituto Gerp', 'Gerp', 'institutogerpesquisas.com.br', 1);
 
 -- ============================================================================
 -- PESQUISAS PRESIDENCIAIS

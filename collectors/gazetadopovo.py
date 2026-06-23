@@ -16,7 +16,8 @@ INSTITUTOS_ALVO = [
     'real time', 'real-time', 'realtimebigdata',
     'atlas', 'atlasintel', 'atlas intel',
     'ipespe', 'paraná', 'parana pesquisas',
-    'vox populi', 'nexus', 'btg', 'nexus pesquisas',
+    'vox populi', 'vox', 'nexus', 'btg', 'nexus pesquisas',
+    'gerp', 'instituto gerp',
     'doxa', 'verita',
     'futura', 'futura inteligencia', 'futurainteligencia',
     'poderdata', 'poder data', 'poderdata/aya', 'aya',
@@ -42,6 +43,10 @@ INSTITUTO_ID_MAP = {
     'aya':              11,
     'meio':             12,
     'ideia':            12,
+    'vox populi':       13,
+    'vox':              13,
+    'gerp':             14,
+    'instituto gerp':   14,
 }
 
 UF_MAP = {
@@ -146,6 +151,10 @@ class GazetaDoPovoColetor(PlaywrightCollector, BaseCollector):
             return 11
         if 'meio' in combinado or 'ideia' in combinado:
             return 12
+        if 'vox' in combinado:
+            return 13
+        if 'gerp' in combinado:
+            return 14
         self.logger.warning("[GazetaDoPovo] Instituto não identificado em %s — usando fallback 7", url[:60])
         return 7
 
