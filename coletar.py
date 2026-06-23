@@ -39,6 +39,7 @@ def main():
     from collectors.gazetadopovo import GazetaDoPovoColetor
     from collectors.atlas import AtlasCollector
     from collectors.poder360 import Poder360Collector
+    from collectors.verita import VeritaCollector
     from database import salvar_log_scheduler
     from notifier import send_telegram, montar_mensagem_coleta
 
@@ -53,6 +54,7 @@ def main():
         GazetaDoPovoColetor(db_path=DB_PATH),
         AtlasCollector(db_path=DB_PATH),
         Poder360Collector(db_path=DB_PATH),
+        VeritaCollector(db_path=DB_PATH),
     ]
     
     resultados = []

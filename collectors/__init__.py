@@ -8,6 +8,7 @@ from .atlas import AtlasCollector
 from .paraná_pesquisas import ParanaPesquisasCollector
 from .real_time import RealTimeCollector
 from .poder360 import Poder360Collector
+from .verita import VeritaCollector
 
 # Lista com todas as classes de coletores concretos para fácil iteração
 ALL_COLLECTORS = [
@@ -18,5 +19,6 @@ ALL_COLLECTORS = [
     AtlasCollector,
     ParanaPesquisasCollector,
     RealTimeCollector,
-    Poder360Collector
+    Poder360Collector,
+    VeritaCollector,
 ]

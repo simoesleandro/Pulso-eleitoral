@@ -109,6 +109,7 @@ MAPA_NOMES = {
     'rodrigo neves': 'Rodrigo Neves',
     # Candidatos hipotéticos / não declarados — descartar
     'michelle bolsonaro': None,
+    'michele bolsonaro': None,
     'michelle': None,
     'aécio neves': None,
     'aecio neves': None,
