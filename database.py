@@ -169,14 +169,14 @@ def get_pesquisas_mais_recentes(cargo: str) -> list[dict]:
         # Encontra a pesquisa mais recente
         cursor.execute("""
             SELECT p.id, p.data_pesquisa, p.margem_erro, p.tamanho_amostra, p.fonte_url, inst.nome AS instituto,
-                   int.candidato, int.percentual, int.partido
+                   int.candidato, int.percentual, int.partido, int.tipo
             FROM pesquisas p
             JOIN institutos inst ON p.instituto_id = inst.id
             JOIN intencoes int ON int.pesquisa_id = p.id
             WHERE p.cargo = ? AND p.id = (
-                SELECT id FROM pesquisas 
-                WHERE cargo = ? 
-                ORDER BY data_pesquisa DESC, id DESC 
+                SELECT id FROM pesquisas
+                WHERE cargo = ?
+                ORDER BY data_pesquisa DESC, id DESC
                 LIMIT 1
             )
             ORDER BY int.percentual DESC

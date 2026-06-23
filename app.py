@@ -489,7 +489,8 @@ def api_pesquisas_presidente():
         "percentuais": percentuais,
         "data_coleta": first['data_pesquisa'],
         "instituto": first['instituto'],
-        "margem_erro": first['margem_erro']
+        "margem_erro": first['margem_erro'],
+        "tipo": first['tipo'],
     })
 
 @app.route('/api/pesquisas/governador-rj')
@@ -503,9 +504,10 @@ def api_pesquisas_governador_rj():
             "percentuais": [],
             "data_coleta": None,
             "instituto": None,
-            "margem_erro": None
+            "margem_erro": None,
+            "tipo": None,
         })
-    
+
     candidatos = [r['candidato'] for r in rows]
     percentuais = [r['percentual'] for r in rows]
     first = rows[0]
@@ -514,7 +516,8 @@ def api_pesquisas_governador_rj():
         "percentuais": percentuais,
         "data_coleta": first['data_pesquisa'],
         "instituto": first['instituto'],
-        "margem_erro": first['margem_erro']
+        "margem_erro": first['margem_erro'],
+        "tipo": first['tipo'],
     })
 
 @app.route('/api/alertas')

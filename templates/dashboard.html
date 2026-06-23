@@ -21,6 +21,8 @@
       transition:opacity .15s;
     }
     .pe-tooltip-wrap:hover .pe-tooltip { visibility:visible; opacity:1; }
+    .pe-badge--espontanea { background:#EAECEF; color:#5a7184; }
+    .pe-badge--estimulada { background:#E8F0FE; color:#1A56DB; }
   </style>
 </head>
 <body class="pe-page">
@@ -96,12 +98,16 @@
       <h3 class="pe-section__title" style="font-size:13px;">Pesquisa Mais Recente</h3>
       <div class="pe-grid-2" style="margin-bottom:24px;">
         <div class="pe-card">
+          <div id="pres-tipo-chart" style="margin-bottom:8px;"></div>
           <div class="pe-chart-container"><canvas id="chart-presidente"></canvas></div>
         </div>
         <div class="pe-card pe-info-card">
           <div class="pe-kpi">
             <div class="pe-kpi__label">Instituto mais recente</div>
-            <div id="pres-instituto" class="pe-kpi__value">—</div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <div id="pres-instituto" class="pe-kpi__value">—</div>
+              <span id="pres-tipo-info"></span>
+            </div>
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
             <div class="pe-kpi" id="pres-margem-bloco">
@@ -150,12 +156,16 @@
       <h2 class="pe-section__title">Governo do Estado — RJ 2026</h2>
       <div class="pe-grid-2">
         <div class="pe-card">
+          <div id="gov-tipo-chart" style="margin-bottom:8px;"></div>
           <div class="pe-chart-container"><canvas id="chart-governador"></canvas></div>
         </div>
         <div class="pe-card pe-info-card">
           <div class="pe-kpi">
             <div class="pe-kpi__label">Instituto mais recente</div>
-            <div id="gov-instituto" class="pe-kpi__value">—</div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <div id="gov-instituto" class="pe-kpi__value">—</div>
+              <span id="gov-tipo-info"></span>
+            </div>
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
             <div class="pe-kpi" id="gov-margem-bloco">
@@ -237,6 +247,17 @@
       return isoStr;
     }
 
+    function tipoBadgeHTML(tipo) {
+      const espontanea = tipo && tipo.toLowerCase() === 'espontanea' || tipo === 'espontânea';
+      const label = espontanea ? 'Espontânea' : 'Estimulada';
+      const cls   = espontanea ? 'pe-badge--espontanea' : 'pe-badge--estimulada';
+      return `<span class="pe-tooltip-wrap">
+        <span class="pe-badge ${cls}">${label}</span>
+        <span style="margin-left:3px;font-size:13px;color:var(--pe-text-muted);cursor:help;">ⓘ</span>
+        <span class="pe-tooltip">Espontânea: eleitor menciona candidatos sem ver lista. Estimulada: eleitor escolhe entre lista apresentada.</span>
+      </span>`;
+    }
+
     function getCandidateColor(name) {
       if (name === 'Lula') return PE_CANDIDATE_COLORS[0];
       if (name === 'Flávio Bolsonaro') return PE_CANDIDATE_COLORS[1];
@@ -258,6 +279,9 @@
       } catch (err) { console.warn('Erro presidente:', err); }
 
       document.getElementById('pres-instituto').textContent = data.instituto;
+      const presTipoBadge = tipoBadgeHTML(data.tipo);
+      document.getElementById('pres-tipo-chart').innerHTML = presTipoBadge;
+      document.getElementById('pres-tipo-info').innerHTML  = presTipoBadge;
       const presM = parseFloat(String(data.margem_erro ?? '').replace(',', '.').match(/[\d.]+/)?.[0] ?? '');
       const presMBloco = document.getElementById('pres-margem-bloco');
       if (!isNaN(presM) && presM > 0) {
@@ -310,6 +334,9 @@
       } catch (err) { console.warn('Erro governador:', err); }
 
       document.getElementById('gov-instituto').textContent = data.instituto;
+      const govTipoBadge = tipoBadgeHTML(data.tipo);
+      document.getElementById('gov-tipo-chart').innerHTML = govTipoBadge;
+      document.getElementById('gov-tipo-info').innerHTML  = govTipoBadge;
       const govM = parseFloat(String(data.margem_erro ?? '').replace(',', '.').match(/[\d.]+/)?.[0] ?? '');
       const govMBloco = document.getElementById('gov-margem-bloco');
       if (!isNaN(govM) && govM > 0) {
