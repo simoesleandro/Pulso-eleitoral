@@ -236,10 +236,140 @@ MAPA_NOMES = {
 }
 
 
+PROMPT_MULTIESTADO = """
+Você é um extrator de dados de pesquisas eleitorais brasileiras por estado.
+Analise o texto abaixo e extraia intenções de voto de 1º turno POR ESTADO.
+
+REGRAS CRÍTICAS:
+- Extraia SOMENTE percentuais de 1º turno com valor numérico explícito (ex: "38%", "38 por cento")
+- NÃO invente percentuais — se não há número claro, não inclua
+- IGNORE percentuais de 2º turno: confronto direto entre 2 candidatos onde um aparece > 50%
+  e outro em torno de 30-48% somando ~100%; frases como "venceria com X% a Y%"
+- IGNORE "Cenários alternativos" ou "Cenário com [nome]" — esses blocos são projeções, não intenções reais
+- IGNORE aprovação/rejeição de governo, avaliação de mandato, margens de vantagem (ex: "+20 pontos")
+- IGNORE dados históricos de eleições passadas (2018, 2022) — extraia APENAS o cenário atual (2026)
+- Para cada estado, extraia os candidatos com percentuais no 1º turno do cenário PRINCIPAL
+- Use SEMPRE o nome do candidato, nunca o nome do partido (ex: se o texto disser "PT tem 42%", extraia como o candidato do PT — Lula para presidente)
+- Percentuais válidos por candidato no 1º turno: entre 1% e 80% (estado nordestino pode ter > 60%)
+- Use a sigla de UF em maiúsculas: SP, MG, RJ, BA, RS, PR, GO, CE, PE, PA, DF, SC, etc.
+
+Retorne SOMENTE JSON válido, sem markdown, sem explicação:
+{
+  "data": "YYYY-MM-DD ou null",
+  "estados": [
+    {
+      "uf": "SP",
+      "candidatos": [
+        {"nome": "Nome Candidato", "percentual": 45.0},
+        {"nome": "Nome Candidato 2", "percentual": 40.0}
+      ]
+    }
+  ]
+}
+
+Se não encontrar dados estaduais com percentuais explícitos de 1º turno, retorne:
+{"data": null, "estados": []}
+
+Ano de referência: 2026.
+
+TEXTO:
+{texto}
+"""
+
+
 def normalizar_nome(nome: str) -> str | None:
     """Normaliza nome do candidato para forma canônica. Retorna None para descartar."""
     chave = nome.lower().strip()
     return MAPA_NOMES.get(chave, nome)
+
+
+def extrair_regional_multiestado(texto: str, fonte_url: str = "") -> list[dict]:
+    """
+    Extrai intenções de voto de 1º turno agrupadas por estado a partir de texto
+    que cobre múltiplos estados numa mesma página.
+
+    Returns:
+        Lista de dicts: {"uf": "SP", "candidato": "Lula", "percentual": 45.0, "data": "YYYY-MM-DD"}
+        Em caso de erro ou sem dados: []
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        logger.error("GEMINI_API_KEY não configurada")
+        return []
+
+    try:
+        client = genai.Client(api_key=api_key)
+        texto_truncado = texto[:8000]
+        prompt = PROMPT_MULTIESTADO.replace("{texto}", texto_truncado)
+
+        MODELOS = [
+            "gemini-2.5-flash",
+            "gemini-2.5-pro",
+        ]
+
+        raw = None
+        modelo_usado = None
+
+        for modelo in MODELOS:
+            for tentativa in range(2):
+                try:
+                    response = client.models.generate_content(model=modelo, contents=prompt)
+                    raw = response.text.strip()
+                    modelo_usado = modelo
+                    break
+                except Exception as e:
+                    if '503' in str(e) and tentativa == 0:
+                        time.sleep(5)
+                    else:
+                        logger.warning(f"Falha no modelo {modelo} tentativa {tentativa+1}: {e}")
+                        break
+            if raw is not None:
+                break
+
+        if raw is None:
+            logger.error("extrair_regional_multiestado: todos os modelos falharam")
+            return []
+
+        start_idx = raw.find("{")
+        end_idx = raw.rfind("}")
+        if start_idx == -1 or end_idx == -1:
+            return []
+        resultado = json.loads(raw[start_idx:end_idx + 1])
+
+        data_pesquisa = resultado.get("data") or ""
+        estados = resultado.get("estados", [])
+
+        registros = []
+        for estado in estados:
+            uf = (estado.get("uf") or "").upper().strip()
+            if not uf or len(uf) != 2:
+                continue
+            for c in estado.get("candidatos", []):
+                nome_raw = c.get("nome", "")
+                percentual = c.get("percentual")
+                if not nome_raw or percentual is None:
+                    continue
+                nome = normalizar_nome(nome_raw)
+                if nome is None:
+                    continue
+                if not (1.0 <= float(percentual) <= 80.0):
+                    continue
+                registros.append({
+                    "uf": uf,
+                    "candidato": nome,
+                    "percentual": float(percentual),
+                    "data": data_pesquisa,
+                })
+
+        logger.info(f"extrair_regional_multiestado: {len(registros)} registros de {len(estados)} estados via {modelo_usado}")
+        return registros
+
+    except json.JSONDecodeError as e:
+        logger.warning(f"extrair_regional_multiestado JSON inválido: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"extrair_regional_multiestado erro: {e}")
+        return []
 
 
 def extrair_com_gemini(texto: str, fonte_url: str = "", permite_regional: bool = False) -> dict:
@@ -267,7 +397,6 @@ def extrair_com_gemini(texto: str, fonte_url: str = "", permite_regional: bool =
         
         MODELOS = [
             "gemini-2.5-flash",
-            "gemini-2.5-flash-8b",
             "gemini-2.5-pro",
         ]
         

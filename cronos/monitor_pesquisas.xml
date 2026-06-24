@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Monitor de novas pesquisas eleitorais via Google News RSS — 09h, 14h e 19h (seg-sex)</Description>
+    <Author>Pulso Eleitoral</Author>
+  </RegistrationInfo>
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>2026-06-24T09:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByWeek>
+        <WeeksInterval>1</WeeksInterval>
+        <DaysOfWeek>
+          <Monday/>
+          <Tuesday/>
+          <Wednesday/>
+          <Thursday/>
+          <Friday/>
+        </DaysOfWeek>
+      </ScheduleByWeek>
+    </CalendarTrigger>
+    <CalendarTrigger>
+      <StartBoundary>2026-06-24T14:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByWeek>
+        <WeeksInterval>1</WeeksInterval>
+        <DaysOfWeek>
+          <Monday/>
+          <Tuesday/>
+          <Wednesday/>
+          <Thursday/>
+          <Friday/>
+        </DaysOfWeek>
+      </ScheduleByWeek>
+    </CalendarTrigger>
+    <CalendarTrigger>
+      <StartBoundary>2026-06-24T19:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByWeek>
+        <WeeksInterval>1</WeeksInterval>
+        <DaysOfWeek>
+          <Monday/>
+          <Tuesday/>
+          <Wednesday/>
+          <Thursday/>
+          <Friday/>
+        </DaysOfWeek>
+      </ScheduleByWeek>
+    </CalendarTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <UserId>stife</UserId>
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <ExecutionTimeLimit>PT10M</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>C:\Meus_projetos\Pulso_Eleitoral\cronos\monitor_pesquisas.bat</Command>
+      <WorkingDirectory>C:\Meus_projetos\Pulso_Eleitoral</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>
