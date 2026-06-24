@@ -69,6 +69,31 @@ def montar_mensagem_coleta(resultados: list[dict],
     return "\n".join(linhas)
 
 
+def montar_mensagem_nova_pesquisa(pesquisa: dict) -> str:
+    """
+    Monta notificação para uma pesquisa recém-inserida no banco.
+    pesquisa: dict com keys instituto, cargo, data_pesquisa, candidatos (list de {candidato, percentual})
+    """
+    instituto = pesquisa.get("instituto", "—")
+    cargo = pesquisa.get("cargo", "—").replace("_", " ").title()
+    data = pesquisa.get("data_pesquisa", "—")
+
+    candidatos = sorted(pesquisa.get("candidatos", []), key=lambda c: c["percentual"], reverse=True)
+    cands_str = " | ".join(
+        f"{c['candidato']} {c['percentual']:.0f}%"
+        for c in candidatos
+    ) or "—"
+
+    return (
+        f"📊 <b>Nova pesquisa coletada</b>\n"
+        f"Instituto: {instituto}\n"
+        f"Cargo: {cargo}\n"
+        f"Data: {data}\n"
+        f"Candidatos: {cands_str}\n"
+        f"🔗 <a href='https://pulso-eleitoral.fly.dev/dashboard'>Ver Dashboard</a>"
+    )
+
+
 def montar_mensagem_alerta(alertas: list[dict]) -> str:
     if not alertas:
         return ""

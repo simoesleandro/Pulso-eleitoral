@@ -47,6 +47,7 @@ def main():
     with database.get_db() as conn:
         p_antes = conn.execute("SELECT COUNT(*) FROM pesquisas").fetchone()[0]
         i_antes = conn.execute("SELECT COUNT(*) FROM intencoes").fetchone()[0]
+        max_id_antes = conn.execute("SELECT COALESCE(MAX(id), 0) FROM pesquisas").fetchone()[0]
 
     coletores = [
         DatafolhaCollector(db_path=DB_PATH),
@@ -83,10 +84,37 @@ def main():
     pesquisas_novas = max(0, p_depois - p_antes)
     intencoes_novas = max(0, i_depois - i_antes)
 
-    # Envia notificação
+    # Envia notificação de resumo da coleta
     mensagem = montar_mensagem_coleta(resultados, pesquisas_novas, intencoes_novas)
     send_telegram(mensagem)
     logger.info(f"Notificação enviada: {pesquisas_novas} pesquisas novas, {intencoes_novas} intenções novas")
+
+    # Notificação individual por pesquisa nova
+    if pesquisas_novas > 0:
+        from notifier import montar_mensagem_nova_pesquisa
+        with database.get_db() as conn:
+            novas = conn.execute("""
+                SELECT p.id, inst.nome AS instituto, p.cargo, p.data_pesquisa
+                FROM pesquisas p
+                JOIN institutos inst ON p.instituto_id = inst.id
+                WHERE p.id > ?
+                ORDER BY p.id
+            """, (max_id_antes,)).fetchall()
+            for row in novas:
+                pid, instituto, cargo, data_pesquisa = row
+                candidatos = conn.execute("""
+                    SELECT candidato, percentual FROM intencoes
+                    WHERE pesquisa_id = ?
+                    ORDER BY percentual DESC
+                """, (pid,)).fetchall()
+                pesquisa_info = {
+                    "instituto": instituto,
+                    "cargo": cargo,
+                    "data_pesquisa": data_pesquisa,
+                    "candidatos": [{"candidato": c, "percentual": p} for c, p in candidatos],
+                }
+                send_telegram(montar_mensagem_nova_pesquisa(pesquisa_info))
+                logger.info(f"Notificação nova pesquisa: {instituto} / {cargo} / {data_pesquisa}")
 
     # Sincroniza com Fly.io se houve dados novos
     if pesquisas_novas > 0 or intencoes_novas > 0:
