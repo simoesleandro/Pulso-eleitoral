@@ -627,6 +627,92 @@ def api_institutos():
         })
     return jsonify({"institutos": institutos})
 
+_COLETORES_DISPONIVEIS = {
+    'datafolha':      ('collectors.datafolha',        'DatafolhaCollector'),
+    'quaest':         ('collectors.quaest',            'QuaestCollector'),
+    'gazetadopovo':   ('collectors.gazetadopovo',      'GazetaDoPovoColetor'),
+    'cnn_brasil':     ('collectors.cnn_brasil',        'CnnBrasilColetor'),
+    'verita':         ('collectors.verita',            'VeritaCollector'),
+    'quaest_regional':('collectors.quaest_regional',   'QuaestRegionalColetor'),
+}
+
+
+def _coletar_url_especifica(url: str, coletor_key: str) -> dict:
+    """Instancia o coletor, faz fetch da URL, salva no banco e retorna delta de registros."""
+    import importlib
+    from datetime import date as _date
+
+    if coletor_key not in _COLETORES_DISPONIVEIS:
+        return {'erro': f'Coletor inválido: {coletor_key}'}
+
+    module_path, class_name = _COLETORES_DISPONIVEIS[coletor_key]
+
+    try:
+        with get_db() as conn:
+            p_antes = conn.execute("SELECT COUNT(*) FROM pesquisas").fetchone()[0]
+            i_antes = conn.execute("SELECT COUNT(*) FROM intencoes").fetchone()[0]
+            r_antes = conn.execute("SELECT COUNT(*) FROM pesquisas_regionais").fetchone()[0]
+
+        mod = importlib.import_module(module_path)
+        coletor = getattr(mod, class_name)(db_path=DB_PATH)
+
+        html = coletor._get_page(url)
+        if not html or len(html) < 200:
+            return {'erro': 'Página vazia ou inacessível (HTML < 200 chars).', 'coletor': class_name, 'url': url}
+
+        if coletor_key == 'quaest_regional':
+            coletor._parse_page(html, url, data_post=_date.today().isoformat())
+        else:
+            dados = coletor._parse_release(html, url)
+            coletor.save(dados)
+
+        with get_db() as conn:
+            p_depois = conn.execute("SELECT COUNT(*) FROM pesquisas").fetchone()[0]
+            i_depois = conn.execute("SELECT COUNT(*) FROM intencoes").fetchone()[0]
+            r_depois = conn.execute("SELECT COUNT(*) FROM pesquisas_regionais").fetchone()[0]
+
+        return {
+            'coletor': class_name,
+            'url': url,
+            'pesquisas_salvas': p_depois - p_antes,
+            'intencoes_salvas': i_depois - i_antes,
+            'regionais_salvas': r_depois - r_antes,
+        }
+
+    except Exception as e:
+        app.logger.error(f"[coletar-url] {class_name} em {url}: {e}")
+        return {'erro': str(e), 'coletor': class_name, 'url': url}
+
+
+@app.route('/admin/coletar-url', methods=['GET', 'POST'])
+@login_required
+def admin_coletar_url():
+    """Coleta uma URL específica com o coletor selecionado."""
+    if request.method == 'GET':
+        coletores = [
+            ('datafolha',       'Datafolha'),
+            ('quaest',          'Quaest'),
+            ('gazetadopovo',    'Gazeta do Povo'),
+            ('cnn_brasil',      'CNN Brasil (Real Time Big Data)'),
+            ('verita',          'Verita'),
+            ('quaest_regional', 'Quaest Regional (WP API)'),
+        ]
+        return render_template('admin_coletar_url.html', coletores=coletores)
+
+    body = request.get_json(silent=True) or {}
+    url = (body.get('url') or '').strip()
+    coletor_key = (body.get('coletor') or '').strip()
+
+    if not url or not url.startswith('http'):
+        return jsonify({'erro': 'URL inválida — deve começar com http(s)://'}), 400
+    if not coletor_key:
+        return jsonify({'erro': 'Selecione um coletor.'}), 400
+
+    resultado = _coletar_url_especifica(url, coletor_key)
+    status = 200 if 'erro' not in resultado else 422
+    return jsonify(resultado), status
+
+
 @app.route('/admin/apply-db', methods=['POST'])
 def apply_db():
     if request.headers.get('X-Admin-Pass') != os.getenv('ADMIN_PASS'):

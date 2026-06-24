@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coletar URL — Pulso Eleitoral</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <style>
+    .cu-card { padding: 2rem; }
+
+    .cu-form { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .cu-field { display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .cu-label {
+      font-size: 12px; font-weight: 500;
+      color: var(--pe-text-secondary);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
+    .cu-input {
+      width: 100%; box-sizing: border-box;
+      background: var(--pe-surface);
+      border: 0.5px solid var(--pe-border);
+      border-radius: 6px;
+      color: var(--pe-text-primary);
+      font-family: var(--pe-font-mono); font-size: 13px;
+      padding: 0.75rem;
+      outline: none; transition: border-color 0.15s;
+    }
+    .cu-input:focus { border-color: var(--pe-accent); }
+
+    .cu-select { appearance: none; cursor: pointer; }
+
+    .cu-actions { display: flex; align-items: center; gap: var(--pe-space-3); flex-wrap: wrap; margin-top: 0.5rem; }
+
+    .cu-btn { padding: 0.75rem 2rem; }
+
+    .cu-spinner { display: none; }
+    .cu-spinner.active { display: inline; }
+
+    .cu-result {
+      display: none;
+      padding: var(--pe-space-4);
+      border-radius: var(--pe-radius-md);
+      border: 0.5px solid var(--pe-border);
+      background: var(--pe-surface);
+    }
+    .cu-result.visible { display: block; }
+    .cu-result--ok   { border-color: #22c55e; }
+    .cu-result--erro { border-color: #ef4444; }
+
+    .cu-result__title { font-size: 13px; font-weight: 500; margin-bottom: var(--pe-space-2); }
+    .cu-result__title--ok   { color: #22c55e; }
+    .cu-result__title--erro { color: #ef4444; }
+
+    .cu-kpis { display: flex; gap: var(--pe-space-6); flex-wrap: wrap; margin-top: var(--pe-space-3); }
+    .cu-kpi { text-align: center; }
+    .cu-kpi__val { font-family: var(--pe-font-mono); font-size: 28px; font-weight: 500; color: var(--pe-text-primary); }
+    .cu-kpi__lbl { font-size: 11px; color: var(--pe-text-secondary); margin-top: 2px; }
+
+    .cu-url-preview {
+      font-family: var(--pe-font-mono); font-size: 11px;
+      color: var(--pe-text-secondary); word-break: break-all;
+      margin-top: var(--pe-space-3);
+    }
+  </style>
+</head>
+<body class="pe-page">
+
+  <!-- Topbar -->
+  <nav class="pe-topbar">
+    <a class="pe-topbar__logo" href="/">
+      <div class="pe-topbar__logomark">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="2.5" fill="#fff"/>
+          <path d="M7 1.5 Q11 4 11 7 Q11 10 7 12.5" stroke="rgba(255,255,255,0.85)" stroke-width="1.2" fill="none"/>
+          <path d="M7 1.5 Q3 4 3 7 Q3 10 7 12.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" fill="none"/>
+        </svg>
+      </div>
+      <span class="pe-topbar__name">Pulso Eleitoral — Admin</span>
+    </a>
+    <div class="pe-topbar__nav">
+      <a class="pe-topbar__nav-item" href="/">Dashboard</a>
+      <a class="pe-topbar__nav-item" href="/admin">Painel Admin</a>
+      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="/admin/coletar-url">Coletar URL</a>
+      <a class="pe-topbar__nav-item" href="/admin/usuarios">Usuários</a>
+      <a class="pe-topbar__nav-item" href="/logout">Sair</a>
+    </div>
+  </nav>
+
+  <main class="pe-main pe-container">
+    <div style="margin-bottom: var(--pe-space-6);">
+      <h1 class="pe-display">Coletar URL Específica</h1>
+      <p class="pe-mono" style="margin-top: var(--pe-space-1); color: var(--pe-text-secondary);">
+        Cole uma URL de pesquisa eleitoral, selecione o coletor correspondente e dispare a extração imediata.
+      </p>
+    </div>
+
+    <div class="pe-card cu-card">
+      <div class="pe-card__title">Nova Coleta Manual</div>
+
+      <div class="cu-form">
+
+        <!-- URL -->
+        <div class="cu-field">
+          <label class="cu-label" for="cu-url">URL da pesquisa</label>
+          <input
+            id="cu-url"
+            class="cu-input"
+            type="url"
+            placeholder="https://www.datafolha.com.br/pesquisa/..."
+            autocomplete="off"
+            spellcheck="false"
+          >
+        </div>
+
+        <!-- Coletor -->
+        <div class="cu-field">
+          <label class="cu-label" for="cu-coletor">Coletor</label>
+          <select id="cu-coletor" class="cu-input cu-select">
+            <option value="">— selecione o coletor —</option>
+            {% for key, label in coletores %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Ações -->
+        <div class="cu-actions">
+          <button id="cu-btn" class="pe-btn pe-btn--primary cu-btn">Coletar agora</button>
+          <span id="cu-spinner" class="cu-spinner pe-mono">Extraindo com Gemini…</span>
+        </div>
+
+        <!-- Resultado -->
+        <div id="cu-result" class="cu-result">
+          <div id="cu-result-title" class="cu-result__title"></div>
+          <div id="cu-kpis" class="cu-kpis"></div>
+          <div id="cu-url-preview" class="cu-url-preview"></div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const btn      = document.getElementById('cu-btn');
+    const spinner  = document.getElementById('cu-spinner');
+    const resultEl = document.getElementById('cu-result');
+    const titleEl  = document.getElementById('cu-result-title');
+    const kpisEl   = document.getElementById('cu-kpis');
+    const urlPrev  = document.getElementById('cu-url-preview');
+
+    btn.addEventListener('click', async () => {
+      const url     = document.getElementById('cu-url').value.trim();
+      const coletor = document.getElementById('cu-coletor').value;
+
+      if (!url || !url.startsWith('http')) {
+        showErro('URL inválida — deve começar com http:// ou https://');
+        return;
+      }
+      if (!coletor) {
+        showErro('Selecione um coletor antes de continuar.');
+        return;
+      }
+
+      btn.disabled = true;
+      spinner.classList.add('active');
+      resultEl.className = 'cu-result';
+
+      try {
+        const res = await fetch('/admin/coletar-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, coletor }),
+        });
+        const data = await res.json();
+        if (data.erro) {
+          showErro(data.erro, url);
+        } else {
+          showOk(data);
+        }
+      } catch (err) {
+        showErro('Erro de rede: ' + err.message, url);
+      } finally {
+        btn.disabled = false;
+        spinner.classList.remove('active');
+      }
+    });
+
+    function showOk(data) {
+      resultEl.classList.add('visible', 'cu-result--ok');
+      titleEl.className = 'cu-result__title cu-result__title--ok';
+      titleEl.textContent = '✓ Coleta concluída — ' + data.coletor;
+
+      const kpis = [
+        { val: data.pesquisas_salvas,  lbl: 'pesquisas novas'  },
+        { val: data.intencoes_salvas,  lbl: 'intenções salvas' },
+        { val: data.regionais_salvas,  lbl: 'regionais salvas' },
+      ];
+      kpisEl.innerHTML = kpis.map(k =>
+        `<div class="cu-kpi">
+          <div class="cu-kpi__val">${k.val}</div>
+          <div class="cu-kpi__lbl">${k.lbl}</div>
+        </div>`
+      ).join('');
+
+      urlPrev.textContent = data.url;
+    }
+
+    function showErro(msg, url = '') {
+      resultEl.classList.add('visible', 'cu-result--erro');
+      titleEl.className = 'cu-result__title cu-result__title--erro';
+      titleEl.textContent = '✗ ' + msg;
+      kpisEl.innerHTML = '';
+      urlPrev.textContent = url;
+    }
+  </script>
+</body>
+</html>
