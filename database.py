@@ -404,9 +404,8 @@ def get_simulacao_segundo_turno() -> dict:
 
 def get_simulacao_monte_carlo(n_simulacoes: int = 10000) -> dict:
     """
-    Simula 2º turno Lula x Flávio via Monte Carlo.
-    Cada simulação sorteia percentuais dentro de média ± margem (distribuição normal).
-    Retorna probabilidade de vitória baseada em n_simulacoes iterações.
+    Simula múltiplos cenários de 2º turno via Monte Carlo.
+    Retorna array de cenários + chaves flat 'lula'/'flavio' para compatibilidade.
     """
     import random
 
@@ -435,77 +434,91 @@ def get_simulacao_monte_carlo(n_simulacoes: int = 10000) -> dict:
         if candidato not in margens:
             margens[candidato] = margem
 
-    lula_media = next((c['media'] for c in candidatos if c['candidato'] == 'Lula'), 0)
-    flavio_media = next((c['media'] for c in candidatos if c['candidato'] == 'Flávio Bolsonaro'), 0)
-    # pesos para redistribuição proporcional dos indefinidos
-    _peso_total = lula_media + flavio_media if (lula_media + flavio_media) > 0 else 1
-    _peso_lula = lula_media / _peso_total
-    _peso_flavio = flavio_media / _peso_total
+    medias_dict = {c['candidato']: c['media'] for c in candidatos}
 
-    lula_vitorias = 0
+    def _simular(nome_a: str, nome_b: str) -> dict:
+        media_a = medias_dict.get(nome_a, 0)
+        media_b = medias_dict.get(nome_b, 0)
+        peso_total = (media_a + media_b) if (media_a + media_b) > 0 else 1
+        peso_a = media_a / peso_total
+        peso_b = media_b / peso_total
 
-    for _ in range(n_simulacoes):
-        simulado = {}
-        for c in candidatos:
-            nome = c['candidato']
-            media_val = c['media']
-            margem = margens.get(nome, MARGEM_DEFAULT)
-            sigma = max(margem * 2.0, 6.0)  # piso de 6pp: incerteza eleitoral com ~9 meses até a eleição
-            percentual = random.gauss(media_val, sigma)
-            simulado[nome] = max(0, percentual)
+        vitorias_a = 0
+        for _ in range(n_simulacoes):
+            simulado = {}
+            for c in candidatos:
+                nome = c['candidato']
+                sigma = max(margens.get(nome, MARGEM_DEFAULT) * 2.0, 6.0)
+                simulado[nome] = max(0, random.gauss(c['media'], sigma))
 
-        lula = simulado.get('Lula', 0)
-        flavio = simulado.get('Flávio Bolsonaro', 0)
+            a = simulado.get(nome_a, 0)
+            b = simulado.get(nome_b, 0)
 
-        for nome, pct in simulado.items():
-            if nome in ('Lula', 'Flávio Bolsonaro'):
-                continue
-            if nome in DIREITA:
-                split = min(0.90, max(0.50, random.gauss(0.70, 0.08)))
-                flavio += pct * split
-                lula += pct * (1 - split)
-            elif nome in ESQUERDA_CENTRO:
-                split = min(0.90, max(0.50, random.gauss(0.70, 0.08)))
-                lula += pct * split
-                flavio += pct * (1 - split)
-            else:
-                # 40% ao líder, 30% ao segundo, 30% redistribuído proporcionalmente
-                if lula_media >= flavio_media:
-                    lula += pct * 0.40
-                    flavio += pct * 0.30
+            for nome, pct in simulado.items():
+                if nome in (nome_a, nome_b):
+                    continue
+                if nome in ESQUERDA_CENTRO:
+                    split = min(0.90, max(0.50, random.gauss(0.70, 0.08)))
+                    a += pct * split
+                    b += pct * (1 - split)
+                elif nome in DIREITA:
+                    # Eleitores do Flávio têm maior afinidade com outro cand. de direita
+                    # num 2º turno hipotético sem ele — split ligeiramente mais alto
+                    mu = 0.75 if (nome == 'Flávio Bolsonaro' and nome_b != 'Flávio Bolsonaro') else 0.70
+                    split = min(0.90, max(0.50, random.gauss(mu, 0.08)))
+                    b += pct * split
+                    a += pct * (1 - split)
                 else:
-                    flavio += pct * 0.40
-                    lula += pct * 0.30
-                abstain = pct * 0.30
-                lula += abstain * _peso_lula
-                flavio += abstain * _peso_flavio
+                    if media_a >= media_b:
+                        a += pct * 0.40
+                        b += pct * 0.30
+                    else:
+                        b += pct * 0.40
+                        a += pct * 0.30
+                    abstain = pct * 0.30
+                    a += abstain * peso_a
+                    b += abstain * peso_b
 
-        total = lula + flavio
-        if total > 0:
-            lula_norm = lula / total
-            flavio_norm = flavio / total
-        else:
-            lula_norm = flavio_norm = 0.0
+            total = a + b
+            if total > 0 and (a / total) > 0.5:
+                vitorias_a += 1
 
-        if lula_norm > flavio_norm:
-            lula_vitorias += 1
+        prob_a = round(vitorias_a / n_simulacoes * 100, 1)
+        prob_b = round(100 - prob_a, 1)
+        return {
+            'candidato_a': {
+                'nome': nome_a,
+                'media_direto': round(media_a, 1),
+                'prob_vitoria': prob_a,
+                'favorito': prob_a > prob_b,
+            },
+            'candidato_b': {
+                'nome': nome_b,
+                'media_direto': round(media_b, 1),
+                'prob_vitoria': prob_b,
+                'favorito': prob_b > prob_a,
+            },
+        }
 
-    prob_lula = round(lula_vitorias / n_simulacoes * 100, 1)
-    prob_flavio = round(100 - prob_lula, 1)
+    CENARIOS_DEF = [
+        ('Lula', 'Flávio Bolsonaro', 'lula_flavio',  'Lula vs Flávio Bolsonaro'),
+        ('Lula', 'Ronaldo Caiado',   'lula_caiado',  'Lula vs Ronaldo Caiado'),
+        ('Lula', 'Romeu Zema',       'lula_zema',    'Lula vs Romeu Zema'),
+    ]
 
+    cenarios = []
+    for nome_a, nome_b, cid, label in CENARIOS_DEF:
+        resultado = _simular(nome_a, nome_b)
+        cenarios.append({'id': cid, 'label': label, **resultado})
+
+    primeiro = cenarios[0]
     return {
-        'lula': {
-            'media_direto': lula_media,
-            'prob_vitoria': prob_lula,
-            'favorito': prob_lula > prob_flavio,
-        },
-        'flavio': {
-            'media_direto': flavio_media,
-            'prob_vitoria': prob_flavio,
-            'favorito': prob_flavio > prob_lula,
-        },
+        'cenarios': cenarios,
         'n_simulacoes': n_simulacoes,
         'margem_default_usada': MARGEM_DEFAULT,
+        # chaves flat para compatibilidade com dashboard existente
+        'lula':   {**primeiro['candidato_a'], 'prob_vitoria': primeiro['candidato_a']['prob_vitoria']},
+        'flavio': {**primeiro['candidato_b'], 'prob_vitoria': primeiro['candidato_b']['prob_vitoria']},
     }
 
 

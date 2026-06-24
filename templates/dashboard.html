@@ -654,18 +654,14 @@
       const mc = resMC.ok ? await resMC.json() : null;
       const st = d.segundo_turno;
       const container = document.getElementById('simulacao-container');
+      const nSim = mc ? mc.n_simulacoes.toLocaleString('pt-BR') : null;
+      const cenarios = mc && mc.cenarios ? mc.cenarios : [];
+      let cenarioAtivo = cenarios.length ? cenarios[0].id : 'lula_flavio';
 
-      const lulaCor = st.lula.vencedor ? 'var(--pe-up)' : 'var(--pe-text-muted)';
-      const flavioCor = st.flavio.vencedor ? 'var(--pe-up)' : 'var(--pe-text-muted)';
-
-      function mcBloco(lado) {
-        if (!mc) return '';
-        const prob = mc[lado].prob_vitoria;
-        const favorito = mc[lado].favorito;
-        const badgeCor = favorito ? 'var(--pe-up)' : 'var(--pe-down)';
-        const badgeBg  = favorito ? '#e6f4ec' : '#fdecea';
+      function mcSubBloco(prob, favorito, corBarra) {
+        const badgeCor   = favorito ? 'var(--pe-up)' : 'var(--pe-down)';
+        const badgeBg    = favorito ? '#e6f4ec' : '#fdecea';
         const badgeTexto = favorito ? 'FAVORITO' : 'ADVERSÁRIO';
-        const barCor = lado === 'lula' ? 'var(--pe-navy)' : 'var(--pe-red)';
         return `
           <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--pe-surface);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -679,45 +675,105 @@
             <div style="font-size:20px; font-weight:500; color:${badgeCor}; font-family:'JetBrains Mono',monospace; margin-bottom:4px;">${prob.toFixed(1)}%</div>
             <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">de chance de vencer</div>
             <div style="background:var(--pe-surface); border-radius:2px; height:6px; overflow:hidden;">
-              <div style="width:${Math.min(prob, 100)}%; height:100%; background:${barCor}; border-radius:2px; transition:width .6s ease;"></div>
+              <div style="width:${Math.min(prob, 100)}%; height:100%; background:${corBarra}; border-radius:2px; transition:width .6s ease;"></div>
             </div>
           </div>`;
       }
 
-      const nSim = mc ? mc.n_simulacoes.toLocaleString('pt-BR') : null;
+      function renderCards(cid) {
+        if (cid === 'lula_flavio') {
+          const lulaCor  = st.lula.vencedor  ? 'var(--pe-up)' : 'var(--pe-text-muted)';
+          const flavioCor = st.flavio.vencedor ? 'var(--pe-up)' : 'var(--pe-text-muted)';
+          const cen = cenarios.find(c => c.id === 'lula_flavio');
+          return `
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+              <div class="pe-card" style="border-left:3px solid var(--pe-navy);">
+                <div class="pe-kpi__label">Lula (PT) ${st.lula.vencedor ? '🏆' : ''}</div>
+                <div style="font-size:32px; font-weight:500; color:${lulaCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${st.lula.total_estimado.toFixed(1)}%</div>
+                <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">estimativa 2º turno</div>
+                <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
+                  Votos diretos: ${st.lula.votos_diretos.toFixed(1)}%<br>
+                  Redistribuídos: +${st.lula.votos_redistribuidos.toFixed(1)}%
+                </div>
+                <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
+                  <div style="width:${Math.min(st.lula.total_estimado, 100)}%; height:100%; background:var(--pe-navy); border-radius:2px;"></div>
+                </div>
+                ${cen ? mcSubBloco(cen.candidato_a.prob_vitoria, cen.candidato_a.favorito, 'var(--pe-navy)') : ''}
+              </div>
+              <div class="pe-card" style="border-left:3px solid var(--pe-red);">
+                <div class="pe-kpi__label">Flávio Bolsonaro (PL) ${st.flavio.vencedor ? '🏆' : ''}</div>
+                <div style="font-size:32px; font-weight:500; color:${flavioCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${st.flavio.total_estimado.toFixed(1)}%</div>
+                <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">estimativa 2º turno</div>
+                <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
+                  Votos diretos: ${st.flavio.votos_diretos.toFixed(1)}%<br>
+                  Redistribuídos: +${st.flavio.votos_redistribuidos.toFixed(1)}%
+                </div>
+                <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
+                  <div style="width:${Math.min(st.flavio.total_estimado, 100)}%; height:100%; background:var(--pe-red); border-radius:2px;"></div>
+                </div>
+                ${cen ? mcSubBloco(cen.candidato_b.prob_vitoria, cen.candidato_b.favorito, 'var(--pe-red)') : ''}
+              </div>
+            </div>`;
+        }
+
+        // Cenários alternativos — apenas Monte Carlo
+        const cen = cenarios.find(c => c.id === cid);
+        if (!cen) return '';
+        const a = cen.candidato_a;
+        const b = cen.candidato_b;
+        const lulaCor = a.favorito ? 'var(--pe-up)' : 'var(--pe-text-muted)';
+        const advCor  = b.favorito ? 'var(--pe-up)' : 'var(--pe-text-muted)';
+        return `
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="pe-card" style="border-left:3px solid var(--pe-navy);">
+              <div class="pe-kpi__label">Lula (PT) ${a.favorito ? '🏆' : ''}</div>
+              <div style="font-size:32px; font-weight:500; color:${lulaCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${a.media_direto.toFixed(1)}%</div>
+              <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">intenção de voto direta</div>
+              <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
+                <div style="width:${Math.min(a.media_direto, 100)}%; height:100%; background:var(--pe-navy); border-radius:2px;"></div>
+              </div>
+              ${mcSubBloco(a.prob_vitoria, a.favorito, 'var(--pe-navy)')}
+            </div>
+            <div class="pe-card" style="border-left:3px solid var(--pe-red);">
+              <div class="pe-kpi__label">${b.nome} ${b.favorito ? '🏆' : ''}</div>
+              <div style="font-size:32px; font-weight:500; color:${advCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${b.media_direto.toFixed(1)}%</div>
+              <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">intenção de voto direta</div>
+              <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
+                <div style="width:${Math.min(b.media_direto, 100)}%; height:100%; background:var(--pe-red); border-radius:2px;"></div>
+              </div>
+              ${mcSubBloco(b.prob_vitoria, b.favorito, 'var(--pe-red)')}
+            </div>
+          </div>
+          <div style="background:#FFF8EC; border-left:3px solid var(--pe-warn); border-radius:0 4px 4px 0; padding:10px 14px; margin-top:12px; font-size:12px; color:var(--pe-warn);">
+            ⚠ Cenário hipotético: ${b.nome} não disputa atualmente. Votos do Flávio Bolsonaro redistribuídos para ${b.nome.split(' ')[0]} com peso ≈75%.
+          </div>`;
+      }
+
+      function renderTabs() {
+        return cenarios.map(c => {
+          const ativo = c.id === cenarioAtivo;
+          return `<button onclick="window.__simAba('${c.id}')" style="
+            background:none; border:none; border-bottom:2px solid ${ativo ? 'var(--pe-red)' : 'transparent'};
+            color:${ativo ? '#fff' : 'rgba(255,255,255,0.5)'}; cursor:pointer;
+            padding:10px 16px; font-size:13px; font-family:'Inter',sans-serif;
+            white-space:nowrap; transition:color .15s, border-color .15s;
+          ">${c.label}</button>`;
+        }).join('');
+      }
+
+      window.__simAba = function(cid) {
+        cenarioAtivo = cid;
+        document.getElementById('sim-tabs').innerHTML = renderTabs();
+        document.getElementById('sim-cards').innerHTML = renderCards(cid);
+      };
 
       container.innerHTML = `
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
-          <div class="pe-card" style="border-left:3px solid var(--pe-navy);">
-            <div class="pe-kpi__label">Lula (PT) ${st.lula.vencedor ? '🏆' : ''}</div>
-            <div style="font-size:32px; font-weight:500; color:${lulaCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${st.lula.total_estimado.toFixed(1)}%</div>
-            <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">estimativa 2º turno</div>
-            <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
-              Votos diretos: ${st.lula.votos_diretos.toFixed(1)}%<br>
-              Redistribuídos: +${st.lula.votos_redistribuidos.toFixed(1)}%
-            </div>
-            <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
-              <div style="width:${Math.min(st.lula.total_estimado, 100)}%; height:100%; background:var(--pe-navy); border-radius:2px;"></div>
-            </div>
-            ${mcBloco('lula')}
-          </div>
-          <div class="pe-card" style="border-left:3px solid var(--pe-red);">
-            <div class="pe-kpi__label">Flávio Bolsonaro (PL) ${st.flavio.vencedor ? '🏆' : ''}</div>
-            <div style="font-size:32px; font-weight:500; color:${flavioCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${st.flavio.total_estimado.toFixed(1)}%</div>
-            <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">estimativa 2º turno</div>
-            <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
-              Votos diretos: ${st.flavio.votos_diretos.toFixed(1)}%<br>
-              Redistribuídos: +${st.flavio.votos_redistribuidos.toFixed(1)}%
-            </div>
-            <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
-              <div style="width:${Math.min(st.flavio.total_estimado, 100)}%; height:100%; background:var(--pe-red); border-radius:2px;"></div>
-            </div>
-            ${mcBloco('flavio')}
-          </div>
+        <div id="sim-tabs" style="display:flex; background:var(--pe-navy); border-radius:4px 4px 0 0; padding:0 8px; margin-bottom:16px; overflow-x:auto; gap:4px;">
+          ${renderTabs()}
         </div>
-        <div class="pe-card" style="background:var(--pe-surface); border:none;">
-          ${nSim ? `
-          <div class="pe-mono" style="font-size:12px; color:var(--pe-navy); margin-bottom:6px; font-weight:500;">
+        <div id="sim-cards">${renderCards(cenarioAtivo)}</div>
+        <div class="pe-card" style="background:var(--pe-surface); border:none; margin-top:12px;">
+          ${nSim ? `<div class="pe-mono" style="font-size:12px; color:var(--pe-navy); font-weight:500;">
             Baseado em ${nSim} simulações Monte Carlo · atualizado em ${d.primeiro_turno.data_atualizacao}
           </div>` : ''}
         </div>

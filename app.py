@@ -93,6 +93,7 @@ def require_login():
         'api_kpis_avancados',
         'api_regional_presidente',
         'api_simulacao_segundo_turno',
+        'api_monte_carlo',
         'apply_db'
     ]
     if request.endpoint in allowed_endpoints:
