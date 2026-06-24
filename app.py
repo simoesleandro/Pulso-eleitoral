@@ -421,8 +421,8 @@ def api_visao_geral_analise():
         
         MODELOS = [
             "gemini-2.5-flash",
-            "gemini-2.0-flash",
-            "gemini-1.5-flash"
+            "gemini-2.5-flash-8b",
+            "gemini-2.5-pro",
         ]
         
         analise_texto = None
