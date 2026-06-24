@@ -223,6 +223,7 @@ class BaseCollector(ABC):
                     break
                     
         data_real = resultado.get("data")  # YYYY-MM-DD extraída pelo Gemini, ou None
+        tipo = resultado.get("tipo", "estimulada")
 
         return [
             {
@@ -230,13 +231,14 @@ class BaseCollector(ABC):
                 "cargo": resultado.get("cargo", "presidente"),
                 "candidato": c["nome"],
                 "percentual": float(c["percentual"]),
+                "tipo": tipo,
                 "data_pesquisa": data_real or hoje,
                 "data_coleta": hoje,
                 "data_divulgacao": data_real,
                 "tamanho_amostra": resultado.get("tamanho_amostra"),
                 "margem_erro": resultado.get("margem_erro"),
                 "fonte_url": url,
-                "metodologia": "Espontânea"
+                "metodologia": "Espontânea" if tipo == "espontanea" else "Estimulada",
             }
             for c in candidatos
             if c.get("nome") and c.get("percentual") is not None

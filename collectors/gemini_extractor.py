@@ -21,18 +21,12 @@ REGRAS CRÍTICAS:
 - IGNORE percentuais de 2º turno (geralmente acima de 50% em confronto direto)
 - IGNORE pesquisas estaduais/regionais — apenas âmbito nacional
 - IGNORE aprovação/rejeição de governo
-- Extraia SOMENTE o cenário de 1º turno ESPONTÂNEO (sem lista de nomes)
-- Se o release apresentar múltiplos cenários, escolha APENAS o cenário
-  principal de 1º turno com mais candidatos
+- Se o release apresentar múltiplos cenários de 1º turno, escolha o cenário
+  com MAIS candidatos listados
 - Se o release misturar 1º e 2º turno, extraia APENAS o cenário de 1º turno
 - IGNORE: cenários de 2º turno, cenários hipotéticos com candidatos
   que ainda não declararam candidatura (Michelle Bolsonaro, Aécio Neves, etc.)
 - Percentuais válidos para presidente: entre 1% e 60% por candidato
-- Candidatos NACIONAIS principais (Lula, Flávio Bolsonaro) têm percentuais
-  entre 25% e 50% em 1º turno nacional — se aparecerem com menos de 25%,
-  provavelmente são dados estaduais — IGNORE esse cenário inteiro
-- Candidatos menores (Ciro Gomes, Ronaldo Caiado, Romeu Zema, etc.) podem
-  ter percentuais entre 1% e 20% — esses são válidos
 - A soma dos percentuais dos candidatos deve ser <= 100%
 - Se a soma ultrapassar 100%, os percentuais provavelmente são de
   cenários diferentes — retorne {"candidatos": []}
@@ -45,9 +39,33 @@ REGRAS CRÍTICAS:
 - Pesquisas nacionais geralmente mencionam "todo o Brasil", "nível nacional",
   "eleitorado brasileiro" ou não mencionam estado nenhum
 
+DETERMINAÇÃO DO CAMPO "tipo":
+Retorne "espontanea" ou "estimulada" com base nas pistas abaixo:
+
+  "espontanea" quando:
+  - O texto usa palavras como "espontânea", "sem lista", "sem apresentação de nomes",
+    "de cabeça", "citou espontaneamente", "mencionou sem estímulo"
+  - Os candidatos principais (Lula, Flávio Bolsonaro) aparecem com percentuais
+    anormalmente baixos para corrida bipolar: Flávio abaixo de 25% e/ou
+    muitos candidatos menores com 1–5% cada
+  - REGRA FORTE: se Flávio Bolsonaro aparecer abaixo de 25% em corrida presidencial
+    2026, classifique como "espontanea" — EXCETO se o texto usar explicitamente
+    as palavras "estimulada", "com lista" ou "ao ouvir os nomes"
+  - A soma dos percentuais é notavelmente baixa (abaixo de 70%), indicando
+    alto percentual de "não sabe / não respondeu" implícito
+
+  "estimulada" quando:
+  - O texto usa explicitamente palavras como "estimulada", "com lista",
+    "ao ouvir os nomes", "escolheria entre", "ao ser apresentada lista"
+  - Os candidatos principais estão acima de 25% cada em corrida bipolar
+
+  Na dúvida, analise os percentuais: soma abaixo de 80% ou candidato principal
+  abaixo de 25% indica "espontanea"; caso contrário, use "estimulada".
+
 Retorne SOMENTE JSON válido, sem markdown, sem explicação:
 {
   "cargo": "presidente",
+  "tipo": "espontanea",
   "instituto": "nome do instituto mencionado",
   "data": "YYYY-MM-DD ou null",
   "tamanho_amostra": numero ou null,
