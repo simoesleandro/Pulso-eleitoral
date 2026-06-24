@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Metodologia — Pulso Eleitoral</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <style>
+    .met-hero {
+      background: var(--pe-navy);
+      padding: 48px 24px 40px;
+      text-align: center;
+    }
+    .met-hero__title {
+      color: #fff;
+      font-size: 28px;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+    .met-hero__sub {
+      color: rgba(255,255,255,0.55);
+      font-size: 14px;
+      max-width: 560px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .met-toc {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+    }
+    .met-toc a {
+      display: inline-block;
+      padding: 4px 12px;
+      background: var(--pe-surface);
+      color: var(--pe-navy);
+      border-radius: 3px;
+      font-size: 12px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background .15s;
+    }
+    .met-toc a:hover { background: var(--pe-surface-2); border: 1px solid var(--pe-surface); }
+
+    .met-section {
+      margin-bottom: 40px;
+      scroll-margin-top: 72px;
+    }
+    .met-section__title {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--pe-navy);
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--pe-surface);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .met-section__num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      background: var(--pe-navy);
+      color: #fff;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    .met-prose {
+      font-size: 14px;
+      line-height: 1.75;
+      color: var(--pe-text);
+      max-width: 720px;
+    }
+    .met-prose p { margin-bottom: 14px; }
+    .met-prose p:last-child { margin-bottom: 0; }
+
+    .met-callout {
+      background: var(--pe-surface);
+      border-left: 3px solid var(--pe-navy);
+      border-radius: 0 4px 4px 0;
+      padding: 14px 16px;
+      margin: 16px 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--pe-text);
+      max-width: 720px;
+    }
+    .met-callout--warn {
+      border-left-color: var(--pe-warn);
+      background: #FFF8EC;
+    }
+
+    .met-grid-institutos {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .met-inst-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--pe-surface-2);
+      border: 1px solid var(--pe-surface);
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-size: 13px;
+    }
+    .met-inst-chip__dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--pe-navy);
+      flex-shrink: 0;
+    }
+    .met-inst-chip__name { font-weight: 500; color: var(--pe-navy); }
+    .met-inst-chip__how { font-size: 11px; color: var(--pe-text-muted); margin-top: 2px; }
+
+    .met-formula {
+      background: var(--pe-navy);
+      color: #e8edf2;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      border-radius: 4px;
+      padding: 16px 20px;
+      margin: 16px 0;
+      line-height: 1.7;
+      max-width: 560px;
+    }
+    .met-formula span { color: rgba(255,255,255,0.45); }
+
+    .met-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+      max-width: 640px;
+    }
+    @media (max-width: 560px) { .met-compare { grid-template-columns: 1fr; } }
+    .met-compare__card {
+      border: 1px solid var(--pe-surface);
+      border-radius: 4px;
+      padding: 16px;
+    }
+    .met-compare__label {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 8px;
+    }
+    .met-compare__label--esp { color: #5a7184; }
+    .met-compare__label--est { color: #1A56DB; }
+    .met-compare__badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+    .met-compare__badge--esp { background: #EAECEF; color: #5a7184; }
+    .met-compare__badge--est { background: #E8F0FE; color: #1A56DB; }
+    .met-compare__text { font-size: 13px; line-height: 1.6; color: var(--pe-text); }
+
+    .met-limit-list {
+      list-style: none;
+      max-width: 680px;
+      margin-top: 12px;
+    }
+    .met-limit-list li {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--pe-surface);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .met-limit-list li:last-child { border-bottom: none; }
+    .met-limit-list__icon { color: var(--pe-warn); font-size: 15px; flex-shrink: 0; margin-top: 2px; }
+
+    .met-oss-card {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: var(--pe-surface-2);
+      border: 1px solid var(--pe-surface);
+      border-radius: 6px;
+      padding: 24px;
+      max-width: 560px;
+    }
+    .met-oss-card__icon { font-size: 36px; flex-shrink: 0; }
+    .met-oss-card__title { font-size: 15px; font-weight: 500; color: var(--pe-navy); margin-bottom: 6px; }
+    .met-oss-card__text { font-size: 13px; color: var(--pe-text-muted); line-height: 1.5; margin-bottom: 12px; }
+  </style>
+</head>
+<body class="pe-page">
+
+  <nav class="pe-topbar">
+    <a class="pe-topbar__logo" href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pe-red)" stroke-width="2">
+        <circle cx="12" cy="12" r="3" fill="var(--pe-red)"/>
+        <circle cx="12" cy="12" r="7" stroke="var(--pe-red)" stroke-width="1.5" stroke-dasharray="2 2"/>
+        <circle cx="12" cy="12" r="10" stroke="var(--pe-red)" stroke-width="1"/>
+      </svg>
+      <span class="pe-topbar__name">Pulso Eleitoral</span>
+    </a>
+    <div class="pe-topbar__nav">
+      <a class="pe-topbar__nav-item" href="/dashboard">Dashboard</a>
+      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="/metodologia">Metodologia</a>
+    </div>
+    <div class="pe-topbar__meta"></div>
+  </nav>
+
+  <!-- Hero -->
+  <div class="met-hero">
+    <div class="met-hero__title">Como o Pulso Eleitoral funciona</div>
+    <p class="met-hero__sub">Transparência total sobre coleta, cálculos e limitações — para você interpretar os números com segurança.</p>
+  </div>
+
+  <main class="pe-container" style="max-width:900px; padding-top:36px;">
+
+    <!-- Índice -->
+    <nav class="met-toc" aria-label="Índice">
+      <a href="#o-que-e">O que é</a>
+      <a href="#fontes">Fontes</a>
+      <a href="#media">Média Agregada</a>
+      <a href="#monte-carlo">Monte Carlo</a>
+      <a href="#tipos">Tipos de pesquisa</a>
+      <a href="#limitacoes">Limitações</a>
+      <a href="#codigo">Código aberto</a>
+    </nav>
+
+    <!-- 1. O que é -->
+    <section id="o-que-e" class="met-section">
+      <h2 class="met-section__title">
+        <span class="met-section__num">1</span>
+        O que é o Pulso Eleitoral
+      </h2>
+      <div class="met-prose">
+        <p>O Pulso Eleitoral é um <strong>agregador automático de pesquisas eleitorais</strong>. Em vez de acompanhar cada instituto separadamente, o sistema coleta os dados diariamente, organiza tudo num banco de dados único e calcula médias e tendências de forma contínua.</p>
+        <p>A ideia central é simples: uma pesquisa isolada tem margem de erro. A média de várias pesquisas de institutos diferentes, feitas em períodos próximos, tende a ser mais estável e representativa do que qualquer número individual.</p>
+        <p>O Pulso não produz pesquisas próprias. Ele apenas coleta, organiza e apresenta o que institutos independentes já publicam.</p>
+      </div>
+      <div class="met-callout">
+        <strong>Atualização:</strong> a coleta roda automaticamente uma vez por dia. Os números no dashboard refletem a última execução bem-sucedida.
+      </div>
+    </section>
+
+    <!-- 2. Fontes -->
+    <section id="fontes" class="met-section">
+      <h2 class="met-section__title">
+        <span class="met-section__num">2</span>
+        Fontes monitoradas
+      </h2>
+      <div class="met-prose">
+        <p>O sistema monitora os principais institutos que publicam pesquisas presidenciais nacionais para as eleições de 2026. Cada instituto tem uma estratégia de coleta diferente:</p>
+      </div>
+      <div class="met-grid-institutos">
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">Datafolha</div>
+            <div class="met-inst-chip__how">Página própria + Playwright</div>
+          </div>
+        </div>
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">Quaest</div>
+            <div class="met-inst-chip__how">Releases no site</div>
+          </div>
+        </div>
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">AtlasIntel</div>
+            <div class="met-inst-chip__how">Página própria</div>
+          </div>
+        </div>
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">Real Time Big Data</div>
+            <div class="met-inst-chip__how">Gazeta do Povo</div>
+          </div>
+        </div>
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">Paraná Pesquisas</div>
+            <div class="met-inst-chip__how">Gazeta do Povo</div>
+          </div>
+        </div>
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">Nexus / BTG Pactual</div>
+            <div class="met-inst-chip__how">Gazeta do Povo</div>
+          </div>
+        </div>
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">Verita</div>
+            <div class="met-inst-chip__how">PDF via Playwright</div>
+          </div>
+        </div>
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">Futura Inteligência</div>
+            <div class="met-inst-chip__how">Gazeta do Povo</div>
+          </div>
+        </div>
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">PoderData</div>
+            <div class="met-inst-chip__how">Poder360</div>
+          </div>
+        </div>
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">Meio / Ideia</div>
+            <div class="met-inst-chip__how">Gazeta do Povo</div>
+          </div>
+        </div>
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">Vox Populi</div>
+            <div class="met-inst-chip__how">Gazeta do Povo</div>
+          </div>
+        </div>
+        <div class="met-inst-chip">
+          <div>
+            <div class="met-inst-chip__name">Instituto Gerp</div>
+            <div class="met-inst-chip__how">Gazeta do Povo</div>
+          </div>
+        </div>
+      </div>
+      <div class="met-prose" style="margin-top:16px;">
+        <p>Depois de coletar o texto ou PDF do release, um modelo de linguagem (Google Gemini) extrai automaticamente os percentuais de cada candidato, a data de campo, o tamanho da amostra e a margem de erro. Os dados estruturados são salvos em banco de dados SQLite.</p>
+      </div>
+    </section>
+
+    <!-- 3. Média Agregada -->
+    <section id="media" class="met-section">
+      <h2 class="met-section__title">
+        <span class="met-section__num">3</span>
+        Média Agregada
+      </h2>
+      <div class="met-prose">
+        <p>A média agregada que aparece no dashboard não é uma média simples de todos os números disponíveis. O cálculo usa uma <strong>janela móvel de 30 dias</strong>: apenas pesquisas com data de campo nos últimos 30 dias entram na conta.</p>
+        <p>Dentro dessa janela, cada instituto contribui com sua pesquisa mais recente. O resultado é a média aritmética dos percentuais de cada candidato entre os institutos incluídos.</p>
+      </div>
+      <div class="met-formula">
+        Média(candidato) = <span>Σ</span> percentual_instituto_i / N<br>
+        <span>onde N = institutos com pesquisa nos últimos 30 dias</span><br>
+        <span>e cada instituto contribui com apenas 1 pesquisa (a mais recente)</span>
+      </div>
+      <div class="met-prose">
+        <p>O sistema não aplica pesos por tamanho de amostra ou histórico de acertos — todos os institutos têm o mesmo peso. Isso evita viés de seleção sobre qual instituto "merece" mais peso, algo que exigiria julgamentos subjetivos.</p>
+      </div>
+      <div class="met-callout">
+        A variação de 30 dias exibida ao lado de cada candidato compara a média atual com a média calculada 30 dias atrás, usando o mesmo método.
+      </div>
+    </section>
+
+    <!-- 4. Monte Carlo -->
+    <section id="monte-carlo" class="met-section">
+      <h2 class="met-section__title">
+        <span class="met-section__num">4</span>
+        Simulação Monte Carlo
+      </h2>
+      <div class="met-prose">
+        <p>A seção de <strong>Simulação de 2º Turno</strong> usa uma técnica estatística chamada Monte Carlo. A ideia é simular o que poderia acontecer se a eleição fosse realizada hoje, levando em conta a incerteza das pesquisas.</p>
+        <p>O sistema roda <strong>10.000 simulações</strong>. Em cada uma delas:</p>
+      </div>
+      <div class="met-callout">
+        1. Os percentuais dos candidatos são sorteados dentro de uma distribuição normal, com desvio padrão de <strong>6 pontos percentuais</strong> (σ = 6pp) — valor que reflete a variação histórica entre institutos em eleições brasileiras.<br><br>
+        2. Os votos dos candidatos que não entram no 2º turno são redistribuídos proporcionalmente entre Lula e Flávio Bolsonaro.<br><br>
+        3. Registra-se quem ficou na frente naquela simulação.
+      </div>
+      <div class="met-prose">
+        <p>O percentual de vitória exibido (ex.: "Lula: 62% de chance") é simplesmente a fração das 10.000 simulações em que aquele candidato venceu o 2º turno simulado.</p>
+      </div>
+      <div class="met-callout met-callout--warn">
+        <strong>Atenção:</strong> a simulação Monte Carlo <em>não é uma previsão eleitoral</em>. Ela mostra quão robusta é a vantagem atual nas pesquisas — não o que vai acontecer na eleição. Pesquisas feitas meses antes da votação têm baixo poder preditivo; candidatos mudam, eventos inesperados acontecem.
+      </div>
+    </section>
+
+    <!-- 5. Tipos de pesquisa -->
+    <section id="tipos" class="met-section">
+      <h2 class="met-section__title">
+        <span class="met-section__num">5</span>
+        Tipos de pesquisa
+      </h2>
+      <div class="met-prose">
+        <p>Institutos brasileiros costumam publicar dois tipos diferentes de intenção de voto no mesmo release. O Pulso Eleitoral identifica e sinaliza qual tipo foi capturado:</p>
+      </div>
+      <div class="met-compare">
+        <div class="met-compare__card">
+          <div class="met-compare__label met-compare__label--esp">Tipo</div>
+          <div class="met-compare__badge met-compare__badge--esp">Espontânea</div>
+          <p class="met-compare__text">O entrevistador <strong>não apresenta lista</strong> de nomes. O eleitor cita espontaneamente quem votaria. Os percentuais tendem a ser menores — candidatos menos conhecidos recebem menos menções.</p>
+        </div>
+        <div class="met-compare__card">
+          <div class="met-compare__label met-compare__label--est">Tipo</div>
+          <div class="met-compare__badge met-compare__badge--est">Estimulada</div>
+          <p class="met-compare__text">O entrevistador <strong>apresenta uma lista</strong> com os nomes dos candidatos. O eleitor escolhe entre as opções. Os percentuais são geralmente maiores e mais estáveis entre institutos.</p>
+        </div>
+      </div>
+      <div class="met-prose" style="margin-top:16px;">
+        <p>O tipo é detectado automaticamente pelo modelo Gemini com base nas palavras do release e nos percentuais (percentuais muito baixos para candidatos principais indicam pesquisa espontânea). O badge colorido no dashboard mostra qual tipo corresponde à pesquisa mais recente exibida.</p>
+      </div>
+    </section>
+
+    <!-- 6. Limitações -->
+    <section id="limitacoes" class="met-section">
+      <h2 class="met-section__title">
+        <span class="met-section__num">6</span>
+        Limitações
+      </h2>
+      <div class="met-prose">
+        <p>O Pulso Eleitoral é uma ferramenta de acompanhamento, não de análise política profunda. Há limites importantes que você deve conhecer:</p>
+      </div>
+      <ul class="met-limit-list">
+        <li>
+          <span class="met-limit-list__icon">⚠</span>
+          <div><strong>Margem de erro acumulada.</strong> Cada pesquisa tem sua própria margem de erro (tipicamente ±2pp). A média agrega erros independentes, mas não os elimina. Diferenças de 1–2pp entre candidatos podem estar dentro do ruído estatístico.</div>
+        </li>
+        <li>
+          <span class="met-limit-list__icon">⚠</span>
+          <div><strong>Cobertura desigual.</strong> Alguns institutos publicam mensalmente, outros esporadicamente. Períodos sem coleta de um instituto específico não aparecem como lacuna visível — a média continua com os demais.</div>
+        </li>
+        <li>
+          <span class="met-limit-list__icon">⚠</span>
+          <div><strong>Extração automática tem falhas.</strong> Os dados são extraídos por um modelo de linguagem (Gemini), que pode cometer erros de interpretação em releases ambíguos. Números claramente discrepantes devem ser verificados na fonte original.</div>
+        </li>
+        <li>
+          <span class="met-limit-list__icon">⚠</span>
+          <div><strong>Não inclui todos os institutos.</strong> Apenas institutos que publicam resultados digitais acessíveis são monitorados. Pesquisas divulgadas exclusivamente em TV ou print não são capturadas.</div>
+        </li>
+        <li>
+          <span class="met-limit-list__icon">⚠</span>
+          <div><strong>Não é previsão.</strong> Pesquisas eleitorais medem intenção de voto no momento da coleta. Eleições dependem de campanhas, debates, escândalos e eventos imprevisíveis. Histórico de acurácia em eleições anteriores não garante precisão futura.</div>
+        </li>
+        <li>
+          <span class="met-limit-list__icon">⚠</span>
+          <div><strong>Sem ponderação por qualidade metodológica.</strong> O sistema não avalia a qualidade amostral de cada instituto. Um instituto com metodologia menos rigorosa tem o mesmo peso na média que um com metodologia auditada.</div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- 7. Código aberto -->
+    <section id="codigo" class="met-section">
+      <h2 class="met-section__title">
+        <span class="met-section__num">7</span>
+        Código aberto
+      </h2>
+      <div class="met-prose">
+        <p>O código-fonte do Pulso Eleitoral é público. Você pode inspecionar os coletores, os cálculos da média agregada, a simulação Monte Carlo e o próprio prompt enviado ao Gemini.</p>
+      </div>
+      <div class="met-oss-card">
+        <div class="met-oss-card__icon">⌥</div>
+        <div>
+          <div class="met-oss-card__title">pulso-eleitoral</div>
+          <p class="met-oss-card__text">Flask · SQLite · Playwright · Gemini API · Chart.js · hospedado no Fly.io</p>
+          <a href="https://github.com/stifermeister/pulso-eleitoral" class="pe-btn pe-btn--primary" style="font-size:12px; padding:6px 14px;" target="_blank" rel="noopener">Ver no GitHub →</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="pe-footer">
+    <p>Pulso Eleitoral · dados públicos · 2026</p>
+    <a href="/dashboard">Voltar ao Dashboard</a>
+  </footer>
+
+</body>
+</html>

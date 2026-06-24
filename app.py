@@ -83,8 +83,8 @@ def require_login():
     """Middleware simples que exige login para todas as rotas, 
     exceto /login, /api/status e arquivos estáticos."""
     allowed_endpoints = [
-        'login', 'static', 'api_status', 'dashboard', 
-        'api_pesquisas_presidente', 'api_pesquisas_historico', 
+        'login', 'static', 'api_status', 'dashboard', 'metodologia',
+        'api_pesquisas_presidente', 'api_pesquisas_historico',
         'api_pesquisas_governador_rj', 'api_institutos',
         'api_visao_geral', 'api_visao_geral_analise', 'api_comparativo',
         'api_pesquisas_historico_multi',
@@ -466,6 +466,11 @@ def api_visao_geral_analise():
 def dashboard():
     """Página pública do dashboard."""
     return render_template('dashboard.html')
+
+@app.route('/metodologia')
+def metodologia():
+    """Página de metodologia — como o sistema funciona."""
+    return render_template('metodologia.html')
 
 @app.route('/api/pesquisas/presidente')
 def api_pesquisas_presidente():
