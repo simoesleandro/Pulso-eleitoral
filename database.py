@@ -342,9 +342,10 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
 def get_simulacao_segundo_turno() -> dict:
     """Simula resultado de 2º turno Lula x Flávio com redistribuição proporcional de votos."""
     DIREITA = {'Flávio Bolsonaro', 'Ronaldo Caiado', 'Romeu Zema',
-               'Cabo Daciolo', 'Renan Santos', 'Tarcísio de Freitas'}
+               'Cabo Daciolo', 'Tarcísio de Freitas', 'Renan Santos'}
     ESQUERDA_CENTRO = {'Lula', 'Ciro Gomes', 'Simone Tebet',
-                       'Rui Costa Pimenta', 'Augusto Cury'}
+                       'Rui Costa Pimenta', 'Augusto Cury',
+                       'Samara Martins', 'Eduardo Paes'}
 
     media = get_media_agregada('presidente', dias=30)
     candidatos = media.get('candidatos', [])
@@ -410,9 +411,10 @@ def get_simulacao_monte_carlo(n_simulacoes: int = 10000) -> dict:
     import random
 
     DIREITA = {'Flávio Bolsonaro', 'Ronaldo Caiado', 'Romeu Zema',
-               'Cabo Daciolo', 'Renan Santos', 'Tarcísio de Freitas'}
+               'Cabo Daciolo', 'Tarcísio de Freitas', 'Renan Santos'}
     ESQUERDA_CENTRO = {'Lula', 'Ciro Gomes', 'Simone Tebet',
-                       'Rui Costa Pimenta', 'Augusto Cury'}
+                       'Rui Costa Pimenta', 'Augusto Cury',
+                       'Samara Martins', 'Eduardo Paes'}
     MARGEM_DEFAULT = 2.0
 
     media = get_media_agregada('presidente', dias=30)
