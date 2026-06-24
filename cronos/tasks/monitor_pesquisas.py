@@ -17,7 +17,7 @@ import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
 import requests
 
@@ -89,15 +89,30 @@ HEADERS = {
 JANELA_HORAS = 24          # janela RSS: só busca artigos das últimas 24h
 JANELA_DEDUP_DIAS = 7      # dedup: ignora GUIDs vistos nos últimos 7 dias
 
-TERMOS_RELEVANCIA = [
-    'intenção de voto',
-    'pesquisa eleitoral',
-    'pesquisa presidencial',
+# Filtro de relevância — regras em _relevante()
+TERMOS_PRESIDENCIAL = [
     'presidente da república',
-    '1º turno',
-    '2º turno',
-    'primeiro turno',
-    'segundo turno',
+    'presidencial',
+    'presidente lula',
+    'flávio bolsonaro',
+    'corrida presidencial',
+    'eleição presidencial',
+    'pesquisa para presidente',
+]
+
+TERMOS_ESTADUAL = [
+    'governador',
+    'senador',
+    'deputado',
+    'prefeito',
+    'vereador',
+    'assembleia',
+    'câmara municipal',
+]
+
+TERMOS_2TURNO_HIPOTETICO = [
+    'no 2º turno',
+    'em eventual 2º turno',
 ]
 
 # ---------------------------------------------------------------------------
@@ -110,13 +125,25 @@ CREATE TABLE IF NOT EXISTS monitor_urls_vistas (
     url       TEXT,
     titulo    TEXT,
     termo     TEXT,
+    dominio   TEXT,
+    instituto TEXT,
     visto_em  TEXT DEFAULT (datetime('now', 'localtime'))
 )
 """
 
+_ALTER_STMTS = [
+    "ALTER TABLE monitor_urls_vistas ADD COLUMN dominio TEXT",
+    "ALTER TABLE monitor_urls_vistas ADD COLUMN instituto TEXT",
+]
+
 
 def _init_tabela(conn: sqlite3.Connection) -> None:
     conn.execute(CREATE_TABLE)
+    for stmt in _ALTER_STMTS:
+        try:
+            conn.execute(stmt)
+        except sqlite3.OperationalError:
+            pass  # coluna já existe
     conn.commit()
 
 
@@ -128,16 +155,67 @@ def _ja_visto(conn: sqlite3.Connection, guid: str) -> bool:
     ).fetchone() is not None
 
 
+def _dominio(url: str) -> str:
+    try:
+        return urlparse(url).netloc.replace('www.', '')
+    except Exception:
+        return ''
+
+
+def _semana_iso(pub_str: str) -> str:
+    """Retorna 'YYYY-Www' para a pubDate fornecida, ou da semana atual."""
+    try:
+        dt = parsedate_to_datetime(pub_str) if pub_str else datetime.now(timezone.utc)
+        iso = dt.isocalendar()
+        return f"{iso.year}-W{iso.week:02d}"
+    except Exception:
+        iso = datetime.now(timezone.utc).isocalendar()
+        return f"{iso.year}-W{iso.week:02d}"
+
+
+def _ja_visto_composto(conn: sqlite3.Connection, dominio: str, instituto: str, semana: str) -> bool:
+    """Dedup agressivo: mesmo veículo + mesmo instituto + mesma semana → ignora."""
+    if not dominio or instituto == '—':
+        return False
+    return conn.execute(
+        "SELECT 1 FROM monitor_urls_vistas "
+        "WHERE dominio = ? AND instituto = ? AND visto_em >= datetime('now', 'localtime', ?)",
+        (dominio, instituto, f'-{JANELA_DEDUP_DIAS} days'),
+    ).fetchone() is not None
+
+
 def _relevante(titulo: str) -> bool:
-    """Retorna True se o título contém ao menos um termo eleitoral explícito."""
-    titulo_lower = titulo.lower()
-    return any(t in titulo_lower for t in TERMOS_RELEVANCIA)
+    """
+    Retorna True apenas se o título:
+      1. Contém ao menos um termo de cargo PRESIDENCIAL
+      2. NÃO contém termos de cargo estadual
+      3. NÃO contém fraseologia de 2º turno hipotético (exceto se presidencial presente)
+    """
+    t = titulo.lower()
+    has_presidencial = any(term in t for term in TERMOS_PRESIDENCIAL)
+
+    # Regra 1 — exige contexto presidencial
+    if not has_presidencial:
+        return False
+
+    # Regra 2 — cargo estadual invalida mesmo com presidencial
+    if any(term in t for term in TERMOS_ESTADUAL):
+        return False
+
+    # Regra 3 — 2º turno hipotético sem presidencial → ruído
+    # (a cláusula "exceto se presidencial" já é garantida pela regra 1)
+    if any(term in t for term in TERMOS_2TURNO_HIPOTETICO) and not has_presidencial:
+        return False
+
+    return True
 
 
-def _registrar(conn: sqlite3.Connection, guid: str, url: str, titulo: str, termo: str) -> None:
+def _registrar(conn: sqlite3.Connection, guid: str, url: str, titulo: str,
+               termo: str, dominio: str = '', instituto: str = '') -> None:
     conn.execute(
-        "INSERT OR IGNORE INTO monitor_urls_vistas (guid, url, titulo, termo) VALUES (?, ?, ?, ?)",
-        (guid, url, titulo, termo),
+        "INSERT OR IGNORE INTO monitor_urls_vistas "
+        "(guid, url, titulo, termo, dominio, instituto) VALUES (?, ?, ?, ?, ?, ?)",
+        (guid, url, titulo, termo, dominio, instituto),
     )
     conn.commit()
 
@@ -245,28 +323,47 @@ def run() -> None:
     _init_tabela(conn)
 
     novos: list[dict] = []
-    vistos_sessao: set[str] = set()
+    vistos_guid: set[str] = set()
+    vistos_compostos: set[tuple] = set()  # (dominio, instituto, semana_iso)
+
+    total_items = total_recentes = total_relevantes = total_dedup = 0
 
     for termo in TERMOS_BUSCA:
         items = _buscar_rss(termo)
         recentes = [it for it in items if _recente(it['pub'])]
         relevantes = [it for it in recentes if _relevante(it['titulo'])]
+
+        total_items    += len(items)
+        total_recentes += len(recentes)
+        total_relevantes += len(relevantes)
+
         logger.info(
-            "Termo '%s': %d items | %d recentes (24h) | %d relevantes",
+            "Termo '%s': %d items | %d recentes (24h) | %d presidenciais",
             termo, len(items), len(recentes), len(relevantes),
         )
 
         for it in relevantes:
-            guid = it['guid']
-            if guid in vistos_sessao:
-                continue
-            if _ja_visto(conn, guid):
+            guid      = it['guid']
+            instituto = _detectar_instituto(it['titulo'], it['fonte'])
+            dom       = _dominio(it['link'])
+            semana    = _semana_iso(it['pub'])
+            chave_comp = (dom, instituto, semana)
+
+            # Dedup por GUID (intra-sessão e histórico)
+            if guid in vistos_guid or _ja_visto(conn, guid):
+                total_dedup += 1
                 continue
 
-            vistos_sessao.add(guid)
+            # Dedup composto: mesmo veículo + mesmo instituto + mesma semana
+            if chave_comp in vistos_compostos or _ja_visto_composto(conn, dom, instituto, semana):
+                total_dedup += 1
+                logger.debug("Dedup composto: %s | %s | %s", dom, instituto, semana)
+                continue
+
+            vistos_guid.add(guid)
+            vistos_compostos.add(chave_comp)
 
             url_real = _resolver_url(it['link']) if it['link'] else it['guid']
-            instituto = _detectar_instituto(it['titulo'], it['fonte'])
 
             novos.append({
                 'titulo':    it['titulo'],
@@ -275,11 +372,19 @@ def run() -> None:
                 'url':       url_real,
                 'guid':      guid,
                 'termo':     termo,
+                'dominio':   dom,
+                'semana':    semana,
             })
+
+    logger.info(
+        "Resumo filtros: %d items | %d recentes | %d presidenciais | %d dedup | %d novos",
+        total_items, total_recentes, total_relevantes, total_dedup, len(novos),
+    )
 
     # Registra todos no banco antes de enviar (evita re-envio se Telegram falhar parcialmente)
     for it in novos:
-        _registrar(conn, it['guid'], it['url'], it['titulo'], it['termo'])
+        _registrar(conn, it['guid'], it['url'], it['titulo'], it['termo'],
+                   dominio=it['dominio'], instituto=it['instituto'])
     conn.close()
 
     if not novos:
