@@ -9,6 +9,7 @@ from .paraná_pesquisas import ParanaPesquisasCollector
 from .real_time import RealTimeCollector
 from .poder360 import Poder360Collector
 from .verita import VeritaCollector
+from .cnn_brasil import CnnBrasilColetor
 
 # Lista com todas as classes de coletores concretos para fácil iteração
 ALL_COLLECTORS = [
@@ -21,4 +22,5 @@ ALL_COLLECTORS = [
     RealTimeCollector,
     Poder360Collector,
     VeritaCollector,
+    CnnBrasilColetor,
 ]

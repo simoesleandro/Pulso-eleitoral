@@ -93,6 +93,91 @@ EXTRAÇÃO DE NOMES DE CANDIDATOS:
 Se não encontrar intenções de voto com percentuais explícitos, retorne:
 {"candidatos": []}
 
+Ano de referência: 2026. Se o texto mencionar apenas mês e dia sem ano, assuma 2026.
+
+TEXTO:
+{texto}
+"""
+
+PROMPT_EXTRACAO_REGIONAL = """
+Você é um extrator de dados de pesquisas eleitorais brasileiras.
+Analise o texto abaixo e extraia APENAS intenções de voto com percentuais EXPLÍCITOS.
+
+REGRAS CRÍTICAS:
+- Extraia SOMENTE quando houver percentual numérico explícito (ex: "38%", "38 por cento")
+- NÃO invente percentuais — se não há número claro, não inclua o candidato
+- Extraia intenções de voto no 1º turno (nacional ou estadual)
+- IGNORE percentuais de 2º turno (geralmente acima de 50% em confronto direto)
+- IGNORE aprovação/rejeição de governo
+- Se o release apresentar múltiplos cenários de 1º turno, escolha o cenário
+  com MAIS candidatos listados
+- Se o release misturar 1º e 2º turno, extraia APENAS o cenário de 1º turno
+- IGNORE: cenários de 2º turno, cenários hipotéticos com candidatos
+  que ainda não declararam candidatura (Michelle Bolsonaro, Aécio Neves, etc.)
+- Percentuais válidos para presidente: entre 1% e 60% por candidato
+- A soma dos percentuais dos candidatos deve ser <= 100%
+- Se a soma ultrapassar 100%, os percentuais provavelmente são de
+  cenários diferentes — retorne {"candidatos": []}
+- Se a soma for maior que 120%, provavelmente são cenários de 2º turno — retorne []
+- Cargo deve ser "presidente", "governador_rj", "governador_sp" etc
+- Se o texto for sobre aprovação/rejeição de governo sem intenção de voto, retorne lista vazia
+
+DETERMINAÇÃO DO CAMPO "tipo":
+Retorne "espontanea" ou "estimulada" com base nas pistas abaixo:
+
+  "espontanea" quando:
+  - O texto usa palavras como "espontânea", "sem lista", "sem apresentação de nomes",
+    "de cabeça", "citou espontaneamente", "mencionou sem estímulo"
+  - Os candidatos principais (Lula, Flávio Bolsonaro) aparecem com percentuais
+    anormalmente baixos para corrida bipolar: Flávio abaixo de 25% e/ou
+    muitos candidatos menores com 1–5% cada
+  - REGRA FORTE: se Flávio Bolsonaro aparecer abaixo de 25% em corrida presidencial
+    2026, classifique como "espontanea" — EXCETO se o texto usar explicitamente
+    as palavras "estimulada", "com lista" ou "ao ouvir os nomes"
+  - A soma dos percentuais é notavelmente baixa (abaixo de 70%), indicando
+    alto percentual de "não sabe / não respondeu" implícito
+
+  "estimulada" quando:
+  - O texto usa explicitamente palavras como "estimulada", "com lista",
+    "ao ouvir os nomes", "escolheria entre", "ao ser apresentada lista"
+  - Os candidatos principais estão acima de 25% cada em corrida bipolar
+
+  Na dúvida, analise os percentuais: soma abaixo de 80% ou candidato principal
+  abaixo de 25% indica "espontanea"; caso contrário, use "estimulada".
+
+Retorne SOMENTE JSON válido, sem markdown, sem explicação:
+{
+  "cargo": "presidente",
+  "tipo": "espontanea",
+  "instituto": "nome do instituto mencionado",
+  "data": "YYYY-MM-DD ou null",
+  "tamanho_amostra": numero ou null,
+  "margem_erro": extraia de expressões como:
+    - "margem de erro de X pontos percentuais"
+    - "margem de erro é de X%"
+    - "erro amostral de X pontos"
+    - "intervalo de confiança de 95%, margem de X pp"
+    Se não encontrar, retorne null — nunca retorne 0,
+  "candidatos": [
+    {"nome": "Nome Candidato", "percentual": 38.0},
+    {"nome": "Nome Candidato 2", "percentual": 32.0}
+  ]
+}
+
+EXTRAÇÃO DE NOMES DE CANDIDATOS:
+- Extraia o nome completo e correto
+- Exemplos de nomes brasileiros frequentes:
+  - "Rui Costa Pimenta" (não "ii Costa Pimenta")
+  - "Flávio Bolsonaro" (com acento)
+  - "Ronaldo Caiado"
+- Se o nome aparecer truncado ou com erro, corrija com base no contexto
+- Nunca retorne nome com menos de 3 caracteres
+
+Se não encontrar intenções de voto com percentuais explícitos, retorne:
+{"candidatos": []}
+
+Ano de referência: 2026. Se o texto mencionar apenas mês e dia sem ano, assuma 2026.
+
 TEXTO:
 {texto}
 """
@@ -157,7 +242,7 @@ def normalizar_nome(nome: str) -> str | None:
     return MAPA_NOMES.get(chave, nome)
 
 
-def extrair_com_gemini(texto: str, fonte_url: str = "") -> dict:
+def extrair_com_gemini(texto: str, fonte_url: str = "", permite_regional: bool = False) -> dict:
     """
     Usa Gemini Flash para extrair dados estruturados de texto de pesquisa eleitoral.
     
@@ -176,12 +261,13 @@ def extrair_com_gemini(texto: str, fonte_url: str = "") -> dict:
         
         # Limita texto para evitar tokens excessivos
         texto_truncado = texto[:8000]
-        
-        prompt = PROMPT_EXTRACAO.replace("{texto}", texto_truncado)
+
+        template = PROMPT_EXTRACAO_REGIONAL if permite_regional else PROMPT_EXTRACAO
+        prompt = template.replace("{texto}", texto_truncado)
         
         MODELOS = [
             "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash",
             "gemini-2.0-flash-lite",
         ]
         

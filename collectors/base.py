@@ -180,7 +180,8 @@ class BaseCollector(ABC):
             conn.close()
 
     def _parse_com_gemini(self, html: str, url: str,
-                           instituto_id: int) -> list[dict]:
+                           instituto_id: int,
+                           permite_regional: bool = False) -> list[dict]:
         """
         Extrai texto limpo do HTML e usa Gemini para estruturar os dados.
         Retorna lista de dicts no formato padrão do save().
@@ -200,7 +201,7 @@ class BaseCollector(ABC):
             self.logger.warning(f"Texto muito curto em {url}: {len(texto)} chars")
             return []
         
-        resultado = extrair_com_gemini(texto, fonte_url=url)
+        resultado = extrair_com_gemini(texto, fonte_url=url, permite_regional=permite_regional)
         candidatos = resultado.get("candidatos", [])
         
         if not candidatos:
