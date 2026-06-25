@@ -249,11 +249,47 @@ MAPA_NOMES = {
 }
 
 
+CANDIDATOS_PRESIDENCIAIS_2026 = {
+    'lula', 'luiz inácio lula da silva', 'luiz inacio lula da silva',
+    'flávio bolsonaro', 'flavio bolsonaro',
+    'tarcísio de freitas', 'tarcisio de freitas', 'tarcísio', 'tarcisio',
+    'ronaldo caiado', 'caiado',
+    'romeu zema', 'zema',
+    'renan santos',
+    'ciro gomes', 'ciro',
+    'rui costa pimenta',
+    'cabo daciolo',
+    'samara martins',
+    'augusto cury',
+    'edmilson costa',
+    'hertz dias',
+    'joaquim barbosa',
+    'simone tebet', 'simone',
+    'pablo marçal', 'pablo marcal',
+}
+
 PROMPT_MULTIESTADO = """
 Você é um extrator de dados de pesquisas eleitorais brasileiras por estado.
-Analise o texto abaixo e extraia intenções de voto de 1º turno POR ESTADO.
+Analise o texto abaixo e extraia intenções de voto de 1º turno para PRESIDENTE DA REPÚBLICA, agrupadas por estado.
 
-REGRAS CRÍTICAS:
+REGRA FUNDAMENTAL — CARGO:
+- Extraia EXCLUSIVAMENTE dados de PRESIDENTE DA REPÚBLICA (eleição presidencial nacional de 2026)
+- IGNORE COMPLETAMENTE qualquer dado de governador, senador, deputado federal, deputado estadual,
+  prefeito ou qualquer outro cargo que não seja presidente da república
+- Se o texto misturar presidente e governador, extraia APENAS os dados presidenciais
+- Candidatos a GOVERNADOR nunca devem aparecer no resultado — mesmo que tenham percentuais explícitos
+
+CANDIDATOS PRESIDENCIAIS CONHECIDOS (extraia apenas estes e outros claramente presidenciais):
+Lula, Flávio Bolsonaro, Tarcísio de Freitas, Ronaldo Caiado, Romeu Zema,
+Renan Santos, Ciro Gomes, Rui Costa Pimenta, Cabo Daciolo, Samara Martins,
+Augusto Cury, Simone Tebet, Pablo Marçal
+
+CANDIDATOS A GOVERNADOR — NUNCA EXTRAIR (exemplos de nomes a ignorar):
+Juliana Brizola, Luciano Zucco, Eduardo Leite, Ratinho Jr., Raquel Lyra,
+Jerônimo Rodrigues, Adriana Accorsi, Marconi Perillo, Eduardo Paes (governador),
+Cláudio Castro, qualquer candidato identificado como candidato a governador estadual
+
+REGRAS ADICIONAIS:
 - Extraia SOMENTE percentuais de 1º turno com valor numérico explícito (ex: "38%", "38 por cento")
 - NÃO invente percentuais — se não há número claro, não inclua
 - IGNORE percentuais de 2º turno: confronto direto entre 2 candidatos onde um aparece > 50%
@@ -261,9 +297,8 @@ REGRAS CRÍTICAS:
 - IGNORE "Cenários alternativos" ou "Cenário com [nome]" — esses blocos são projeções, não intenções reais
 - IGNORE aprovação/rejeição de governo, avaliação de mandato, margens de vantagem (ex: "+20 pontos")
 - IGNORE dados históricos de eleições passadas (2018, 2022) — extraia APENAS o cenário atual (2026)
-- Para cada estado, extraia os candidatos com percentuais no 1º turno do cenário PRINCIPAL
-- Use SEMPRE o nome do candidato, nunca o nome do partido (ex: se o texto disser "PT tem 42%", extraia como o candidato do PT — Lula para presidente)
-- Percentuais válidos por candidato no 1º turno: entre 1% e 80% (estado nordestino pode ter > 60%)
+- Use SEMPRE o nome do candidato, nunca o nome do partido (ex: se o texto disser "PT tem 42%", extraia como Lula)
+- Percentuais válidos por candidato presidencial no 1º turno: entre 1% e 80%
 - Use a sigla de UF em maiúsculas: SP, MG, RJ, BA, RS, PR, GO, CE, PE, PA, DF, SC, etc.
 
 Retorne SOMENTE JSON válido, sem markdown, sem explicação:
@@ -273,14 +308,14 @@ Retorne SOMENTE JSON válido, sem markdown, sem explicação:
     {
       "uf": "SP",
       "candidatos": [
-        {"nome": "Nome Candidato", "percentual": 45.0},
-        {"nome": "Nome Candidato 2", "percentual": 40.0}
+        {"nome": "Nome Candidato Presidencial", "percentual": 45.0},
+        {"nome": "Nome Candidato Presidencial 2", "percentual": 40.0}
       ]
     }
   ]
 }
 
-Se não encontrar dados estaduais com percentuais explícitos de 1º turno, retorne:
+Se não encontrar dados presidenciais estaduais com percentuais explícitos, retorne:
 {"data": null, "estados": []}
 
 Ano de referência: 2026.
@@ -353,6 +388,7 @@ def extrair_regional_multiestado(texto: str, fonte_url: str = "") -> list[dict]:
         estados = resultado.get("estados", [])
 
         registros = []
+        descartados = []
         for estado in estados:
             uf = (estado.get("uf") or "").upper().strip()
             if not uf or len(uf) != 2:
@@ -367,6 +403,13 @@ def extrair_regional_multiestado(texto: str, fonte_url: str = "") -> list[dict]:
                     continue
                 if not (1.0 <= float(percentual) <= 80.0):
                     continue
+                # Filtro de segurança: aceita só candidatos presidenciais conhecidos
+                nome_check_raw = nome_raw.lower().strip()
+                nome_check_norm = (nome or "").lower().strip()
+                if nome_check_raw not in CANDIDATOS_PRESIDENCIAIS_2026 and \
+                   nome_check_norm not in CANDIDATOS_PRESIDENCIAIS_2026:
+                    descartados.append(f"{nome_raw} ({uf})")
+                    continue
                 registros.append({
                     "uf": uf,
                     "candidato": nome,
@@ -374,6 +417,8 @@ def extrair_regional_multiestado(texto: str, fonte_url: str = "") -> list[dict]:
                     "data": data_pesquisa,
                 })
 
+        if descartados:
+            logger.warning(f"extrair_regional_multiestado: descartados {len(descartados)} não-presidenciais: {descartados[:10]}")
         logger.info(f"extrair_regional_multiestado: {len(registros)} registros de {len(estados)} estados via {modelo_usado}")
         return registros
 
