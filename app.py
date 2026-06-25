@@ -94,6 +94,7 @@ def require_login():
         'api_regional_presidente',
         'api_simulacao_segundo_turno',
         'api_monte_carlo',
+        'api_rejeicao',
         'apply_db'
     ]
     if request.endpoint in allowed_endpoints:
@@ -728,6 +729,32 @@ def apply_db():
         return jsonify({'error': f'{filename} não encontrado'}), 404
     shutil.move(new_db, current_db)
     return jsonify({'ok': True, 'msg': 'banco aplicado'})
+
+@app.route('/api/rejeicao')
+def api_rejeicao():
+    """Retorna média de rejeição por candidato nos últimos 30 dias."""
+    resultado = []
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT r.candidato, AVG(r.percentual) AS media, COUNT(*) AS n_pesquisas
+                FROM rejeicoes r
+                JOIN pesquisas p ON p.id = r.pesquisa_id
+                WHERE p.data_pesquisa >= date('now', '-30 days')
+                  AND p.cargo = 'presidente'
+                GROUP BY r.candidato
+                ORDER BY media DESC
+            """)
+            rows = cursor.fetchall()
+            resultado = [
+                {"candidato": row["candidato"], "media": round(row["media"], 1), "n_pesquisas": row["n_pesquisas"]}
+                for row in rows
+            ]
+    except Exception as e:
+        app.logger.error(f"Erro em /api/rejeicao: {e}")
+    return jsonify({"rejeicoes": resultado})
+
 
 @app.route('/api/status')
 def api_status():

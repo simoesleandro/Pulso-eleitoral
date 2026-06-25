@@ -78,8 +78,21 @@ Retorne SOMENTE JSON válido, sem markdown, sem explicação:
   "candidatos": [
     {"nome": "Nome Candidato", "percentual": 38.0},
     {"nome": "Nome Candidato 2", "percentual": 32.0}
+  ],
+  "rejeicoes": [
+    {"nome": "Nome Candidato", "percentual": 46.0}
   ]
 }
+
+EXTRAÇÃO DE REJEIÇÃO:
+- Se o release incluir seção de rejeição / voto negativo / "não votaria de jeito nenhum" /
+  "rejeitam votar", extraia em "rejeicoes" os candidatos com percentual explícito.
+- Exemplos de frases que indicam rejeição:
+  - "48% dizem que não votariam de jeito nenhum no senador"
+  - "46% rejeitam votar no atual presidente"
+  - "Fulano tem rejeição de 23%"
+- Se não houver seção de rejeição no texto, retorne "rejeicoes": []
+- NÃO confunda rejeição de candidato com aprovação/rejeição de governo
 
 EXTRAÇÃO DE NOMES DE CANDIDATOS:
 - Extraia o nome completo e correto
@@ -91,7 +104,7 @@ EXTRAÇÃO DE NOMES DE CANDIDATOS:
 - Nunca retorne nome com menos de 3 caracteres
 
 Se não encontrar intenções de voto com percentuais explícitos, retorne:
-{"candidatos": []}
+{"candidatos": [], "rejeicoes": []}
 
 Ano de referência: 2026. Se o texto mencionar apenas mês e dia sem ano, assuma 2026.
 

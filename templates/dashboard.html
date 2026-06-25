@@ -150,6 +150,14 @@
           Pontos sólidos = Datafolha · Pontos vazios = Quaest · Linha contínua conecta pesquisas do mesmo instituto
         </div>
       </div>
+
+      <!-- Rejeição -->
+      <h3 class="pe-section__title" style="font-size:13px; margin-top:24px;">Rejeição — últimos 30 dias</h3>
+      <div class="pe-card" id="rejeicao-card">
+        <div id="rejeicao-container">
+          <div class="pe-mono" style="color:var(--pe-text-muted);">Carregando...</div>
+        </div>
+      </div>
     </section>
 
     <!-- SEÇÃO 3: GOV. RJ -->
@@ -897,6 +905,52 @@
       `;
     }
 
+    // ─── Rejeição ─────────────────────────────────────────────
+    async function carregarRejeicao() {
+      try {
+        const res = await fetch('/api/rejeicao');
+        const data = await res.json();
+        const container = document.getElementById('rejeicao-container');
+        if (!data.rejeicoes || data.rejeicoes.length === 0) {
+          container.innerHTML = '<div class="pe-mono" style="color:var(--pe-text-muted);">Sem dados de rejeição disponíveis.</div>';
+          return;
+        }
+        const max = data.rejeicoes[0].media;
+        const rows = data.rejeicoes.map((r, i) => {
+          const barW = max > 0 ? (r.media / max * 100).toFixed(1) : 0;
+          const cor = r.media >= 40 ? 'var(--pe-red)' : r.media >= 25 ? '#e07a2f' : 'var(--pe-text-muted)';
+          return `
+            <tr>
+              <td style="padding:8px 0; font-size:13px; width:32px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">${i + 1}</td>
+              <td style="padding:8px 12px 8px 0; font-size:13px;">${r.candidato}</td>
+              <td style="padding:8px 0; width:120px;">
+                <div style="background:var(--pe-surface); border-radius:3px; overflow:hidden; height:6px;">
+                  <div style="width:${barW}%; height:100%; background:${cor}; border-radius:3px;"></div>
+                </div>
+              </td>
+              <td style="padding:8px 0 8px 12px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:500; color:${cor}; text-align:right;">${r.media.toFixed(1)}%</td>
+              <td style="padding:8px 0 8px 12px; font-size:11px; color:var(--pe-text-muted); text-align:right;">${r.n_pesquisas} pesq.</td>
+            </tr>`;
+        }).join('');
+        container.innerHTML = `
+          <table style="width:100%; border-collapse:collapse;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--pe-surface);">
+                <th style="padding:4px 0; font-size:11px; color:var(--pe-text-muted); text-align:left; font-weight:500;">#</th>
+                <th style="padding:4px 12px 4px 0; font-size:11px; color:var(--pe-text-muted); text-align:left; font-weight:500;">Candidato</th>
+                <th style="padding:4px 0; font-size:11px; color:var(--pe-text-muted); text-align:left; font-weight:500;"></th>
+                <th style="padding:4px 0 4px 12px; font-size:11px; color:var(--pe-text-muted); text-align:right; font-weight:500;">Rejeição méd.</th>
+                <th style="padding:4px 0 4px 12px; font-size:11px; color:var(--pe-text-muted); text-align:right; font-weight:500;">Pesquisas</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>`;
+      } catch (e) {
+        document.getElementById('rejeicao-container').innerHTML =
+          '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar rejeição.</div>';
+      }
+    }
+
     // ─── Inicialização ────────────────────────────────────────
     async function inicializar() {
       await Promise.all([
@@ -911,6 +965,7 @@
         carregarAlertas(),
         carregarSimulacao(),
         carregarRegional(),
+        carregarRejeicao(),
       ]);
     }
 

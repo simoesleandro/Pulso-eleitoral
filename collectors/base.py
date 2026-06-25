@@ -113,8 +113,9 @@ class BaseCollector(ABC):
                             "UPDATE pesquisas SET data_pesquisa=? WHERE id=?",
                             (data_pesquisa_real, pesquisa_id)
                         )
-                    # Limpa as intenções anteriores para evitar duplicação
+                    # Limpa intenções e rejeições anteriores para evitar duplicação
                     cursor.execute("DELETE FROM intencoes WHERE pesquisa_id = ?", (pesquisa_id,))
+                    cursor.execute("DELETE FROM rejeicoes WHERE pesquisa_id = ?", (pesquisa_id,))
                 else:
                     # b. Se não existe: INSERT INTO pesquisas
                     first = group_items[0]
@@ -171,8 +172,21 @@ class BaseCollector(ABC):
                     ))
                     n_intencoes += 1
 
+                # e. Insere rejeições (vêm no primeiro item do grupo)
+                rejeicoes = group_items[0].get("rejeicoes") or []
+                n_rejeicoes = 0
+                for rej in rejeicoes:
+                    nome = rej.get("nome") or rej.get("candidato")
+                    pct = rej.get("percentual")
+                    if nome and pct is not None:
+                        cursor.execute(
+                            "INSERT INTO rejeicoes (pesquisa_id, candidato, percentual) VALUES (?, ?, ?)",
+                            (pesquisa_id, nome, float(pct))
+                        )
+                        n_rejeicoes += 1
+
             conn.commit()
-            logger.info("[COLLECTOR] Salvo: %d pesquisas, %d intenções", n_pesquisas, n_intencoes)
+            logger.info("[COLLECTOR] Salvo: %d pesquisas, %d intenções, %d rejeições", n_pesquisas, n_intencoes, n_rejeicoes)
         except Exception as e:
             conn.rollback()
             logger.error("[COLLECTOR] Erro ao salvar pesquisas no banco: %s", str(e))
@@ -226,7 +240,17 @@ class BaseCollector(ABC):
         data_real = resultado.get("data")  # YYYY-MM-DD extraída pelo Gemini, ou None
         tipo = resultado.get("tipo", "estimulada")
 
-        return [
+        # Normaliza rejeições (mesmo mapa de nomes)
+        from collectors.gemini_extractor import normalizar_nome
+        rejeicoes_raw = resultado.get("rejeicoes") or []
+        rejeicoes = []
+        for r in rejeicoes_raw:
+            nome_rej = normalizar_nome(r.get("nome", ""))
+            pct_rej = r.get("percentual")
+            if nome_rej and pct_rej is not None:
+                rejeicoes.append({"nome": nome_rej, "percentual": float(pct_rej)})
+
+        items = [
             {
                 "instituto_id": inst_id,
                 "cargo": resultado.get("cargo", "presidente"),
@@ -244,4 +268,10 @@ class BaseCollector(ABC):
             for c in candidatos
             if c.get("nome") and c.get("percentual") is not None
         ]
+
+        # Anexa rejeições ao primeiro item para save() persistir
+        if items and rejeicoes:
+            items[0]["rejeicoes"] = rejeicoes
+
+        return items
 

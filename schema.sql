@@ -77,12 +77,22 @@ CREATE TABLE IF NOT EXISTS scheduler_log (
     resultado TEXT -- String JSON contendo o array com o resultado detalhado
 );
 
+-- 10. Rejeição / voto negativo por candidato
+CREATE TABLE IF NOT EXISTS rejeicoes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pesquisa_id INTEGER NOT NULL REFERENCES pesquisas(id) ON DELETE CASCADE,
+    candidato TEXT NOT NULL,
+    percentual REAL NOT NULL
+);
+
 -- Índices de desempenho recomendados no PRD
 CREATE INDEX IF NOT EXISTS idx_intencoes_pesquisa_id ON intencoes(pesquisa_id);
 CREATE INDEX IF NOT EXISTS idx_intencoes_candidato ON intencoes(candidato);
 CREATE INDEX IF NOT EXISTS idx_pesquisas_cargo ON pesquisas(cargo);
 CREATE INDEX IF NOT EXISTS idx_pesquisas_data_pesquisa ON pesquisas(data_pesquisa);
 CREATE INDEX IF NOT EXISTS idx_alertas_cargo ON alertas(cargo);
+CREATE INDEX IF NOT EXISTS idx_rejeicoes_pesquisa_id ON rejeicoes(pesquisa_id);
+CREATE INDEX IF NOT EXISTS idx_rejeicoes_candidato ON rejeicoes(candidato);
 
 -- 8. Dados regionais de intenção de voto por UF
 CREATE TABLE IF NOT EXISTS pesquisas_regionais (
