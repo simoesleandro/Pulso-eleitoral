@@ -9,3 +9,6 @@ venv/
 logs/
 *.log
 *.exe
+
+# Scripts e arquivos descartáveis (debug/fixes pontuais)
+scratch/
