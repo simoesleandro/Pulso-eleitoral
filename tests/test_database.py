@@ -63,7 +63,7 @@ def test_schema_creates_tables():
         assert table in tables, f"Tabela '{table}' não foi criada pelo schema.sql"
 
 def test_seed_inserts_institutos():
-    """Teste 3: Verifica se o seed.sql insere os 7 institutos corretamente no banco."""
+    """Teste 3: Verifica se o seed.sql insere os 14 institutos corretamente no banco."""
     # Inicializa o banco rodando o schema e forçando a carga do seed.sql
     init_db(force_seed=True)
     
@@ -73,10 +73,12 @@ def test_seed_inserts_institutos():
     institutos = cursor.fetchall()
     conn.close()
     
-    assert len(institutos) == 9
+    assert len(institutos) == 14
     nomes_esperados = [
-        'Datafolha', 'Ibope/IPEC', 'Quaest', 'Genial/Quaest', 
-        'Atlas', 'Paraná', 'Real Time'
+        'Datafolha', 'Ibope/IPEC', 'Quaest', 'Genial/Quaest',
+        'Atlas', 'Paraná', 'Real Time', 'Nexus/BTG Pactual', 'Verita',
+        'Futura Inteligência', 'PoderData', 'Meio/Ideia', 'Vox Populi',
+        'Instituto Gerp'
     ]
     for idx, nome in enumerate(nomes_esperados):
         assert institutos[idx]['nome'] == nome

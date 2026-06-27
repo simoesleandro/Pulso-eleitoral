@@ -48,7 +48,7 @@ def test_dashboard_route(client):
     setup_db_with_seed()
     response = client.get('/dashboard')
     assert response.status_code == 200
-    assert b"PULSO ELEITORAL" in response.data
+    assert b"Pulso Eleitoral" in response.data
 
 def test_api_presidente(client):
     """Testa o endpoint público /api/pesquisas/presidente com dados do seed."""
@@ -103,7 +103,7 @@ def test_api_institutos(client):
     assert response.status_code == 200
     data = response.json
     assert 'institutos' in data
-    assert len(data['institutos']) == 9
+    assert len(data['institutos']) == 14
     
     # Verifica a estrutura do primeiro item
     first = data['institutos'][0]
@@ -134,7 +134,8 @@ def test_empty_database_handling(client):
         "percentuais": [],
         "data_coleta": None,
         "instituto": None,
-        "margem_erro": None
+        "margem_erro": None,
+        "tipo": None
     }
     
     # 3. Histórico
@@ -191,7 +192,10 @@ def test_api_alertas(client):
 def test_api_media_agregada(client):
     """Testa GET /api/media-agregada?cargo=presidente retorna candidatos."""
     setup_db_with_seed()
-    response = client.get('/api/media-agregada?cargo=presidente')
+    # Janela larga o bastante para cobrir o seed (data máx 2026-06-10) independente do relógio
+    import datetime
+    dias = (datetime.date.today() - datetime.date(2026, 6, 10)).days + 30
+    response = client.get(f'/api/media-agregada?cargo=presidente&dias={max(dias, 30)}')
     assert response.status_code == 200
     data = response.json
     assert 'candidatos' in data

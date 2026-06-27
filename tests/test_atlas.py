@@ -74,37 +74,8 @@ def test_inferir_cargo():
     # Presidente padrão
     assert collector._inferir_cargo("https://atlaspolitico.com.br/release-y", "Texto sobre presidenciáveis") == 'presidente'
 
-@patch('collectors.atlas.AtlasCollector._get_page')
-def test_fetch_with_mock_requests(mock_get_page):
-    """Testa que fetch() integra o fluxo de listagem e parsing de releases."""
+def test_fetch_desabilitado_retorna_vazio():
+    """Atlas está desabilitado (domínio atlaspolitico.com.br fora do ar/DNS).
+    fetch() deve retornar [] sem crashar enquanto o coletor estiver desligado."""
     collector = AtlasCollector("dummy_path")
-    
-    # Primeira chamada do fetch: obtém listagem
-    # Segunda chamada do fetch: obtém o release 1
-    mock_get_page.side_effect = [
-        # Listagem
-        """
-        <html>
-          <body>
-            <a href="https://atlaspolitico.com.br/pesquisa-presidente-2026">Link</a>
-          </body>
-        </html>
-        """,
-        # Release 1
-        """
-        <html>
-          <body>
-            <p>Lula: 38% | Bolsonaro: 32%</p>
-            <p>15 de junho de 2026</p>
-            <p>2.000 entrevistados</p>
-            <p>margem de erro de 2%</p>
-          </body>
-        </html>
-        """
-    ]
-    
-    data = collector.fetch()
-    assert len(data) == 2
-    candidatos = {r['candidato']: r['percentual'] for r in data}
-    assert candidatos['Lula'] == 38.0
-    assert candidatos['Bolsonaro'] == 32.0
+    assert collector.fetch() == []

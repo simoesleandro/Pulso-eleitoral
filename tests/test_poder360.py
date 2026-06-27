@@ -77,24 +77,11 @@ def test_parse_instituto_correto():
     for r in results:
         assert r['instituto_id'] == 3
 
-@patch('collectors.poder360.Poder360Collector._get_page')
-def test_fetch_com_mock(mock_get_page):
-    """Testa fetch() com requests mockado retornando HTML controlado."""
+def test_fetch_desabilitado_retorna_vazio():
+    """Poder360 está desabilitado (agregador migrou para produto pago — Poder Drive).
+    fetch() deve retornar [] sem crashar enquanto o coletor estiver desligado."""
     collector = Poder360Collector("dummy_path")
-    
-    # Primeira chamada do fetch: obtém a listagem
-    # Segunda chamada do fetch: obtém o release
-    mock_get_page.side_effect = [
-        MOCK_LISTING_HTML,
-        MOCK_RELEASE_HTML,
-        MOCK_RELEASE_HTML
-    ]
-    
-    data = collector.fetch()
-    assert len(data) == 8
-    candidatos = {r['candidato']: r['percentual'] for r in data}
-    assert candidatos['Lula'] == 41.0
-    assert candidatos['Bolsonaro'] == 35.0
+    assert collector.fetch() == []
 
 def test_fetch_vazio_nao_crasha():
     """Testa que fetch() com html vazio retorna [] e não crasha."""

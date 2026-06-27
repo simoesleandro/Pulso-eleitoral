@@ -17,7 +17,7 @@ def mock_gemini(request, monkeypatch):
     if "test_gemini_extractor" in request.node.nodeid:
         return
 
-    def fake_extrair(texto, fonte_url=""):
+    def fake_extrair(texto, fonte_url="", permite_regional=False):
         # Mini-parser simulando o Gemini para os outros testes passarem
         candidatos = []
         if "Lula" in texto:
@@ -49,6 +49,7 @@ def mock_gemini(request, monkeypatch):
             "data": "2026-06-15" if "15 de junho" in texto else ("2026-06-10" if "10 de junho" in texto else "2026-05-06"),
             "tamanho_amostra": 2000,
             "margem_erro": 2.0,
+            "tipo": "espontanea",
             "candidatos": candidatos
         }
         
