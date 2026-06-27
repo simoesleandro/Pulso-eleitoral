@@ -131,8 +131,10 @@ def test_insert_and_read_research():
     
     conn.close()
 
-def test_auth_blocks_routes_without_login(client):
+def test_auth_blocks_routes_without_login(client, monkeypatch):
     """Teste 5: Verifica se a autenticação bloqueia rotas protegidas e permite acesso a rotas livres."""
+    # Define a senha admin explicitamente (não depende de .env / CI)
+    monkeypatch.setenv('ADMIN_PASS', 'senha-de-teste-005')
     # Inicializa o banco de testes
     init_db(force_seed=True)
     
@@ -153,7 +155,7 @@ def test_auth_blocks_routes_without_login(client):
     assert b"Usu\xc3\xa1rio ou senha incorretos" in response_login_fail.data
     
     # Login correto deve redirecionar (302) para a raiz (/) e dar acesso
-    response_login_success = client.post('/login', data={'username': 'admin', 'password': 'admin123'})
+    response_login_success = client.post('/login', data={'username': 'admin', 'password': 'senha-de-teste-005'})
     assert response_login_success.status_code == 302
     assert response_login_success.headers['Location'].endswith('/')
     

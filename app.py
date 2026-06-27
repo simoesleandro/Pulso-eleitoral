@@ -2,6 +2,8 @@ import os
 import datetime
 import atexit
 import json
+import hmac
+import sqlite3
 from functools import wraps
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
 from flask_caching import Cache
@@ -16,7 +18,20 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configurações do Flask
-app.secret_key = os.getenv('SECRET_KEY', 'default-session-secret-key-9999')
+_secret = os.getenv('SECRET_KEY')
+if not _secret:
+    if os.getenv('FLY_APP_NAME'):
+        raise RuntimeError(
+            "SECRET_KEY não configurada em produção. "
+            "Defina com: flyctl secrets set SECRET_KEY=<string aleatória>"
+        )
+    import secrets as _secrets
+    _secret = _secrets.token_hex(32)
+    app.logger.warning(
+        "SECRET_KEY não definida — usando chave efêmera (sessões não persistem "
+        "entre reinícios). Defina SECRET_KEY no .env para desenvolvimento estável."
+    )
+app.secret_key = _secret
 
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 
@@ -716,17 +731,42 @@ def admin_coletar_url():
 
 @app.route('/admin/apply-db', methods=['POST'])
 def apply_db():
-    if request.headers.get('X-Admin-Pass') != os.getenv('ADMIN_PASS'):
-        return jsonify({'error': 'unauthorized'}), 401
     import shutil
+
+    # 1. Auth fail-closed: sem ADMIN_PASS configurada, recusa tudo.
+    expected = os.getenv('ADMIN_PASS')
+    provided = request.headers.get('X-Admin-Pass')
+    if not expected or not provided or not hmac.compare_digest(provided, expected):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    # 2. Validação do nome: basename simples, sem separadores de caminho.
     body = request.get_json(silent=True) or {}
     filename = body.get('filename', '')
-    if not (filename.startswith('pulso_upload_') and filename.endswith('.db')):
+    if (os.path.basename(filename) != filename
+            or not filename.startswith('pulso_upload_')
+            or not filename.endswith('.db')):
         return jsonify({'error': 'filename inválido'}), 400
+
     new_db = f'/data/{filename}'
     current_db = '/data/pulso.db'
     if not os.path.exists(new_db):
         return jsonify({'error': f'{filename} não encontrado'}), 404
+
+    # 3. Validação de integridade: precisa ser um SQLite válido com a tabela 'pesquisas'.
+    try:
+        conn = sqlite3.connect(new_db)
+        try:
+            ok = conn.execute("PRAGMA integrity_check").fetchone()
+            has_tabela = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='pesquisas'"
+            ).fetchone()
+        finally:
+            conn.close()
+    except sqlite3.DatabaseError:
+        ok, has_tabela = None, None
+    if not ok or ok[0] != 'ok' or not has_tabela:
+        return jsonify({'error': 'arquivo não é um banco SQLite válido do Pulso'}), 422
+
     shutil.move(new_db, current_db)
     return jsonify({'ok': True, 'msg': 'banco aplicado'})
 

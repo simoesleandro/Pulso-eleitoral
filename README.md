@@ -203,7 +203,7 @@ python scripts/sync_db.py
 | `GEMINI_API_KEY` | Chave API Google Gemini | — |
 | `TELEGRAM_BOT_TOKEN` | Token do bot Telegram | — |
 | `TELEGRAM_CHAT_ID` | Chat ID para notificações | — |
-| `ADMIN_PASS` | Senha do usuário admin | `pulso2026` |
+| `ADMIN_PASS` | Senha do usuário admin | — (obrigatória; se ausente, uma senha aleatória é gerada e descartada) |
 | `SECRET_KEY` | Chave secreta Flask session | — |
 
 > Lista completa em / Full list in: [`.env.example`](.env.example)

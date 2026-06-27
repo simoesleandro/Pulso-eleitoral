@@ -1,8 +1,11 @@
 import os
 import json
+import logging
 import sqlite3
 from contextlib import contextmanager
 import bcrypt
+
+logger = logging.getLogger(__name__)
 
 # Definindo o caminho do banco de dados (data/pulso.db ou data/pulso_test.db em testes)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -67,7 +70,15 @@ def init_db(force_seed=False):
     if count_usuarios == 0:
         from dotenv import load_dotenv
         load_dotenv()
-        admin_pass = os.getenv('ADMIN_PASS', 'pulso2026')
+        admin_pass = os.getenv('ADMIN_PASS')
+        if not admin_pass:
+            import secrets
+            admin_pass = secrets.token_urlsafe(16)
+            logger.warning(
+                "ADMIN_PASS não configurada — senha admin aleatória gerada e "
+                "descartada. Defina ADMIN_PASS e recrie o usuário admin para ter "
+                "uma senha conhecida."
+            )
         admin_user = 'admin'
         password_hash = bcrypt.hashpw(admin_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         cursor.execute(
