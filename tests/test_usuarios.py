@@ -1,5 +1,9 @@
 import os
 os.environ['TESTING'] = 'True'
+# Fixa uma senha admin conhecida ANTES do seed (init_db lê ADMIN_PASS no seed).
+# Sem isso, em ambientes sem .env/secret (ex.: CI) o admin é semeado com senha
+# aleatória (plano 005 removeu o default 'pulso2026') e os testes de login falham.
+os.environ.setdefault('ADMIN_PASS', 'test-admin-pass')
 
 import pytest
 from database import (
