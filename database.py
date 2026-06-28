@@ -172,22 +172,34 @@ def buscar_ultimo_log() -> dict | None:
     finally:
         conn.close()
 
-def get_pesquisas_mais_recentes(cargo: str) -> list[dict]:
-    """Retorna os dados da pesquisa mais recente para o cargo e suas intenções de voto."""
+def get_pesquisas_mais_recentes(cargo: str, tipo: str = 'estimulada') -> list[dict]:
+    """Retorna a pesquisa mais recente do cargo (do tipo solicitado) e suas intenções.
+
+    tipo='estimulada' inclui também registros legados sem tipo (NULL);
+    tipo='espontanea' casa exatamente. A pesquisa escolhida é a mais recente
+    que contenha intenções do tipo pedido.
+    """
+    if tipo == 'espontanea':
+        filtro_int = "int.tipo = 'espontanea'"
+        filtro_sub = "i2.tipo = 'espontanea'"
+    else:
+        filtro_int = "(int.tipo = 'estimulada' OR int.tipo IS NULL)"
+        filtro_sub = "(i2.tipo = 'estimulada' OR i2.tipo IS NULL)"
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        # Encontra a pesquisa mais recente
-        cursor.execute("""
+        # Encontra a pesquisa mais recente que tenha intenções do tipo pedido
+        cursor.execute(f"""
             SELECT p.id, p.data_pesquisa, p.margem_erro, p.tamanho_amostra, p.fonte_url, inst.nome AS instituto,
                    int.candidato, int.percentual, int.partido, int.tipo
             FROM pesquisas p
             JOIN institutos inst ON p.instituto_id = inst.id
             JOIN intencoes int ON int.pesquisa_id = p.id
-            WHERE p.cargo = ? AND p.id = (
-                SELECT id FROM pesquisas
-                WHERE cargo = ?
-                ORDER BY data_pesquisa DESC, id DESC
+            WHERE p.cargo = ? AND {filtro_int} AND p.id = (
+                SELECT p2.id FROM pesquisas p2
+                JOIN intencoes i2 ON i2.pesquisa_id = p2.id
+                WHERE p2.cargo = ? AND {filtro_sub}
+                ORDER BY p2.data_pesquisa DESC, p2.id DESC
                 LIMIT 1
             )
             ORDER BY int.percentual DESC
@@ -822,26 +834,35 @@ def get_top_candidatos(cargo: str, n: int = 3) -> list[str]:
     return candidatos[:n]
 
 
-def get_historico_multi(candidatos: list[str], cargo: str) -> list[dict]:
-    """Retorna série histórica de múltiplos candidatos para o cargo."""
+def get_historico_multi(candidatos: list[str], cargo: str, tipo: str = 'estimulada') -> list[dict]:
+    """Retorna série histórica de múltiplos candidatos para o cargo.
+
+    Cada ponto inclui `margem_erro` para a renderização da banda de incerteza.
+    tipo='estimulada' inclui registros legados sem tipo (NULL); 'espontanea' é exato.
+    """
+    if tipo == 'espontanea':
+        filtro_tipo = "i.tipo = 'espontanea'"
+    else:
+        filtro_tipo = "(i.tipo = 'estimulada' OR i.tipo IS NULL)"
     candidatos = [c for c in candidatos if _e_candidato(c)]
     series = []
     with get_db() as conn:
         for idx, candidato in enumerate(candidatos):
-            rows = conn.execute("""
-                SELECT p.data_pesquisa AS data, i.percentual, inst.nome AS instituto
+            rows = conn.execute(f"""
+                SELECT p.data_pesquisa AS data, i.percentual, p.margem_erro, inst.nome AS instituto
                 FROM intencoes i
                 JOIN pesquisas p ON i.pesquisa_id = p.id
                 JOIN institutos inst ON p.instituto_id = inst.id
                 WHERE i.candidato = ? AND p.cargo = ?
-                AND (i.tipo = 'estimulada' OR i.tipo IS NULL)
+                AND {filtro_tipo}
                 ORDER BY p.data_pesquisa ASC
             """, (candidato, cargo)).fetchall()
             cor = _CANDIDATE_COLORS.get(candidato, _FALLBACK_COLORS[idx % len(_FALLBACK_COLORS)])
             series.append({
                 "candidato": candidato,
                 "cor": cor,
-                "dados": [{"data": r["data"], "percentual": r["percentual"], "instituto": r["instituto"]} for r in rows]
+                "dados": [{"data": r["data"], "percentual": r["percentual"],
+                           "margem_erro": r["margem_erro"], "instituto": r["instituto"]} for r in rows]
             })
     return series
 

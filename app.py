@@ -528,7 +528,10 @@ def metodologia():
 def api_pesquisas_presidente():
     """Retorna dados consolidados da pesquisa mais recente para Presidente."""
     from database import get_pesquisas_mais_recentes
-    rows = get_pesquisas_mais_recentes('presidente')
+    tipo = request.args.get('tipo', 'estimulada')
+    if tipo not in ('estimulada', 'espontanea'):
+        tipo = 'estimulada'
+    rows = get_pesquisas_mais_recentes('presidente', tipo)
     if not rows:
         return jsonify({
             "candidatos": [],
@@ -591,12 +594,15 @@ def api_pesquisas_historico_multi():
     """Retorna séries históricas de múltiplos candidatos para um cargo."""
     from database import get_historico_multi, get_top_candidatos
     cargo = request.args.get('cargo', 'presidente')
+    tipo = request.args.get('tipo', 'estimulada')
+    if tipo not in ('estimulada', 'espontanea'):
+        tipo = 'estimulada'
     candidatos_param = request.args.get('candidatos', '')
     if candidatos_param:
         candidatos = [c.strip() for c in candidatos_param.split(',') if c.strip()]
     else:
         candidatos = get_top_candidatos(cargo, n=3)
-    series = get_historico_multi(candidatos, cargo)
+    series = get_historico_multi(candidatos, cargo, tipo)
     return jsonify({"cargo": cargo, "series": series})
 
 @app.route('/api/media-agregada')

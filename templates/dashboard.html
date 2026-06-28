@@ -23,6 +23,14 @@
     .pe-tooltip-wrap:hover .pe-tooltip { visibility:visible; opacity:1; }
     .pe-badge--espontanea { background:#EAECEF; color:#5a7184; }
     .pe-badge--estimulada { background:#E8F0FE; color:#1A56DB; }
+    .pe-tipo-toggle { display:inline-flex; border:0.5px solid rgba(10,34,64,0.12); border-radius:6px; overflow:hidden; }
+    .pe-tipo-btn {
+      background:transparent; border:none; padding:5px 12px;
+      font-size:12px; font-family:'Inter',sans-serif; color:#5a7184;
+      cursor:pointer; transition:background .15s, color .15s;
+    }
+    .pe-tipo-btn:not(:last-child) { border-right:0.5px solid rgba(10,34,64,0.12); }
+    .pe-tipo-btn--active { background:#E8F0FE; color:#1A56DB; font-weight:500; }
   </style>
 </head>
 <body class="pe-page">
@@ -96,7 +104,13 @@
       </div>
 
       <!-- Pesquisa Mais Recente -->
-      <h3 class="pe-section__title" style="font-size:13px;">Pesquisa Mais Recente</h3>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <h3 class="pe-section__title" style="font-size:13px;">Pesquisa Mais Recente</h3>
+        <div id="pres-tipo-toggle" class="pe-tipo-toggle">
+          <button type="button" class="pe-tipo-btn pe-tipo-btn--active" data-tipo="estimulada" onclick="setTipoPres('estimulada')">Estimulada</button>
+          <button type="button" class="pe-tipo-btn" data-tipo="espontanea" onclick="setTipoPres('espontanea')">Espontânea</button>
+        </div>
+      </div>
       <div class="pe-grid-2" style="margin-bottom:24px;">
         <div class="pe-card">
           <div id="pres-tipo-chart" style="margin-bottom:8px;"></div>
@@ -232,6 +246,24 @@
     let chartPres = null;
     let chartGov = null;
     let chartHist = null;
+    let tipoPres = 'estimulada';  // tipo selecionado no toggle da seção Presidente
+
+    // Extrai a margem de erro numérica (aceita "2,0", "± 2.5 pp", null → 0)
+    function parseMargem(v) {
+      const n = parseFloat(String(v ?? '').replace(',', '.').match(/[\d.]+/)?.[0] ?? '');
+      return isNaN(n) ? 0 : n;
+    }
+
+    // Alterna entre pesquisa estimulada/espontânea e recarrega gráfico + dados
+    function setTipoPres(tipo) {
+      if (tipo === tipoPres) return;
+      tipoPres = tipo;
+      document.querySelectorAll('#pres-tipo-toggle .pe-tipo-btn').forEach(b =>
+        b.classList.toggle('pe-tipo-btn--active', b.dataset.tipo === tipo)
+      );
+      carregarPresidente();
+      carregarHistoricoMulti();
+    }
 
     const fallbackPres = {
       candidatos: ["Lula", "Flávio Bolsonaro", "Ciro Gomes", "Simone Tebet"],
@@ -280,7 +312,7 @@
     async function carregarPresidente() {
       let data = fallbackPres;
       try {
-        const res = await fetch('/api/pesquisas/presidente');
+        const res = await fetch('/api/pesquisas/presidente?tipo=' + tipoPres);
         if (res.ok) {
           const json = await res.json();
           if (json.candidatos && json.candidatos.length > 0) data = json;
@@ -390,7 +422,7 @@
     let ultimasSeries = [];
 
     async function carregarHistoricoMulti() {
-      const res = await fetch('/api/pesquisas/historico-multi?cargo=presidente&candidatos=Lula,Fl%C3%A1vio%20Bolsonaro');
+      const res = await fetch('/api/pesquisas/historico-multi?cargo=presidente&candidatos=Lula,Fl%C3%A1vio%20Bolsonaro&tipo=' + tipoPres);
       const data = await res.json();
       ultimasSeries = data.series;
 
@@ -409,13 +441,37 @@
       if (chartHistoricoMulti) chartHistoricoMulti.destroy();
 
       const todasDatas = [...new Set(series.flatMap(s => s.dados.map(d => d.data)))].sort();
-      const datasets = series.map(s => ({
-        label: s.candidato,
-        data: todasDatas.map(dt => { const p = s.dados.find(d => d.data === dt); return p ? p.percentual : null; }),
-        borderColor: s.cor, backgroundColor: s.cor + '18', borderWidth: 2,
-        pointBackgroundColor: s.cor, pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
-        pointRadius: 5, pointHoverRadius: 7, tension: 0.2, spanGaps: false,
-      }));
+
+      // Para cada candidato: banda de incerteza (linha±margem) + linha principal.
+      // A banda são 2 datasets ocultos (limite inferior e superior) com fill entre eles.
+      const datasets = [];
+      series.forEach(s => {
+        const porData = {};
+        s.dados.forEach(d => { porData[d.data] = d; });
+        const pct   = todasDatas.map(dt => porData[dt] ? porData[dt].percentual : null);
+        const lower = todasDatas.map(dt => { const d = porData[dt]; return d ? d.percentual - parseMargem(d.margem_erro) : null; });
+        const upper = todasDatas.map(dt => { const d = porData[dt]; return d ? d.percentual + parseMargem(d.margem_erro) : null; });
+
+        const idxLower = datasets.length;
+        datasets.push({
+          label: '_band_lower_' + s.candidato, data: lower, _band: true,
+          borderColor: 'transparent', backgroundColor: 'transparent',
+          borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false,
+          tension: 0.2, spanGaps: false,
+        });
+        datasets.push({
+          label: '_band_upper_' + s.candidato, data: upper, _band: true,
+          borderColor: 'transparent', backgroundColor: s.cor + '26',  // ~0.15 de opacidade
+          borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: idxLower,
+          tension: 0.2, spanGaps: false,
+        });
+        datasets.push({
+          label: s.candidato, data: pct,
+          borderColor: s.cor, backgroundColor: s.cor + '18', borderWidth: 2,
+          pointBackgroundColor: s.cor, pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
+          pointRadius: 5, pointHoverRadius: 7, tension: 0.2, spanGaps: false,
+        });
+      });
 
       chartHistoricoMulti = new Chart(ctx, {
         type: 'line',
@@ -425,11 +481,19 @@
           interaction: { mode: 'index', intersect: false },
           plugins: {
             datalabels: { display: false },
-            legend: { display: true, position: 'top', labels: { color: '#0A2240', font: { family: "'Inter', sans-serif", size: 12 }, usePointStyle: true, padding: 16 } },
+            legend: { display: true, position: 'top', labels: { filter: item => !item.text.startsWith('_band'), color: '#0A2240', font: { family: "'Inter', sans-serif", size: 12 }, usePointStyle: true, padding: 16 } },
             tooltip: {
               backgroundColor: '#FFFFFF', titleColor: '#0A2240', bodyColor: '#5a7184',
               borderColor: 'rgba(10,34,64,0.1)', borderWidth: 1, padding: 12,
-              callbacks: { label: c => c.parsed.y !== null ? ` ${c.dataset.label}: ${c.parsed.y.toFixed(1)}%` : null }
+              filter: item => !item.dataset._band,
+              callbacks: {
+                label: c => {
+                  if (c.parsed.y === null) return null;
+                  const d = ultimasSeries.find(s => s.candidato === c.dataset.label)?.dados?.find(x => formatarData(x.data) === c.label);
+                  const m = d ? parseMargem(d.margem_erro) : 0;
+                  return ` ${c.dataset.label}: ${c.parsed.y.toFixed(1)}%${m > 0 ? ` (±${m}pp)` : ''}`;
+                }
+              }
             }
           },
           scales: {
