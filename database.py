@@ -284,11 +284,24 @@ def detectar_variacoes_bruscas(cargo: str = 'presidente',
 
 
 def get_media_agregada(cargo: str, dias: int = 30) -> dict:
-    """Retorna média agregada dos percentuais dos últimos `dias` dias por candidato."""
+    """Retorna média agregada (poll-of-polls ponderado) por candidato.
+
+    Em vez de média simples de todas as pesquisas — que deixaria um instituto
+    prolífico dominar — o cálculo:
+      1. Usa SOMENTE a pesquisa mais recente de cada instituto (1 voto/instituto);
+      2. Pondera por tamanho de amostra (peso = amostra, ou 1000 se ausente);
+      3. Pondera por recência via decaimento exponencial (0.9 ^ dias);
+      4. score = peso_amostra * peso_recencia;
+      5. média ponderada = SUM(percentual * score) / SUM(score).
+
+    A variação no período continua sendo medida sobre todas as pesquisas da
+    janela (sinal temporal), independente da deduplicação usada na média.
+    """
     data_limite = (date.today() - timedelta(days=dias)).isoformat()
     with get_db() as conn:
         rows = conn.execute("""
-            SELECT i.candidato, i.percentual, p.data_pesquisa, inst.nome AS instituto
+            SELECT i.candidato, i.percentual, p.id AS pesquisa_id, p.data_pesquisa,
+                   p.tamanho_amostra, inst.nome AS instituto
             FROM intencoes i
             JOIN pesquisas p ON i.pesquisa_id = p.id
             JOIN institutos inst ON p.instituto_id = inst.id
@@ -303,10 +316,40 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
             ORDER BY i.candidato, p.data_pesquisa
         """, (cargo, data_limite)).fetchall()
 
-    # Agrupa por candidato
+    # Lista completa por candidato (para a variação temporal e o filtro de ruído)
     por_candidato: dict[str, list] = {}
+    # Estrutura de pesquisas: pesquisa_id -> {instituto, data, amostra, cands: {nome: pct}}
+    polls: dict[int, dict] = {}
     for r in rows:
         por_candidato.setdefault(r['candidato'], []).append(r)
+        poll = polls.setdefault(r['pesquisa_id'], {
+            'instituto': r['instituto'],
+            'data': r['data_pesquisa'],
+            'amostra': r['tamanho_amostra'] or 0,
+            'cands': {},
+        })
+        poll['cands'][r['candidato']] = r['percentual']
+
+    # 1. Seleciona a pesquisa mais recente de cada instituto (desempate por id)
+    recente_por_instituto: dict[str, int] = {}
+    for pid, poll in polls.items():
+        atual = recente_por_instituto.get(poll['instituto'])
+        if atual is None or (poll['data'], pid) > (polls[atual]['data'], atual):
+            recente_por_instituto[poll['instituto']] = pid
+    pids_selecionados = set(recente_por_instituto.values())
+
+    # 2-4. Score de cada pesquisa selecionada = peso_amostra * peso_recencia
+    hoje = date.today()
+    scores: dict[int, float] = {}
+    for pid in pids_selecionados:
+        poll = polls[pid]
+        peso_amostra = poll['amostra'] if poll['amostra'] and poll['amostra'] > 0 else 1000
+        try:
+            dias_desde = max(0, (hoje - date.fromisoformat(poll['data'])).days)
+        except (ValueError, TypeError):
+            dias_desde = 0
+        peso_recencia = 0.9 ** dias_desde
+        scores[pid] = peso_amostra * peso_recencia
 
     data_meio = (date.today() - timedelta(days=dias // 2)).isoformat()
 
@@ -317,10 +360,27 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
     for candidato, entradas in por_candidato.items():
         if len(entradas) < 2:
             continue
-        percentuais = [e['percentual'] for e in entradas]
-        for e in entradas:
-            institutos_set.add(e['instituto'])
 
+        # 5. Média ponderada sobre as pesquisas selecionadas (1 por instituto)
+        num = 0.0
+        den = 0.0
+        percentuais_sel = []
+        for pid in pids_selecionados:
+            poll = polls[pid]
+            if candidato not in poll['cands']:
+                continue
+            pct = poll['cands'][candidato]
+            s = scores[pid]
+            num += pct * s
+            den += s
+            percentuais_sel.append(pct)
+            institutos_set.add(poll['instituto'])
+
+        if den == 0 or not percentuais_sel:
+            continue
+        media_ponderada = num / den
+
+        # Variação no período: todas as pesquisas da janela (sinal temporal)
         recentes = [e['percentual'] for e in entradas if e['data_pesquisa'] >= data_meio]
         anteriores = [e['percentual'] for e in entradas if e['data_pesquisa'] < data_meio]
         if recentes and anteriores:
@@ -330,13 +390,13 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
 
         candidatos_resultado.append({
             "candidato": candidato,
-            "media": round(mean(percentuais), 1),
-            "min": round(min(percentuais), 1),
-            "max": round(max(percentuais), 1),
+            "media": round(media_ponderada, 1),
+            "min": round(min(percentuais_sel), 1),
+            "max": round(max(percentuais_sel), 1),
             "variacao_30d": variacao,
-            "pesquisas_count": len(percentuais),
+            "pesquisas_count": len(percentuais_sel),
         })
-        total_pesquisas += len(percentuais)
+        total_pesquisas += len(percentuais_sel)
 
     candidatos_resultado.sort(key=lambda x: x['media'], reverse=True)
 
