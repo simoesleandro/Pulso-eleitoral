@@ -7,6 +7,7 @@ import sqlite3
 from functools import wraps
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
 from flask_caching import Cache
+from flask_wtf.csrf import CSRFProtect
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -34,6 +35,20 @@ if not _secret:
 app.secret_key = _secret
 
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
+
+# Flags de cookie de sessão (defesa contra XSS/MITM/CSRF).
+# Secure só em produção (Fly serve HTTPS); em dev local sobre HTTP ficaria inutilizável.
+_em_producao = bool(os.getenv('FLY_APP_NAME'))
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=_em_producao,
+)
+
+# Proteção CSRF (Flask-WTF). Desativada apenas sob TESTING para manter a suíte verde
+# (o test client não tem como obter token); ativa em dev e produção.
+app.config['WTF_CSRF_ENABLED'] = os.getenv('TESTING') != 'True'
+csrf = CSRFProtect(app)
 
 # Inicializa o banco de dados
 init_db()
@@ -122,6 +137,26 @@ def require_login():
         
     if not session.get('logged_in'):
         return redirect(url_for('login'))
+
+@app.after_request
+def aplicar_security_headers(response):
+    """Adiciona cabeçalhos de segurança HTTP a todas as respostas (defesa em profundidade)."""
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # CSP alinhada ao que os templates realmente carregam: scripts/estilos inline,
+    # Chart.js/Tabler via jsDelivr e Google Fonts. connect-src 'self' (todas as APIs são internas).
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+        "img-src 'self' data:; "
+        "connect-src 'self'"
+    )
+    return response
 
 @app.route('/')
 def index():
@@ -653,6 +688,41 @@ _COLETORES_DISPONIVEIS = {
 }
 
 
+def _url_segura(url: str) -> bool:
+    """Guarda anti-SSRF: aceita só http(s) e bloqueia hosts internos/privados/loopback.
+
+    O coletor faz fetch server-side de uma URL fornecida pelo admin; sem isso, a URL
+    poderia apontar para metadados de nuvem, localhost ou a rede interna do Fly.
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    if parsed.scheme not in ('http', 'https') or not parsed.hostname:
+        return False
+
+    host = parsed.hostname
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except Exception:
+        return False
+
+    for info in infos:
+        ip_str = info[4][0]
+        try:
+            ip = ipaddress.ip_address(ip_str)
+        except ValueError:
+            return False
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            return False
+    return True
+
+
 def _coletar_url_especifica(url: str, coletor_key: str) -> dict:
     """Instancia o coletor, faz fetch da URL, salva no banco e retorna delta de registros."""
     import importlib
@@ -721,6 +791,8 @@ def admin_coletar_url():
 
     if not url or not url.startswith('http'):
         return jsonify({'erro': 'URL inválida — deve começar com http(s)://'}), 400
+    if not _url_segura(url):
+        return jsonify({'erro': 'URL recusada: aponta para host interno/privado ou esquema não permitido.'}), 400
     if not coletor_key:
         return jsonify({'erro': 'Selecione um coletor.'}), 400
 
@@ -730,6 +802,7 @@ def admin_coletar_url():
 
 
 @app.route('/admin/apply-db', methods=['POST'])
+@csrf.exempt  # Autenticado por header X-Admin-Pass (hmac), chamado headless pelo sync_db.py — sem cookie/sessão, logo sem risco de CSRF.
 def apply_db():
     import shutil
 

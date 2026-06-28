@@ -137,6 +137,7 @@
                     <!-- Botão Toggle Status -->
                     <form action="/admin/usuarios/{{ user.id }}/toggle" method="POST" style="margin: 0;"
                           onsubmit="return confirm('Deseja realmente alterar o status de ativação do usuário \'{{ user.username }}\'?');">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                       <button type="submit" class="pe-btn pe-btn--secondary" style="padding: 4px 8px; font-size: 11px;">
                         {% if user.ativo == 1 %}Desativar{% else %}Ativar{% endif %}
                       </button>
@@ -145,6 +146,7 @@
                     <!-- Botão Excluir -->
                     <form action="/admin/usuarios/{{ user.id }}/remover" method="POST" style="margin: 0;"
                           onsubmit="return confirm('Tem certeza que deseja excluir o usuário \'{{ user.username }}\'? Esta ação é irreversível.');">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                       <button type="submit" class="pe-btn pe-btn--danger" style="padding: 4px 8px; font-size: 11px;">
                         Excluir
                       </button>
@@ -166,6 +168,7 @@
       <div class="pe-card" style="height: fit-content;">
         <div class="pe-card__title" style="margin-bottom: var(--pe-space-4);">Novo Usuário</div>
         <form id="criar-usuario-form" action="/admin/usuarios/criar" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group">
             <label class="form-label" for="username">Usuário (Username)</label>
             <input class="form-input" type="text" id="username" name="username" required

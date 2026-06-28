@@ -46,12 +46,26 @@ testes) e por fim **002** (gate de CI, que só faz sentido com a suíte verde).
   comportamento by-design (uma URL de release = uma pesquisa, atualizada in-place).
   Não tratar sem confirmar a intenção do produto.
 
+## Hardening de segurança — 2ª rodada (2026-06-27) — DONE
+
+Auditoria de segurança no padrão Sentinela RJ, executada e deployada:
+- **DONE** — CSRF (Flask-WTF `CSRFProtect`) em todas as rotas de escrita com
+  sessão; `/admin/apply-db` fica `@csrf.exempt` (auth por header `X-Admin-Pass`,
+  chamado headless pelo `sync_db.py`). CSRF desligado só sob `TESTING`.
+- **DONE** — Flags de cookie: `HTTPONLY`, `SAMESITE=Lax`, `SECURE` (só em prod/Fly).
+- **DONE** — Headers HTTP via `after_request`: `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `X-XSS-Protection`, HSTS,
+  `Referrer-Policy: strict-origin-when-cross-origin` e CSP (permite jsDelivr,
+  Google Fonts e inline, que os templates usam).
+- **DONE** — Guarda anti-SSRF em `/admin/coletar-url` (`_url_segura`): só http(s),
+  bloqueia loopback/privado/link-local/reservado via resolução DNS.
+
+Auditoria de rotas POST/PATCH/DELETE: não há PATCH/DELETE; todas as rotas POST de
+escrita já tinham `@login_required` (apply-db usa auth por header). Sem rotas abertas.
+
 ## Achados auditados NÃO planejados (backlog, fora dos bundles escolhidos)
 
-Disponíveis para virar planos depois, se desejado:
-- CSRF + flags de cookie (`Secure`/`SameSite`) em rotas POST (médio).
-- Guarda anti-SSRF em `/admin/coletar-url` (médio, requer admin logado).
-- Headers de segurança HTTP (CSP, X-Frame-Options, HSTS).
+Ainda disponíveis para virar planos depois, se desejado:
 - Pin de dependências / lockfile (`requirements.txt` usa `>=`).
 - Deduplicar `_get_page`/dedup de links entre coletores.
 - `except Exception: pass` silenciosos em `database.py`.
