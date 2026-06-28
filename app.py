@@ -687,6 +687,34 @@ _COLETORES_DISPONIVEIS = {
     'quaest_regional':('collectors.quaest_regional',   'QuaestRegionalColetor'),
 }
 
+# Mapeia domínio → coletor. A chave é casada por sufixo no hostname, então
+# subdomínios (www., datafolha.folha.uol...) também batem.
+_DOMINIO_COLETOR = {
+    'gazetadopovo.com.br':          'gazetadopovo',
+    'cnnbrasil.com.br':             'cnn_brasil',
+    'datafolha.folha.uol.com.br':   'datafolha',
+    'quaest.com.br':                'quaest_regional',
+    'institutoverita.com.br':       'verita',
+}
+
+# Coletor genérico usado quando o domínio não é reconhecido (extrai via Gemini).
+_COLETOR_FALLBACK = 'gazetadopovo'
+
+
+def _detectar_coletor(url: str) -> str:
+    """Detecta a chave do coletor a partir do domínio da URL.
+
+    Casa por sufixo de hostname; se nenhum domínio conhecido bater, devolve o
+    coletor genérico (_COLETOR_FALLBACK)."""
+    try:
+        host = (urlparse(url).hostname or '').lower()
+    except Exception:
+        host = ''
+    for dominio, key in _DOMINIO_COLETOR.items():
+        if host == dominio or host.endswith('.' + dominio):
+            return key
+    return _COLETOR_FALLBACK
+
 
 def _url_segura(url: str) -> bool:
     """Guarda anti-SSRF: aceita só http(s) e bloqueia hosts internos/privados/loopback.
@@ -773,29 +801,19 @@ def _coletar_url_especifica(url: str, coletor_key: str) -> dict:
 @app.route('/admin/coletar-url', methods=['GET', 'POST'])
 @login_required
 def admin_coletar_url():
-    """Coleta uma URL específica com o coletor selecionado."""
+    """Coleta uma URL específica detectando o coletor pelo domínio da URL."""
     if request.method == 'GET':
-        coletores = [
-            ('datafolha',       'Datafolha'),
-            ('quaest',          'Quaest'),
-            ('gazetadopovo',    'Gazeta do Povo'),
-            ('cnn_brasil',      'CNN Brasil (Real Time Big Data)'),
-            ('verita',          'Verita'),
-            ('quaest_regional', 'Quaest Regional (WP API)'),
-        ]
-        return render_template('admin_coletar_url.html', coletores=coletores)
+        return render_template('admin_coletar_url.html')
 
     body = request.get_json(silent=True) or {}
     url = (body.get('url') or '').strip()
-    coletor_key = (body.get('coletor') or '').strip()
 
     if not url or not url.startswith('http'):
         return jsonify({'erro': 'URL inválida — deve começar com http(s)://'}), 400
     if not _url_segura(url):
         return jsonify({'erro': 'URL recusada: aponta para host interno/privado ou esquema não permitido.'}), 400
-    if not coletor_key:
-        return jsonify({'erro': 'Selecione um coletor.'}), 400
 
+    coletor_key = _detectar_coletor(url)
     resultado = _coletar_url_especifica(url, coletor_key)
     status = 200 if 'erro' not in resultado else 422
     return jsonify(resultado), status

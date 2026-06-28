@@ -54,10 +54,19 @@
     .cu-result.visible { display: block; }
     .cu-result--ok   { border-color: #22c55e; }
     .cu-result--erro { border-color: #ef4444; }
+    .cu-result--warn { border-color: #eab308; }
 
     .cu-result__title { font-size: 13px; font-weight: 500; margin-bottom: var(--pe-space-2); }
     .cu-result__title--ok   { color: #22c55e; }
     .cu-result__title--erro { color: #ef4444; }
+    .cu-result__title--warn { color: #eab308; }
+
+    .cu-result__msg {
+      font-size: 12px; line-height: 1.6;
+      color: var(--pe-text-secondary);
+      white-space: pre-line;
+      margin-top: var(--pe-space-2);
+    }
 
     .cu-kpis { display: flex; gap: var(--pe-space-6); flex-wrap: wrap; margin-top: var(--pe-space-3); }
     .cu-kpi { text-align: center; }
@@ -98,7 +107,7 @@
     <div style="margin-bottom: var(--pe-space-6);">
       <h1 class="pe-display">Coletar URL Específica</h1>
       <p class="pe-mono" style="margin-top: var(--pe-space-1); color: var(--pe-text-secondary);">
-        Cole uma URL de pesquisa eleitoral, selecione o coletor correspondente e dispare a extração imediata.
+        Cole uma URL de pesquisa eleitoral e dispare a extração imediata. O coletor é detectado automaticamente pelo domínio.
       </p>
     </div>
 
@@ -120,17 +129,6 @@
           >
         </div>
 
-        <!-- Coletor -->
-        <div class="cu-field">
-          <label class="cu-label" for="cu-coletor">Coletor</label>
-          <select id="cu-coletor" class="cu-input cu-select">
-            <option value="">— selecione o coletor —</option>
-            {% for key, label in coletores %}
-            <option value="{{ key }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-
         <!-- Ações -->
         <div class="cu-actions">
           <button id="cu-btn" class="pe-btn pe-btn--primary cu-btn">Coletar agora</button>
@@ -140,6 +138,7 @@
         <!-- Resultado -->
         <div id="cu-result" class="cu-result">
           <div id="cu-result-title" class="cu-result__title"></div>
+          <div id="cu-result-msg" class="cu-result__msg"></div>
           <div id="cu-kpis" class="cu-kpis"></div>
           <div id="cu-url-preview" class="cu-url-preview"></div>
         </div>
@@ -153,19 +152,15 @@
     const spinner  = document.getElementById('cu-spinner');
     const resultEl = document.getElementById('cu-result');
     const titleEl  = document.getElementById('cu-result-title');
+    const msgEl    = document.getElementById('cu-result-msg');
     const kpisEl   = document.getElementById('cu-kpis');
     const urlPrev  = document.getElementById('cu-url-preview');
 
     btn.addEventListener('click', async () => {
-      const url     = document.getElementById('cu-url').value.trim();
-      const coletor = document.getElementById('cu-coletor').value;
+      const url = document.getElementById('cu-url').value.trim();
 
       if (!url || !url.startsWith('http')) {
         showErro('URL inválida — deve começar com http:// ou https://');
-        return;
-      }
-      if (!coletor) {
-        showErro('Selecione um coletor antes de continuar.');
         return;
       }
 
@@ -180,7 +175,7 @@
             'Content-Type': 'application/json',
             'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
           },
-          body: JSON.stringify({ url, coletor }),
+          body: JSON.stringify({ url }),
         });
         const data = await res.json();
         if (data.erro) {
@@ -197,14 +192,43 @@
     });
 
     function showOk(data) {
+      const pesquisas = Number(data.pesquisas_salvas) || 0;
+      const intencoes = Number(data.intencoes_salvas) || 0;
+      const regionais = Number(data.regionais_salvas) || 0;
+
+      // Nada extraído: aviso explicativo em vez de KPIs zerados.
+      if (pesquisas === 0 && intencoes === 0 && regionais === 0) {
+        showWarn(
+          'Nenhum dado extraído',
+          'Nenhum dado extraído. Possíveis motivos:\n' +
+          '• O conteúdo é um artigo de análise, não um release de pesquisa\n' +
+          '• Os percentuais de intenção de voto não estão no texto\n' +
+          '• O instituto não foi reconhecido pelo extrator\n' +
+          'Verifique se a URL contém dados de pesquisa eleitoral com percentuais.',
+          data
+        );
+        return;
+      }
+
+      // Pesquisa salva mas sem candidatos: aviso de revisão manual.
+      if (pesquisas > 0 && intencoes === 0) {
+        showWarn(
+          'Pesquisa sem candidatos',
+          'Pesquisa registrada mas sem candidatos extraídos.\nVerifique o release manualmente.',
+          data
+        );
+        return;
+      }
+
       resultEl.classList.add('visible', 'cu-result--ok');
       titleEl.className = 'cu-result__title cu-result__title--ok';
       titleEl.textContent = '✓ Coleta concluída — ' + data.coletor;
+      msgEl.textContent = '';
 
       const kpis = [
-        { val: data.pesquisas_salvas,  lbl: 'pesquisas novas'  },
-        { val: data.intencoes_salvas,  lbl: 'intenções salvas' },
-        { val: data.regionais_salvas,  lbl: 'regionais salvas' },
+        { val: pesquisas, lbl: 'pesquisas novas'  },
+        { val: intencoes, lbl: 'intenções salvas' },
+        { val: regionais, lbl: 'regionais salvas' },
       ];
       kpisEl.innerHTML = kpis.map(k =>
         `<div class="cu-kpi">
@@ -216,10 +240,20 @@
       urlPrev.textContent = data.url;
     }
 
+    function showWarn(title, msg, data) {
+      resultEl.classList.add('visible', 'cu-result--warn');
+      titleEl.className = 'cu-result__title cu-result__title--warn';
+      titleEl.textContent = '⚠ ' + title + ' — ' + data.coletor;
+      msgEl.textContent = msg;
+      kpisEl.innerHTML = '';
+      urlPrev.textContent = data.url;
+    }
+
     function showErro(msg, url = '') {
       resultEl.classList.add('visible', 'cu-result--erro');
       titleEl.className = 'cu-result__title cu-result__title--erro';
       titleEl.textContent = '✗ ' + msg;
+      msgEl.textContent = '';
       kpisEl.innerHTML = '';
       urlPrev.textContent = url;
     }
