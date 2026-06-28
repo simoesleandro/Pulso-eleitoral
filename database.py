@@ -293,13 +293,13 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
             JOIN pesquisas p ON i.pesquisa_id = p.id
             JOIN institutos inst ON p.instituto_id = inst.id
             WHERE p.cargo = ? AND p.data_pesquisa >= ?
+            AND (i.tipo = 'estimulada' OR i.tipo IS NULL)
             AND LOWER(i.candidato) NOT LIKE '%outros%'
             AND LOWER(i.candidato) NOT LIKE '%nulos%'
             AND LOWER(i.candidato) NOT LIKE '%brancos%'
             AND LOWER(i.candidato) NOT LIKE '%indecisos%'
             AND LOWER(i.candidato) NOT LIKE '%não sabe%'
             AND LOWER(i.candidato) NOT LIKE '%não respondeu%'
-            AND NOT (i.candidato IN ('Lula', 'Flávio Bolsonaro') AND i.percentual < 20)
             ORDER BY i.candidato, p.data_pesquisa
         """, (cargo, data_limite)).fetchall()
 
@@ -436,6 +436,7 @@ def get_simulacao_monte_carlo(n_simulacoes: int = 10000) -> dict:
         FROM intencoes i
         JOIN pesquisas p ON i.pesquisa_id = p.id
         WHERE p.cargo = 'presidente' AND p.margem_erro > 0
+        AND (i.tipo = 'estimulada' OR i.tipo IS NULL)
         ORDER BY p.data_pesquisa DESC
     """).fetchall()
     conn.close()
@@ -620,13 +621,15 @@ def get_kpis_avancados(cargo: str) -> dict:
                 if c_end:
                     r = conn.execute(
                         "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
-                        "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? AND p.data_pesquisa<?",
+                        "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? AND p.data_pesquisa<? "
+                        "AND (i.tipo='estimulada' OR i.tipo IS NULL)",
                         (cand, cargo, c_start, c_end)
                     ).fetchone()
                 else:
                     r = conn.execute(
                         "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
-                        "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=?",
+                        "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? "
+                        "AND (i.tipo='estimulada' OR i.tipo IS NULL)",
                         (cand, cargo, c_start)
                     ).fetchone()
                 return r["m"] if r and r["m"] is not None else 0.0
@@ -665,12 +668,14 @@ def get_kpis_avancados(cargo: str) -> dict:
                 continue
             r_rec = conn.execute(
                 "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
-                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=?",
+                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? "
+                "AND (i.tipo='estimulada' OR i.tipo IS NULL)",
                 (c["candidato"], cargo, d15)
             ).fetchone()
             r_ant = conn.execute(
                 "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
-                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? AND p.data_pesquisa<?",
+                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? AND p.data_pesquisa<? "
+                "AND (i.tipo='estimulada' OR i.tipo IS NULL)",
                 (c["candidato"], cargo, d30, d15)
             ).fetchone()
             pct_atual = round(r_rec["m"] if r_rec and r_rec["m"] is not None else c["media"], 1)
@@ -712,7 +717,8 @@ def get_kpis_avancados(cargo: str) -> dict:
         for c in candidatos[:3]:
             rows = conn.execute(
                 "SELECT i.percentual FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
-                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? ORDER BY p.data_pesquisa",
+                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? "
+                "AND (i.tipo='estimulada' OR i.tipo IS NULL) ORDER BY p.data_pesquisa",
                 (c["candidato"], cargo, d30)
             ).fetchall()
             pcts = [r["percentual"] for r in rows]
@@ -768,6 +774,7 @@ def get_historico_multi(candidatos: list[str], cargo: str) -> list[dict]:
                 JOIN pesquisas p ON i.pesquisa_id = p.id
                 JOIN institutos inst ON p.instituto_id = inst.id
                 WHERE i.candidato = ? AND p.cargo = ?
+                AND (i.tipo = 'estimulada' OR i.tipo IS NULL)
                 ORDER BY p.data_pesquisa ASC
             """, (candidato, cargo)).fetchall()
             cor = _CANDIDATE_COLORS.get(candidato, _FALLBACK_COLORS[idx % len(_FALLBACK_COLORS)])

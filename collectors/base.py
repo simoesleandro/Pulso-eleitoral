@@ -119,6 +119,7 @@ class BaseCollector(ABC):
                 else:
                     # b. Se não existe: INSERT INTO pesquisas
                     first = group_items[0]
+                    import hashlib
                     margem_erro = first.get("margem_erro")
                     if margem_erro is not None:
                         import re as _re
@@ -131,7 +132,7 @@ class BaseCollector(ABC):
                         tamanho_amostra = 0
                     metodologia = first.get("metodologia") or "Não informado"
                     data_divulgacao = first.get("data_divulgacao") or dt_coleta
-                    registro_tse = first.get("registro_tse") or f"GEN-{inst_id}-{cargo}-{dt_coleta}-{hash(url)}"
+                    registro_tse = first.get("registro_tse") or f"GEN-{inst_id}-{cargo}-{dt_coleta}-{hashlib.sha1(url.encode()).hexdigest()[:10]}"
 
                     data_pesquisa = first.get("data_pesquisa") or dt_coleta
 
