@@ -25,7 +25,7 @@ REGRAS CRÍTICAS:
   com MAIS candidatos listados
 - Se o release misturar 1º e 2º turno, extraia APENAS o cenário de 1º turno
 - IGNORE: cenários de 2º turno, cenários hipotéticos com candidatos
-  que ainda não declararam candidatura (Michelle Bolsonaro, Aécio Neves, etc.)
+  que ainda não declararam candidatura ({lista_ignorar})
 - Percentuais válidos para presidente: entre 1% e 60% por candidato
 - A soma dos percentuais dos candidatos deve ser <= 100%
 - Se a soma ultrapassar 100%, os percentuais provavelmente são de
@@ -126,7 +126,7 @@ REGRAS CRÍTICAS:
   com MAIS candidatos listados
 - Se o release misturar 1º e 2º turno, extraia APENAS o cenário de 1º turno
 - IGNORE: cenários de 2º turno, cenários hipotéticos com candidatos
-  que ainda não declararam candidatura (Michelle Bolsonaro, Aécio Neves, etc.)
+  que ainda não declararam candidatura ({lista_ignorar})
 - Percentuais válidos para presidente: entre 1% e 60% por candidato
 - A soma dos percentuais dos candidatos deve ser <= 100%
 - Se a soma ultrapassar 100%, os percentuais provavelmente são de
@@ -195,78 +195,45 @@ TEXTO:
 {texto}
 """
 
-MAPA_NOMES = {
-    'luiz inácio lula da silva': 'Lula',
-    'luiz inacio lula da silva': 'Lula',
-    'lula': 'Lula',
-    'flávio bolsonaro': 'Flávio Bolsonaro',
-    'flavio bolsonaro': 'Flávio Bolsonaro',
-    'bolsonaro': 'Flávio Bolsonaro',
-    'flavio': 'Flávio Bolsonaro',
-    'jair bolsonaro': None,
-    'jair messias bolsonaro': None,
-    'bolsonaro pai': None,
-    'ronaldo caiado': 'Ronaldo Caiado',
-    'romeu zema': 'Romeu Zema',
-    'renan santos': 'Renan Santos',
-    'renan santos (missão)': 'Renan Santos',
-    'samara martins': 'Samara Martins',
-    'augusto cury': 'Augusto Cury',
-    'rui costa pimenta': 'Rui Costa Pimenta',
-    'cabo daciolo': 'Cabo Daciolo',
-    'ciro gomes': 'Ciro Gomes',
-    'simone tebet': 'Simone Tebet',
-    'tarcísio de freitas': 'Tarcísio de Freitas',
-    'tarcisio de freitas': 'Tarcísio de Freitas',
-    'eduardo paes': 'Eduardo Paes',
-    'cláudio castro': 'Cláudio Castro',
-    'claudio castro': 'Cláudio Castro',
-    'marcelo freixo': 'Marcelo Freixo',
-    'rodrigo neves': 'Rodrigo Neves',
-    # Candidatos hipotéticos / não declarados — descartar
-    'michelle bolsonaro': None,
-    'michele bolsonaro': None,
-    'michelle': None,
-    'aécio neves': None,
-    'aecio neves': None,
-    'aldo rebelo': None,
-    'eduardo bolsonaro': None,
-    'camilo santana': None,
-    'fernando haddad': None,
-    'elmano de freitas': None,
-    'acm neto': None,
-    'jeronimo rodrigues': None,
-    'jerônimo rodrigues': None,
-    'ratinho junior': None,
-    'ratinho': None,
-    'carlos massa ratinho junior': None,
-    'joaquim barbosa': None,
-    # Abreviações comuns
-    'ciro': 'Ciro Gomes',
-    'simone': 'Simone Tebet',
-    'tarcísio': 'Tarcísio de Freitas',
-    'tarcisio': 'Tarcísio de Freitas',
-}
+# MAPA_NOMES, CANDIDATOS_PRESIDENCIAIS_2026 e as listas de nomes nos prompts
+# foram unificados na tabela `candidatos` (fonte única de verdade). Os acessores
+# abaixo leem dela via database (com cache). Se o banco ainda não tiver a tabela,
+# os fallbacks deixam a normalização como no-op (nome cru) — comportamento seguro.
+
+def _mapa_nomes() -> dict:
+    """{alias minúsculo -> nome_canonico | None}. Vazio se a tabela não existir."""
+    try:
+        from database import get_mapa_apelidos
+        return get_mapa_apelidos()
+    except Exception:
+        return {}
 
 
-CANDIDATOS_PRESIDENCIAIS_2026 = {
-    'lula', 'luiz inácio lula da silva', 'luiz inacio lula da silva',
-    'flávio bolsonaro', 'flavio bolsonaro',
-    'tarcísio de freitas', 'tarcisio de freitas', 'tarcísio', 'tarcisio',
-    'ronaldo caiado', 'caiado',
-    'romeu zema', 'zema',
-    'renan santos',
-    'ciro gomes', 'ciro',
-    'rui costa pimenta',
-    'cabo daciolo',
-    'samara martins',
-    'augusto cury',
-    'edmilson costa',
-    'hertz dias',
-    'joaquim barbosa',
-    'simone tebet', 'simone',
-    'pablo marçal', 'pablo marcal',
-}
+def _presidenciais() -> set:
+    """Conjunto de chaves minúsculas de candidatos presidenciais ativos."""
+    try:
+        from database import get_nomes_presidenciais
+        return get_nomes_presidenciais()
+    except Exception:
+        return set()
+
+
+def _montar_prompt(template: str, texto: str) -> str:
+    """Injeta no template o texto e as listas de candidatos vindas da tabela."""
+    try:
+        from database import get_presidenciais_canonicos, get_candidatos_ignorar
+        presidenciais = ", ".join(get_presidenciais_canonicos())
+        ignorar = ", ".join(get_candidatos_ignorar())
+    except Exception:
+        presidenciais, ignorar = "", ""
+    if not presidenciais:
+        presidenciais = "Lula, Flávio Bolsonaro, Tarcísio de Freitas, Ronaldo Caiado, Romeu Zema"
+    if not ignorar:
+        ignorar = "Michelle Bolsonaro, Aécio Neves"
+    return (template
+            .replace("{lista_presidenciais}", presidenciais)
+            .replace("{lista_ignorar}", ignorar)
+            .replace("{texto}", texto))
 
 PROMPT_MULTIESTADO = """
 Você é um extrator de dados de pesquisas eleitorais brasileiras por estado.
@@ -280,9 +247,7 @@ REGRA FUNDAMENTAL — CARGO:
 - Candidatos a GOVERNADOR nunca devem aparecer no resultado — mesmo que tenham percentuais explícitos
 
 CANDIDATOS PRESIDENCIAIS CONHECIDOS (extraia apenas estes e outros claramente presidenciais):
-Lula, Flávio Bolsonaro, Tarcísio de Freitas, Ronaldo Caiado, Romeu Zema,
-Renan Santos, Ciro Gomes, Rui Costa Pimenta, Cabo Daciolo, Samara Martins,
-Augusto Cury, Simone Tebet, Pablo Marçal
+{lista_presidenciais}
 
 CANDIDATOS A GOVERNADOR — NUNCA EXTRAIR (exemplos de nomes a ignorar):
 Juliana Brizola, Luciano Zucco, Eduardo Leite, Ratinho Jr., Raquel Lyra,
@@ -326,9 +291,18 @@ TEXTO:
 
 
 def normalizar_nome(nome: str) -> str | None:
-    """Normaliza nome do candidato para forma canônica. Retorna None para descartar."""
+    """Normaliza nome do candidato para forma canônica usando a tabela candidatos.
+
+    Retorna o nome canônico se o apelido for conhecido, None se for um candidato
+    marcado para descarte (hipotético/inelegível), ou o próprio nome se desconhecido.
+    """
+    if not nome:
+        return None
     chave = nome.lower().strip()
-    return MAPA_NOMES.get(chave, nome)
+    mapa = _mapa_nomes()
+    if chave in mapa:
+        return mapa[chave]  # nome_canonico ou None (descartar)
+    return nome
 
 
 def extrair_regional_multiestado(texto: str, fonte_url: str = "") -> list[dict]:
@@ -348,7 +322,8 @@ def extrair_regional_multiestado(texto: str, fonte_url: str = "") -> list[dict]:
     try:
         client = genai.Client(api_key=api_key)
         texto_truncado = texto[:8000]
-        prompt = PROMPT_MULTIESTADO.replace("{texto}", texto_truncado)
+        prompt = _montar_prompt(PROMPT_MULTIESTADO, texto_truncado)
+        presidenciais = _presidenciais()
 
         MODELOS = [
             "gemini-2.5-flash",
@@ -406,8 +381,8 @@ def extrair_regional_multiestado(texto: str, fonte_url: str = "") -> list[dict]:
                 # Filtro de segurança: aceita só candidatos presidenciais conhecidos
                 nome_check_raw = nome_raw.lower().strip()
                 nome_check_norm = (nome or "").lower().strip()
-                if nome_check_raw not in CANDIDATOS_PRESIDENCIAIS_2026 and \
-                   nome_check_norm not in CANDIDATOS_PRESIDENCIAIS_2026:
+                if nome_check_raw not in presidenciais and \
+                   nome_check_norm not in presidenciais:
                     descartados.append(f"{nome_raw} ({uf})")
                     continue
                 registros.append({
@@ -451,7 +426,7 @@ def extrair_com_gemini(texto: str, fonte_url: str = "", permite_regional: bool =
         texto_truncado = texto[:8000]
 
         template = PROMPT_EXTRACAO_REGIONAL if permite_regional else PROMPT_EXTRACAO
-        prompt = template.replace("{texto}", texto_truncado)
+        prompt = _montar_prompt(template, texto_truncado)
         
         MODELOS = [
             "gemini-2.5-flash",

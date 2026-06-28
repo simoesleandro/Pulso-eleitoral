@@ -116,3 +116,16 @@ CREATE TABLE IF NOT EXISTS usuarios (
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ultimo_login TIMESTAMP
 );
+
+-- 11. Candidatos: fonte única de verdade para normalização de nomes,
+-- espectro político (usado nas simulações de 2º turno) e cores do dashboard.
+CREATE TABLE IF NOT EXISTS candidatos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome_canonico TEXT NOT NULL UNIQUE,
+    apelidos TEXT,                       -- JSON array de variações (minúsculas)
+    espectro TEXT,                       -- 'esquerda' | 'centro' | 'direita' | NULL
+    cor_hex TEXT,
+    is_presidencial INTEGER DEFAULT 1,   -- 1 = corrida presidencial 2026
+    ativo INTEGER DEFAULT 1              -- 0 = descartar menções (hipotéticos/inelegíveis)
+);
+CREATE INDEX IF NOT EXISTS idx_candidatos_espectro ON candidatos(espectro);

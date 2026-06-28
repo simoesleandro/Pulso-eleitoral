@@ -32,8 +32,163 @@ def get_conn():
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
+# ─── Candidatos: fonte única de verdade ────────────────────────────────────
+# Roster canônico que popula a tabela `candidatos`. Cada item:
+# (nome_canonico, [apelidos...], espectro, cor_hex, is_presidencial, ativo)
+# ativo=0 → menções devem ser descartadas (hipotéticos / inelegíveis / não declarados).
+_CANDIDATOS_SEED = [
+    # Presidenciais ativos
+    ("Lula", ["luiz inácio lula da silva", "luiz inacio lula da silva", "lula", "lula da silva"], "esquerda", "#0A2240", 1, 1),
+    ("Flávio Bolsonaro", ["flávio bolsonaro", "flavio bolsonaro", "bolsonaro", "flavio", "flávio"], "direita", "#C0392B", 1, 1),
+    ("Ronaldo Caiado", ["ronaldo caiado", "caiado"], "direita", "#5a7184", 1, 1),
+    ("Romeu Zema", ["romeu zema", "zema"], "direita", "#B4B2A9", 1, 1),
+    ("Renan Santos", ["renan santos", "renan santos (missão)"], "direita", "#1D9E75", 1, 1),
+    ("Tarcísio de Freitas", ["tarcísio de freitas", "tarcisio de freitas", "tarcísio", "tarcisio"], "direita", None, 1, 1),
+    ("Pablo Marçal", ["pablo marçal", "pablo marcal"], "direita", None, 1, 1),
+    ("Ciro Gomes", ["ciro gomes", "ciro"], "centro", None, 1, 1),
+    ("Simone Tebet", ["simone tebet", "simone"], "centro", None, 1, 1),
+    ("Augusto Cury", ["augusto cury"], "centro", None, 1, 1),
+    ("Rui Costa Pimenta", ["rui costa pimenta"], "esquerda", None, 1, 1),
+    ("Samara Martins", ["samara martins"], "esquerda", None, 1, 1),
+    ("Cabo Daciolo", ["cabo daciolo"], "direita", None, 1, 1),
+    ("Edmilson Costa", ["edmilson costa"], "esquerda", None, 1, 1),
+    ("Hertz Dias", ["hertz dias"], "esquerda", None, 1, 1),
+    # Governador RJ (não presidenciais)
+    ("Eduardo Paes", ["eduardo paes"], "centro", None, 0, 1),
+    ("Cláudio Castro", ["cláudio castro", "claudio castro"], "direita", None, 0, 1),
+    ("Marcelo Freixo", ["marcelo freixo"], "esquerda", None, 0, 1),
+    ("Rodrigo Neves", ["rodrigo neves"], "centro", None, 0, 1),
+    # Descartar (hipotéticos / inelegíveis / não declarados)
+    ("Jair Bolsonaro", ["jair bolsonaro", "jair messias bolsonaro", "bolsonaro pai"], None, None, 1, 0),
+    ("Michelle Bolsonaro", ["michelle bolsonaro", "michele bolsonaro", "michelle"], None, None, 1, 0),
+    ("Aécio Neves", ["aécio neves", "aecio neves"], None, None, 1, 0),
+    ("Aldo Rebelo", ["aldo rebelo"], None, None, 1, 0),
+    ("Eduardo Bolsonaro", ["eduardo bolsonaro"], None, None, 1, 0),
+    ("Camilo Santana", ["camilo santana"], None, None, 1, 0),
+    ("Fernando Haddad", ["fernando haddad"], None, None, 1, 0),
+    ("Elmano de Freitas", ["elmano de freitas"], None, None, 1, 0),
+    ("ACM Neto", ["acm neto"], None, None, 1, 0),
+    ("Jerônimo Rodrigues", ["jerônimo rodrigues", "jeronimo rodrigues"], None, None, 0, 0),
+    ("Ratinho Junior", ["ratinho junior", "ratinho", "carlos massa ratinho junior"], None, None, 0, 0),
+    ("Joaquim Barbosa", ["joaquim barbosa"], None, None, 1, 0),
+]
+
+# Cache em memória dos dados derivados da tabela candidatos (roster é estático).
+_cache_candidatos = None
+
+
+def _popular_candidatos(conn) -> None:
+    """Insere o roster canônico na tabela candidatos se ela estiver vazia (idempotente)."""
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM candidatos")
+    if cur.fetchone()[0] > 0:
+        return
+    for nome, apelidos, espectro, cor, is_pres, ativo in _CANDIDATOS_SEED:
+        cur.execute(
+            "INSERT INTO candidatos (nome_canonico, apelidos, espectro, cor_hex, is_presidencial, ativo) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (nome, json.dumps(apelidos, ensure_ascii=False), espectro, cor, is_pres, ativo)
+        )
+    conn.commit()
+    _invalidar_cache_candidatos()
+
+
+def _invalidar_cache_candidatos() -> None:
+    global _cache_candidatos
+    _cache_candidatos = None
+
+
+def _carregar_candidatos_cache() -> dict:
+    """Carrega (e memoiza) os mapas derivados da tabela candidatos.
+
+    Retorna dict com:
+      - mapa: {alias/canonico_lower -> nome_canonico | None}  (None = descartar)
+      - espectro: {nome_canonico -> 'esquerda'|'centro'|'direita'}  (só ativos)
+      - cores: {nome_canonico -> cor_hex}
+      - presidenciais: set de chaves minúsculas (apelidos+canonico) de presidenciais ativos
+      - presidenciais_canonicos: [nome_canonico, ...] presidenciais ativos
+      - ignorar: [nome_canonico, ...] com ativo=0
+    """
+    global _cache_candidatos
+    if _cache_candidatos is not None:
+        return _cache_candidatos
+
+    mapa, espectro, cores = {}, {}, {}
+    presidenciais, presidenciais_canonicos, ignorar = set(), [], []
+    try:
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT nome_canonico, apelidos, espectro, cor_hex, is_presidencial, ativo FROM candidatos"
+            ).fetchall()
+        for r in rows:
+            nome = r["nome_canonico"]
+            ativo = r["ativo"]
+            try:
+                apelidos = json.loads(r["apelidos"]) if r["apelidos"] else []
+            except Exception:
+                apelidos = []
+            chaves = {a.lower().strip() for a in apelidos}
+            chaves.add(nome.lower().strip())
+            destino = nome if ativo else None
+            for k in chaves:
+                mapa[k] = destino
+            if ativo:
+                if r["espectro"]:
+                    espectro[nome] = r["espectro"]
+                if r["cor_hex"]:
+                    cores[nome] = r["cor_hex"]
+                if r["is_presidencial"]:
+                    presidenciais.update(chaves)
+                    presidenciais_canonicos.append(nome)
+            else:
+                ignorar.append(nome)
+        _cache_candidatos = {
+            "mapa": mapa, "espectro": espectro, "cores": cores,
+            "presidenciais": presidenciais, "presidenciais_canonicos": presidenciais_canonicos,
+            "ignorar": ignorar,
+        }
+    except Exception:
+        # DB ainda sem a tabela/dados: devolve mapas vazios (normalização vira no-op).
+        _cache_candidatos = {
+            "mapa": {}, "espectro": {}, "cores": {},
+            "presidenciais": set(), "presidenciais_canonicos": [], "ignorar": [],
+        }
+    return _cache_candidatos
+
+
+def get_mapa_apelidos() -> dict:
+    """{alias/nome minúsculo -> nome_canonico ou None}. Fonte para normalizar_nome."""
+    return _carregar_candidatos_cache()["mapa"]
+
+
+def get_cores_candidatos() -> dict:
+    """{nome_canonico -> cor_hex} dos candidatos com cor definida."""
+    return _carregar_candidatos_cache()["cores"]
+
+
+def get_candidatos_por_espectro(espectros) -> set:
+    """Nomes canônicos cujo espectro está no conjunto pedido (ex.: {'esquerda','centro'})."""
+    esp = _carregar_candidatos_cache()["espectro"]
+    return {nome for nome, e in esp.items() if e in espectros}
+
+
+def get_nomes_presidenciais() -> set:
+    """Conjunto de chaves minúsculas (apelidos + canônicos) de presidenciais ativos."""
+    return _carregar_candidatos_cache()["presidenciais"]
+
+
+def get_presidenciais_canonicos() -> list:
+    """Lista de nomes canônicos presidenciais ativos (para injeção em prompts)."""
+    return _carregar_candidatos_cache()["presidenciais_canonicos"]
+
+
+def get_candidatos_ignorar() -> list:
+    """Lista de nomes canônicos a descartar (para injeção em prompts)."""
+    return _carregar_candidatos_cache()["ignorar"]
+
+
 def init_db(force_seed=False):
-    """Executa o schema.sql para inicializar o banco de dados. 
+    """Executa o schema.sql para inicializar o banco de dados.
     Se o banco estiver vazio ou force_seed for True, executa também o seed.sql."""
     # Garante que a pasta 'data' exista
     if not os.path.exists(DATA_DIR):
@@ -48,7 +203,10 @@ def init_db(force_seed=False):
             schema_sql = f.read()
         conn.executescript(schema_sql)
         conn.commit()
-    
+
+    # Popula a tabela candidatos (idempotente — só insere se vazia)
+    _popular_candidatos(conn)
+
     # Verifica se os dados já foram populados
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM institutos")
@@ -211,13 +369,8 @@ def get_pesquisas_mais_recentes(cargo: str, tipo: str = 'estimulada') -> list[di
     finally:
         conn.close()
 
-_CANDIDATE_COLORS = {
-    'Lula': '#0A2240',
-    'Flávio Bolsonaro': '#C0392B',
-    'Ronaldo Caiado': '#5a7184',
-    'Romeu Zema': '#B4B2A9',
-    'Renan Santos': '#1D9E75',
-}
+# Cores canônicas vêm da tabela candidatos (get_cores_candidatos);
+# esta paleta é só o fallback para candidatos sem cor definida.
 _FALLBACK_COLORS = ['#0A2240', '#C0392B', '#5a7184', '#B4B2A9', '#1D9E75']
 
 
@@ -424,11 +577,8 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
 
 def get_simulacao_segundo_turno() -> dict:
     """Simula resultado de 2º turno Lula x Flávio com redistribuição proporcional de votos."""
-    DIREITA = {'Flávio Bolsonaro', 'Ronaldo Caiado', 'Romeu Zema',
-               'Cabo Daciolo', 'Tarcísio de Freitas', 'Renan Santos'}
-    ESQUERDA_CENTRO = {'Lula', 'Ciro Gomes', 'Simone Tebet',
-                       'Rui Costa Pimenta', 'Augusto Cury',
-                       'Samara Martins', 'Eduardo Paes'}
+    DIREITA = get_candidatos_por_espectro({'direita'})
+    ESQUERDA_CENTRO = get_candidatos_por_espectro({'esquerda', 'centro'})
 
     media = get_media_agregada('presidente', dias=30)
     candidatos = media.get('candidatos', [])
@@ -492,11 +642,8 @@ def get_simulacao_monte_carlo(n_simulacoes: int = 10000) -> dict:
     """
     import random
 
-    DIREITA = {'Flávio Bolsonaro', 'Ronaldo Caiado', 'Romeu Zema',
-               'Cabo Daciolo', 'Tarcísio de Freitas', 'Renan Santos'}
-    ESQUERDA_CENTRO = {'Lula', 'Ciro Gomes', 'Simone Tebet',
-                       'Rui Costa Pimenta', 'Augusto Cury',
-                       'Samara Martins', 'Eduardo Paes'}
+    DIREITA = get_candidatos_por_espectro({'direita'})
+    ESQUERDA_CENTRO = get_candidatos_por_espectro({'esquerda', 'centro'})
     MARGEM_DEFAULT = 2.0
 
     media = get_media_agregada('presidente', dias=30)
@@ -857,7 +1004,7 @@ def get_historico_multi(candidatos: list[str], cargo: str, tipo: str = 'estimula
                 AND {filtro_tipo}
                 ORDER BY p.data_pesquisa ASC
             """, (candidato, cargo)).fetchall()
-            cor = _CANDIDATE_COLORS.get(candidato, _FALLBACK_COLORS[idx % len(_FALLBACK_COLORS)])
+            cor = get_cores_candidatos().get(candidato, _FALLBACK_COLORS[idx % len(_FALLBACK_COLORS)])
             series.append({
                 "candidato": candidato,
                 "cor": cor,
