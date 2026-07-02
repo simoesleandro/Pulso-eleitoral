@@ -207,6 +207,12 @@ def init_db(force_seed=False):
     # Popula a tabela candidatos (idempotente — só insere se vazia)
     _popular_candidatos(conn)
 
+    # Migration idempotente: colunas status/data_status em candidatos
+    # (mesmo padrão de scripts/migrate_candidatos_status.py — ALTER TABLE
+    # puro, sem tocar schema.sql, seguro rodar em toda inicialização)
+    from scripts.migrate_candidatos_status import aplicar_migracao
+    aplicar_migracao(conn)
+
     # Verifica se os dados já foram populados
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM institutos")
@@ -346,13 +352,18 @@ def get_pesquisas_mais_recentes(cargo: str, tipo: str = 'estimulada') -> list[di
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        # Encontra a pesquisa mais recente que tenha intenções do tipo pedido
+        # Encontra a pesquisa mais recente que tenha intenções do tipo pedido.
+        # LEFT JOIN com candidatos: categorias que não são candidatos de verdade
+        # (outros/nulos/brancos/indecisos) não têm linha em `candidatos` e
+        # continuam aparecendo; candidatos com status != 'ativo' (desistente,
+        # inelegível) são excluídos desta lista de "corrida atual".
         cursor.execute(f"""
             SELECT p.id, p.data_pesquisa, p.margem_erro, p.tamanho_amostra, p.fonte_url, inst.nome AS instituto,
                    int.candidato, int.percentual, int.partido, int.tipo
             FROM pesquisas p
             JOIN institutos inst ON p.instituto_id = inst.id
             JOIN intencoes int ON int.pesquisa_id = p.id
+            LEFT JOIN candidatos c ON c.nome_canonico = int.candidato
             WHERE p.cargo = ? AND {filtro_int} AND p.id = (
                 SELECT p2.id FROM pesquisas p2
                 JOIN intencoes i2 ON i2.pesquisa_id = p2.id
@@ -360,6 +371,7 @@ def get_pesquisas_mais_recentes(cargo: str, tipo: str = 'estimulada') -> list[di
                 ORDER BY p2.data_pesquisa DESC, p2.id DESC
                 LIMIT 1
             )
+            AND (c.status IS NULL OR c.status = 'ativo')
             ORDER BY int.percentual DESC
         """, (cargo, cargo))
         rows = cursor.fetchall()
@@ -470,8 +482,10 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
             FROM intencoes i
             JOIN pesquisas p ON i.pesquisa_id = p.id
             JOIN institutos inst ON p.instituto_id = inst.id
+            LEFT JOIN candidatos c ON c.nome_canonico = i.candidato
             WHERE p.cargo = ? AND p.data_pesquisa >= ?
             AND (i.tipo = 'estimulada' OR i.tipo IS NULL)
+            AND (c.status IS NULL OR c.status = 'ativo')
             AND LOWER(i.candidato) NOT LIKE '%outros%'
             AND LOWER(i.candidato) NOT LIKE '%nulos%'
             AND LOWER(i.candidato) NOT LIKE '%brancos%'
