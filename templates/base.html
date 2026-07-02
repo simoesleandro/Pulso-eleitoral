@@ -34,7 +34,7 @@
       <span class="pe-topbar__name">Pulso Eleitoral</span>
     </a>
 
-    <div class="pe-topbar__nav">
+    <div class="pe-topbar__nav" id="topbar-nav">
       <a class="pe-topbar__nav-item {% if request.endpoint == 'index' %}pe-topbar__nav-item--active{% endif %}"
          href="/">visão geral</a>
       <a class="pe-topbar__nav-item {% if request.endpoint == 'presidente' %}pe-topbar__nav-item--active{% endif %}"
@@ -51,6 +51,7 @@
       <span id="topbar-update">carregando...</span>
       <div class="pe-topbar__status-dot" id="topbar-dot"></div>
     </div>
+    <button class="pe-topbar__burger" id="topbar-burger" aria-label="Abrir menu" aria-expanded="false" aria-controls="topbar-nav">☰</button>
   </nav>
 
   <!-- Conteúdo principal -->
@@ -79,6 +80,29 @@
         document.getElementById('topbar-update').textContent = 'offline';
         document.getElementById('topbar-dot').style.background = '#A32D2D';
       });
+
+    // Menu hambúrguer (mobile)
+    (function () {
+      const topbarBurger = document.getElementById('topbar-burger');
+      const topbarNav = document.getElementById('topbar-nav');
+      if (!topbarBurger || !topbarNav) return;
+      topbarBurger.addEventListener('click', () => {
+        const isOpen = topbarNav.classList.toggle('pe-topbar__nav--open');
+        topbarBurger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+      topbarNav.querySelectorAll('.pe-topbar__nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+          topbarNav.classList.remove('pe-topbar__nav--open');
+          topbarBurger.setAttribute('aria-expanded', 'false');
+        });
+      });
+      document.addEventListener('click', (e) => {
+        if (!topbarNav.contains(e.target) && !topbarBurger.contains(e.target)) {
+          topbarNav.classList.remove('pe-topbar__nav--open');
+          topbarBurger.setAttribute('aria-expanded', 'false');
+        }
+      });
+    })();
   </script>
 
   {% block scripts %}{% endblock %}

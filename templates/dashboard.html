@@ -44,7 +44,7 @@
       </svg>
       <span class="pe-topbar__name">Pulso Eleitoral</span>
     </a>
-    <div class="pe-topbar__nav">
+    <div class="pe-topbar__nav" id="topbar-nav">
       <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="#secao-visao-geral" id="nav-visao-geral">Visão Geral</a>
       <a class="pe-topbar__nav-item" href="#secao-presidente" id="nav-presidente">Presidente</a>
       <a class="pe-topbar__nav-item" href="#secao-governador" id="nav-governador">Gov. RJ</a>
@@ -56,6 +56,7 @@
       <span id="badge-update">carregando...</span>
       <div class="pe-topbar__status-dot"></div>
     </div>
+    <button class="pe-topbar__burger" id="topbar-burger" aria-label="Abrir menu" aria-expanded="false" aria-controls="topbar-nav">☰</button>
   </nav>
 
   <main class="pe-container pe-main">
@@ -1069,6 +1070,28 @@
       const el = document.getElementById(s.id);
       if (el) observer.observe(el);
     });
+
+    // Menu hambúrguer (mobile)
+    const topbarBurger = document.getElementById('topbar-burger');
+    const topbarNav = document.getElementById('topbar-nav');
+    if (topbarBurger && topbarNav) {
+      topbarBurger.addEventListener('click', () => {
+        const isOpen = topbarNav.classList.toggle('pe-topbar__nav--open');
+        topbarBurger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+      topbarNav.querySelectorAll('.pe-topbar__nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+          topbarNav.classList.remove('pe-topbar__nav--open');
+          topbarBurger.setAttribute('aria-expanded', 'false');
+        });
+      });
+      document.addEventListener('click', (e) => {
+        if (!topbarNav.contains(e.target) && !topbarBurger.contains(e.target)) {
+          topbarNav.classList.remove('pe-topbar__nav--open');
+          topbarBurger.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
   </script>
 </body>
 </html>
