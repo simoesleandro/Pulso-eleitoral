@@ -73,3 +73,6 @@ Ainda disponíveis para virar planos depois, se desejado:
   Dockerfile instala Playwright 2×.
 - Código morto na raiz: `check.py`, `check_tables.py`, `test_toggle.py`,
   `scripts/debug_*.py`.
+- Pesquisas com recorte por macrorregião (Sul/Sudeste/Nordeste) retornam vazio —
+  extrator só suporta nacional ou UF individual. Edge case conhecido, baixa
+  prioridade.
