@@ -213,6 +213,10 @@ def init_db(force_seed=False):
     from scripts.migrate_candidatos_status import aplicar_migracao
     aplicar_migracao(conn)
 
+    # Migration idempotente: pct_pode_mudar_voto em pesquisas
+    from scripts.migrate_pesquisas_volatilidade import aplicar_migracao as _aplicar_migracao_volatilidade
+    _aplicar_migracao_volatilidade(conn)
+
     # Verifica se os dados já foram populados
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM institutos")
@@ -649,112 +653,299 @@ def get_simulacao_segundo_turno() -> dict:
     }
 
 
-def get_simulacao_monte_carlo(n_simulacoes: int = 10000) -> dict:
+# ─── Motor de Monte Carlo (genérico, qualquer cargo) ───────────────────────
+
+_BUCKET_INDECISOS = "Outros/Nulos/Brancos/Indecisos"
+
+
+def fator_volatilidade(pct_pode_mudar_voto: float | None) -> float:
+    """Fator de inflação do sigma de um candidato quando o instituto divulga
+    o "% de eleitores que podem mudar de voto" (coluna pesquisas.pct_pode_mudar_voto).
+
+    Heurística linear: cada ponto percentual de volatilidade divulgada soma
+    1% ao sigma (ex.: 30% de eleitores voláteis → sigma 1.30x). Quando o dado
+    não foi divulgado (None), o fator é neutro (1.0) — nunca inferimos ou
+    estimamos essa métrica.
     """
-    Simula múltiplos cenários de 2º turno via Monte Carlo.
-    Retorna array de cenários + chaves flat 'lula'/'flavio' para compatibilidade.
+    if pct_pode_mudar_voto is None:
+        return 1.0
+    return 1.0 + max(0.0, pct_pode_mudar_voto) / 100.0
+
+
+def _redistribuir_indecisos(simulado: dict, pct_indecisos: float) -> dict:
+    """Redistribui proporcionalmente o bucket "Outros/Nulos/Brancos/Indecisos"
+    entre os candidatos reais de uma rodada simulada, com base no share
+    relativo de cada um. `pct_indecisos` é a média do bucket para o cargo
+    (0.0 se não houver esse dado — nesse caso é no-op)."""
+    if pct_indecisos <= 0:
+        return simulado
+    total = sum(simulado.values())
+    if total <= 0:
+        return simulado
+    return {nome: pct + pct_indecisos * (pct / total) for nome, pct in simulado.items()}
+
+
+def prob_vitoria_primeiro_turno(candidato: str, runs: list[dict]) -> float:
+    """% de runs (já com o bucket de indecisos redistribuído) em que o share
+    do candidato ultrapassa 50% dos votos válidos do cenário — i.e., vitória
+    em 1º turno sem precisar de confronto direto par a par. Calculada em
+    cima do array de runs já retido pelo motor, sem rodar nova simulação."""
+    if not runs:
+        return 0.0
+    vitorias = 0
+    for run in runs:
+        total = sum(run.values())
+        if total > 0 and run.get(candidato, 0) / total > 0.5:
+            vitorias += 1
+    return round(vitorias / len(runs) * 100, 1)
+
+
+def _margens_por_candidato(cargo: str) -> dict:
+    """Margem de erro da pesquisa mais recente de cada candidato do cargo."""
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT i.candidato, p.margem_erro
+            FROM intencoes i
+            JOIN pesquisas p ON i.pesquisa_id = p.id
+            WHERE p.cargo = ? AND p.margem_erro > 0
+            AND (i.tipo = 'estimulada' OR i.tipo IS NULL)
+            ORDER BY p.data_pesquisa DESC
+        """, (cargo,)).fetchall()
+    margens = {}
+    for candidato, margem in rows:
+        if candidato not in margens:
+            margens[candidato] = margem
+    return margens
+
+
+def _pct_mudar_voto_recente(cargo: str) -> float | None:
+    """pct_pode_mudar_voto mais recente divulgado pra esse cargo (dado é do
+    poll inteiro, não por candidato — quando presente, é aplicado a todos os
+    candidatos do cenário). None se nenhuma pesquisa recente tiver esse dado."""
+    with get_db() as conn:
+        row = conn.execute("""
+            SELECT pct_pode_mudar_voto FROM pesquisas
+            WHERE cargo = ? AND pct_pode_mudar_voto IS NOT NULL
+            ORDER BY data_pesquisa DESC, id DESC
+            LIMIT 1
+        """, (cargo,)).fetchone()
+    return row["pct_pode_mudar_voto"] if row else None
+
+
+def _pct_indecisos_medio(cargo: str, dias: int = 30) -> float:
+    """Média simples do bucket "Outros/Nulos/Brancos/Indecisos" no cargo, nos
+    últimos `dias` dias. 0.0 se não houver esse bucket nas pesquisas (caso do
+    cargo 'presidente' hoje — nenhum instituto reporta essa linha)."""
+    data_limite = (date.today() - timedelta(days=dias)).isoformat()
+    with get_db() as conn:
+        row = conn.execute("""
+            SELECT AVG(i.percentual) AS media
+            FROM intencoes i
+            JOIN pesquisas p ON i.pesquisa_id = p.id
+            WHERE p.cargo = ? AND p.data_pesquisa >= ? AND i.candidato = ?
+        """, (cargo, data_limite, _BUCKET_INDECISOS)).fetchone()
+    return row["media"] if row and row["media"] is not None else 0.0
+
+
+def _simular_cenario(
+    candidatos: list[dict],
+    margens: dict,
+    nome_a: str,
+    nome_b: str,
+    n_simulacoes: int = 10000,
+    fator_sigma: float = 2.0,
+    sigma_minimo: float = 6.0,
+    margem_default: float = 2.0,
+    pct_indecisos: float = 0.0,
+    pct_mudar_voto: dict | None = None,
+    mu_override: dict | None = None,
+) -> dict:
+    """Motor genérico de Monte Carlo para um par de candidatos (nome_a vs
+    nome_b) dentro de um cenário multi-candidato — funciona pra qualquer
+    cargo, não só presidencial.
+
+    `candidatos` é a lista de dicts {'candidato': nome, 'media': pct} (ex.:
+    retorno de get_media_agregada). `mu_override` mapeia nome de candidato →
+    mu preferencial (0.0-1.0) no split de terceiros de direita — usado pelo
+    wrapper presidencial pra preservar o comportamento de que eleitores do
+    Flávio Bolsonaro têm maior afinidade com outro candidato de direita
+    quando ele é um terceiro no cenário.
+
+    Retorna o resultado do par + `runs`: lista com o dict completo de share
+    simulado por candidato em cada rodada (já com o bucket de indecisos
+    redistribuído), pra permitir métricas derivadas sem rodar nova simulação.
     """
     import random
 
     DIREITA = get_candidatos_por_espectro({'direita'})
     ESQUERDA_CENTRO = get_candidatos_por_espectro({'esquerda', 'centro'})
-    MARGEM_DEFAULT = 2.0
-
-    media = get_media_agregada('presidente', dias=30)
-    candidatos = media.get('candidatos', [])
-
-    conn = get_conn()
-    rows = conn.execute("""
-        SELECT i.candidato, p.margem_erro
-        FROM intencoes i
-        JOIN pesquisas p ON i.pesquisa_id = p.id
-        WHERE p.cargo = 'presidente' AND p.margem_erro > 0
-        AND (i.tipo = 'estimulada' OR i.tipo IS NULL)
-        ORDER BY p.data_pesquisa DESC
-    """).fetchall()
-    conn.close()
-
-    margens = {}
-    for candidato, margem in rows:
-        if candidato not in margens:
-            margens[candidato] = margem
+    pct_mudar_voto = pct_mudar_voto or {}
+    mu_override = mu_override or {}
 
     medias_dict = {c['candidato']: c['media'] for c in candidatos}
+    media_a = medias_dict.get(nome_a, 0)
+    media_b = medias_dict.get(nome_b, 0)
+    peso_total = (media_a + media_b) if (media_a + media_b) > 0 else 1
+    peso_a = media_a / peso_total
+    peso_b = media_b / peso_total
 
-    def _simular(nome_a: str, nome_b: str) -> dict:
-        media_a = medias_dict.get(nome_a, 0)
-        media_b = medias_dict.get(nome_b, 0)
-        peso_total = (media_a + media_b) if (media_a + media_b) > 0 else 1
-        peso_a = media_a / peso_total
-        peso_b = media_b / peso_total
+    runs = []
+    vitorias_a = 0
+    for _ in range(n_simulacoes):
+        simulado = {}
+        for c in candidatos:
+            nome = c['candidato']
+            sigma_base = max(margens.get(nome, margem_default) * fator_sigma, sigma_minimo)
+            sigma = sigma_base * fator_volatilidade(pct_mudar_voto.get(nome))
+            simulado[nome] = max(0, random.gauss(c['media'], sigma))
 
-        vitorias_a = 0
-        for _ in range(n_simulacoes):
-            simulado = {}
-            for c in candidatos:
-                nome = c['candidato']
-                sigma = max(margens.get(nome, MARGEM_DEFAULT) * 2.0, 6.0)
-                simulado[nome] = max(0, random.gauss(c['media'], sigma))
+        simulado = _redistribuir_indecisos(simulado, pct_indecisos)
+        runs.append(simulado)
 
-            a = simulado.get(nome_a, 0)
-            b = simulado.get(nome_b, 0)
+        a = simulado.get(nome_a, 0)
+        b = simulado.get(nome_b, 0)
 
-            for nome, pct in simulado.items():
-                if nome in (nome_a, nome_b):
-                    continue
-                if nome in ESQUERDA_CENTRO:
-                    split = min(0.90, max(0.50, random.gauss(0.70, 0.08)))
-                    a += pct * split
-                    b += pct * (1 - split)
-                elif nome in DIREITA:
-                    # Eleitores do Flávio têm maior afinidade com outro cand. de direita
-                    # num 2º turno hipotético sem ele — split ligeiramente mais alto
-                    mu = 0.75 if (nome == 'Flávio Bolsonaro' and nome_b != 'Flávio Bolsonaro') else 0.70
-                    split = min(0.90, max(0.50, random.gauss(mu, 0.08)))
-                    b += pct * split
-                    a += pct * (1 - split)
+        for nome, pct in simulado.items():
+            if nome in (nome_a, nome_b):
+                continue
+            if nome in ESQUERDA_CENTRO:
+                split = min(0.90, max(0.50, random.gauss(0.70, 0.08)))
+                a += pct * split
+                b += pct * (1 - split)
+            elif nome in DIREITA:
+                mu = mu_override.get(nome, 0.70)
+                split = min(0.90, max(0.50, random.gauss(mu, 0.08)))
+                b += pct * split
+                a += pct * (1 - split)
+            else:
+                if media_a >= media_b:
+                    a += pct * 0.40
+                    b += pct * 0.30
                 else:
-                    if media_a >= media_b:
-                        a += pct * 0.40
-                        b += pct * 0.30
-                    else:
-                        b += pct * 0.40
-                        a += pct * 0.30
-                    abstain = pct * 0.30
-                    a += abstain * peso_a
-                    b += abstain * peso_b
+                    b += pct * 0.40
+                    a += pct * 0.30
+                abstain = pct * 0.30
+                a += abstain * peso_a
+                b += abstain * peso_b
 
-            total = a + b
-            if total > 0 and (a / total) > 0.5:
-                vitorias_a += 1
+        total = a + b
+        if total > 0 and (a / total) > 0.5:
+            vitorias_a += 1
 
-        prob_a = round(vitorias_a / n_simulacoes * 100, 1)
-        prob_b = round(100 - prob_a, 1)
-        return {
-            'candidato_a': {
-                'nome': nome_a,
-                'media_direto': round(media_a, 1),
-                'prob_vitoria': prob_a,
-                'favorito': prob_a > prob_b,
-            },
-            'candidato_b': {
-                'nome': nome_b,
-                'media_direto': round(media_b, 1),
-                'prob_vitoria': prob_b,
-                'favorito': prob_b > prob_a,
-            },
-        }
+    prob_a = round(vitorias_a / n_simulacoes * 100, 1)
+    prob_b = round(100 - prob_a, 1)
+    return {
+        'candidato_a': {
+            'nome': nome_a,
+            'media_direto': round(media_a, 1),
+            'prob_vitoria': prob_a,
+            'favorito': prob_a > prob_b,
+            'prob_vitoria_primeiro_turno': prob_vitoria_primeiro_turno(nome_a, runs),
+        },
+        'candidato_b': {
+            'nome': nome_b,
+            'media_direto': round(media_b, 1),
+            'prob_vitoria': prob_b,
+            'favorito': prob_b > prob_a,
+            'prob_vitoria_primeiro_turno': prob_vitoria_primeiro_turno(nome_b, runs),
+        },
+        'runs': runs,
+    }
 
-    CENARIOS_DEF = [
+
+def simular_monte_carlo_cenarios(
+    cargo: str,
+    cenarios_def: list[tuple],
+    n_simulacoes: int = 10000,
+    fator_sigma: float = 2.0,
+    sigma_minimo: float = 6.0,
+    margem_default: float = 2.0,
+    dias_media: int = 30,
+    mu_override: dict | None = None,
+) -> dict:
+    """Motor genérico de Monte Carlo pra qualquer cargo.
+
+    `cenarios_def` é uma lista de tuplas (nome_a, nome_b, id_cenario, label) —
+    os confrontos a simular são decididos por quem chama, não fixos no motor
+    (ex.: o wrapper presidencial get_simulacao_monte_carlo, ou uma futura
+    versão pra governador_rj).
+    """
+    media = get_media_agregada(cargo, dias=dias_media)
+    candidatos = media.get('candidatos', [])
+
+    margens = _margens_por_candidato(cargo)
+    pct_mudar_voto_valor = _pct_mudar_voto_recente(cargo)
+    pct_mudar_voto = (
+        {c['candidato']: pct_mudar_voto_valor for c in candidatos}
+        if pct_mudar_voto_valor is not None else {}
+    )
+    pct_indecisos = _pct_indecisos_medio(cargo, dias=dias_media)
+
+    cenarios = []
+    for nome_a, nome_b, cid, label in cenarios_def:
+        resultado = _simular_cenario(
+            candidatos, margens, nome_a, nome_b,
+            n_simulacoes=n_simulacoes,
+            fator_sigma=fator_sigma,
+            sigma_minimo=sigma_minimo,
+            margem_default=margem_default,
+            pct_indecisos=pct_indecisos,
+            pct_mudar_voto=pct_mudar_voto,
+            mu_override=mu_override,
+        )
+        cenarios.append({'id': cid, 'label': label, **resultado})
+
+    return {
+        'cargo': cargo,
+        'cenarios': cenarios,
+        'n_simulacoes': n_simulacoes,
+        'fator_sigma_usado': fator_sigma,
+        'sigma_minimo_usado': sigma_minimo,
+        'margem_default_usada': margem_default,
+    }
+
+
+def get_simulacao_monte_carlo(n_simulacoes: int = 10000) -> dict:
+    """
+    Wrapper de compatibilidade: simula os cenários presidenciais de sempre
+    (Lula vs Flávio/Caiado/Zema) via simular_monte_carlo_cenarios() e remonta
+    o formato de resposta legado — usado pelo endpoint GET /api/monte-carlo
+    em produção. Mantém exatamente o mesmo formato e comportamento de antes.
+    """
+    CENARIOS_PRESIDENCIAL = [
         ('Lula', 'Flávio Bolsonaro', 'lula_flavio',  'Lula vs Flávio Bolsonaro'),
         ('Lula', 'Ronaldo Caiado',   'lula_caiado',  'Lula vs Ronaldo Caiado'),
         ('Lula', 'Romeu Zema',       'lula_zema',    'Lula vs Romeu Zema'),
     ]
+    MARGEM_DEFAULT = 2.0
 
-    cenarios = []
-    for nome_a, nome_b, cid, label in CENARIOS_DEF:
-        resultado = _simular(nome_a, nome_b)
-        cenarios.append({'id': cid, 'label': label, **resultado})
+    resultado = simular_monte_carlo_cenarios(
+        cargo='presidente',
+        cenarios_def=CENARIOS_PRESIDENCIAL,
+        n_simulacoes=n_simulacoes,
+        margem_default=MARGEM_DEFAULT,
+        # Eleitores do Flávio têm maior afinidade com outro cand. de direita
+        # num 2º turno hipotético sem ele — split ligeiramente mais alto
+        mu_override={'Flávio Bolsonaro': 0.75},
+    )
+
+    def _formato_legado(c: dict) -> dict:
+        return {
+            'nome': c['nome'],
+            'media_direto': c['media_direto'],
+            'prob_vitoria': c['prob_vitoria'],
+            'favorito': c['favorito'],
+        }
+
+    cenarios = [
+        {
+            'id': c['id'],
+            'label': c['label'],
+            'candidato_a': _formato_legado(c['candidato_a']),
+            'candidato_b': _formato_legado(c['candidato_b']),
+        }
+        for c in resultado['cenarios']
+    ]
 
     primeiro = cenarios[0]
     return {

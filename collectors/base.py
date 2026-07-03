@@ -135,11 +135,12 @@ class BaseCollector(ABC):
                     registro_tse = first.get("registro_tse") or f"GEN-{inst_id}-{cargo}-{dt_coleta}-{hashlib.sha1(url.encode()).hexdigest()[:10]}"
 
                     data_pesquisa = first.get("data_pesquisa") or dt_coleta
+                    pct_pode_mudar_voto = first.get("pct_pode_mudar_voto")
 
                     cursor.execute("""
                         INSERT INTO pesquisas
-                        (instituto_id, cargo, data_pesquisa, data_publicacao, tamanho_amostra, margem_erro, contratante, registro_tse, fonte_url)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (instituto_id, cargo, data_pesquisa, data_publicacao, tamanho_amostra, margem_erro, contratante, registro_tse, fonte_url, pct_pode_mudar_voto)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         inst_id,
                         cargo,
@@ -149,7 +150,8 @@ class BaseCollector(ABC):
                         margem_erro,
                         metodologia,
                         registro_tse,
-                        url
+                        url,
+                        pct_pode_mudar_voto
                     ))
                     pesquisa_id = cursor.lastrowid
                     n_pesquisas += 1
@@ -270,9 +272,11 @@ class BaseCollector(ABC):
             if c.get("nome") and c.get("percentual") is not None
         ]
 
-        # Anexa rejeições ao primeiro item para save() persistir
+        # Anexa rejeições e % pode mudar de voto ao primeiro item para save() persistir
         if items and rejeicoes:
             items[0]["rejeicoes"] = rejeicoes
+        if items:
+            items[0]["pct_pode_mudar_voto"] = resultado.get("pct_pode_mudar_voto")
 
         return items
 

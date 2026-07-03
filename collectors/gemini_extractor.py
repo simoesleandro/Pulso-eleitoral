@@ -39,6 +39,15 @@ REGRAS CRÍTICAS:
 - Pesquisas nacionais geralmente mencionam "todo o Brasil", "nível nacional",
   "eleitorado brasileiro" ou não mencionam estado nenhum
 
+EXTRAÇÃO DE "% PODE MUDAR DE VOTO":
+- Se o texto mencionar EXPLICITAMENTE o percentual de eleitores que podem
+  mudar de voto / ainda podem trocar de candidato / não têm voto decidido
+  até a eleição (ex.: "34% dos eleitores podem mudar de voto até outubro"),
+  capture esse número em "pct_pode_mudar_voto"
+- Se não houver menção clara e explícita desse dado no texto, retorne
+  "pct_pode_mudar_voto": null — NUNCA infira, estime ou calcule esse valor
+  a partir de indecisos/outros/nulos
+
 DETERMINAÇÃO DO CAMPO "tipo":
 Retorne "espontanea" ou "estimulada" com base nas pistas abaixo:
 
@@ -81,7 +90,8 @@ Retorne SOMENTE JSON válido, sem markdown, sem explicação:
   ],
   "rejeicoes": [
     {"nome": "Nome Candidato", "percentual": 46.0}
-  ]
+  ],
+  "pct_pode_mudar_voto": numero ou null
 }
 
 EXTRAÇÃO DE REJEIÇÃO:
@@ -135,6 +145,15 @@ REGRAS CRÍTICAS:
 - Cargo deve ser "presidente", "governador_rj", "governador_sp" etc
 - Se o texto for sobre aprovação/rejeição de governo sem intenção de voto, retorne lista vazia
 
+EXTRAÇÃO DE "% PODE MUDAR DE VOTO":
+- Se o texto mencionar EXPLICITAMENTE o percentual de eleitores que podem
+  mudar de voto / ainda podem trocar de candidato / não têm voto decidido
+  até a eleição (ex.: "34% dos eleitores podem mudar de voto até outubro"),
+  capture esse número em "pct_pode_mudar_voto"
+- Se não houver menção clara e explícita desse dado no texto, retorne
+  "pct_pode_mudar_voto": null — NUNCA infira, estime ou calcule esse valor
+  a partir de indecisos/outros/nulos
+
 DETERMINAÇÃO DO CAMPO "tipo":
 Retorne "espontanea" ou "estimulada" com base nas pistas abaixo:
 
@@ -174,7 +193,8 @@ Retorne SOMENTE JSON válido, sem markdown, sem explicação:
   "candidatos": [
     {"nome": "Nome Candidato", "percentual": 38.0},
     {"nome": "Nome Candidato 2", "percentual": 32.0}
-  ]
+  ],
+  "pct_pode_mudar_voto": numero ou null
 }
 
 EXTRAÇÃO DE NOMES DE CANDIDATOS:
@@ -470,7 +490,8 @@ def extrair_com_gemini(texto: str, fonte_url: str = "", permite_regional: bool =
             raw = raw[start_idx:end_idx+1]
             
         resultado = json.loads(raw.strip())
-        
+        resultado.setdefault("pct_pode_mudar_voto", None)
+
         candidatos = resultado.get("candidatos", [])
 
         # Cenário multipolar (1º turno): percentuais > 50% são inválidos
