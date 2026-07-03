@@ -905,6 +905,157 @@ def simular_monte_carlo_cenarios(
     }
 
 
+def _contagem_pesquisas_por_candidato(cargo: str, dias: int = 30) -> dict:
+    """Quantas pesquisas (linhas de intencoes) cada candidato tem na janela,
+    com os mesmos filtros de get_media_agregada (mesmo tipo, mesmos buckets
+    excluídos, mesmo filtro de status ativo/inelegível via LEFT JOIN
+    candidatos) — mas sem o corte de `len(entradas) < 2`, pra permitir
+    distinguir candidatos com dado insuficiente dos com dado suficiente."""
+    data_limite = (date.today() - timedelta(days=dias)).isoformat()
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT i.candidato, COUNT(*) AS n
+            FROM intencoes i
+            JOIN pesquisas p ON i.pesquisa_id = p.id
+            LEFT JOIN candidatos c ON c.nome_canonico = i.candidato
+            WHERE p.cargo = ? AND p.data_pesquisa >= ?
+            AND (i.tipo = 'estimulada' OR i.tipo IS NULL)
+            AND (c.status IS NULL OR c.status = 'ativo')
+            AND LOWER(i.candidato) NOT LIKE '%outros%'
+            AND LOWER(i.candidato) NOT LIKE '%nulos%'
+            AND LOWER(i.candidato) NOT LIKE '%brancos%'
+            AND LOWER(i.candidato) NOT LIKE '%indecisos%'
+            AND LOWER(i.candidato) NOT LIKE '%não sabe%'
+            AND LOWER(i.candidato) NOT LIKE '%não respondeu%'
+            GROUP BY i.candidato
+        """, (cargo, data_limite)).fetchall()
+    return {r['candidato']: r['n'] for r in rows}
+
+
+def _aviso_amostra_limitada(candidatos_suficientes: list[dict]) -> str:
+    """Monta o aviso de amostra limitada citando a maior variação real
+    observada entre pesquisas, quando disponível."""
+    variacoes = [c['variacao_30d'] for c in candidatos_suficientes if c.get('variacao_30d') is not None]
+    if variacoes:
+        maior = max(variacoes, key=abs)
+        detalhe = f"variação entre pesquisas maior que o usual ({abs(maior):.0f}pp)"
+    else:
+        detalhe = "poucos dados disponíveis pra estimar variação"
+    return (
+        f"Baseado em institutos com rosters de candidatos distintos; {detalhe}. "
+        "Interpretar com cautela até mais pesquisas confirmarem tendência."
+    )
+
+
+def simular_prob_vitoria_1_turno(
+    candidatos: dict,
+    n_simulacoes: int = 10000,
+    fator_sigma: float = 2.0,
+    sigma_minimo: float = 6.0,
+) -> dict:
+    """
+    Simula, de forma independente por candidato — sem pool compartilhado,
+    sem redistribuição entre concorrentes, sem depender de um segundo
+    candidato existir — a chance de vitória em 1º turno "sozinho" (share
+    simulado > 50.0).
+
+    Conceitualmente diferente de _simular_cenario/prob_vitoria (que é
+    par-a-par, pensado pra 2º turno: quem ganha entre A e B). Aqui cada
+    candidato é uma distribuição gauss(media, sigma) independente das
+    demais — não há "total da rodada" compartilhado, então não degenera
+    quando só existe 1 candidato com dado suficiente (bug corrigido:
+    antes, prob_vitoria_primeiro_turno(candidato, runs) dividia o share do
+    candidato pela soma do dict de runs, que com 1 candidato só é sempre
+    ele mesmo — share/total = 1.0 sempre, mascarando o sigma real).
+
+    `candidatos` é um dict {nome: {'media': float, 'margem': float,
+    'pct_pode_mudar_voto': float | None (opcional, default None)}}.
+
+    Retorna {nome: prob_pct} — % das n_simulacoes rodadas em que o valor
+    simulado desse candidato (isoladamente) ultrapassou 50.0.
+    """
+    import random
+
+    resultado = {}
+    for nome, dados in candidatos.items():
+        media = dados['media']
+        margem = dados['margem']
+        sigma = max(margem * fator_sigma, sigma_minimo) * fator_volatilidade(dados.get('pct_pode_mudar_voto'))
+
+        vitorias = 0
+        for _ in range(n_simulacoes):
+            if random.gauss(media, sigma) > 50.0:
+                vitorias += 1
+        resultado[nome] = round(vitorias / n_simulacoes * 100, 1)
+
+    return resultado
+
+
+def simular_monte_carlo_cargo(
+    cargo: str,
+    dias_media: int = 30,
+    n_simulacoes: int = 10000,
+    fator_sigma: float = 2.0,
+    sigma_minimo: float = 6.0,
+    margem_default: float = 2.0,
+) -> dict:
+    """
+    Simula a chance de vitória em 1º turno (share > 50%, isoladamente) de
+    cada candidato do cargo com dado suficiente (>= 2 pesquisas na janela)
+    — via simular_prob_vitoria_1_turno(), independente por candidato (sem
+    pool compartilhado nem depender de um segundo candidato existir).
+
+    Formato de resposta NOVO, sem chaves legadas do endpoint presidencial
+    (get_simulacao_monte_carlo) — este endpoint nasce sem dívida de
+    compatibilidade.
+    """
+    media = get_media_agregada(cargo, dias=dias_media)
+    candidatos_suficientes = media.get('candidatos', [])
+    nomes_suficientes = {c['candidato'] for c in candidatos_suficientes}
+
+    contagens = _contagem_pesquisas_por_candidato(cargo, dias=dias_media)
+    candidatos_dados_insuficientes = sorted(
+        nome for nome in contagens if nome not in nomes_suficientes
+    )
+
+    candidatos_simulados = []
+    if candidatos_suficientes:
+        margens = _margens_por_candidato(cargo)
+        pct_mudar_voto_valor = _pct_mudar_voto_recente(cargo)
+
+        entrada = {
+            c['candidato']: {
+                'media': c['media'],
+                'margem': margens.get(c['candidato'], margem_default),
+                'pct_pode_mudar_voto': pct_mudar_voto_valor,
+            }
+            for c in candidatos_suficientes
+        }
+        probs = simular_prob_vitoria_1_turno(
+            entrada, n_simulacoes=n_simulacoes,
+            fator_sigma=fator_sigma, sigma_minimo=sigma_minimo,
+        )
+
+        for c in candidatos_suficientes:
+            candidatos_simulados.append({
+                'nome': c['candidato'],
+                'media': c['media'],
+                'prob_vitoria_1_turno': probs[c['candidato']],
+            })
+        candidatos_simulados.sort(key=lambda c: c['media'], reverse=True)
+
+    amostra_limitada = len(candidatos_suficientes) < 2
+    aviso = _aviso_amostra_limitada(candidatos_suficientes) if amostra_limitada else None
+
+    return {
+        'cargo': cargo,
+        'candidatos_simulados': candidatos_simulados,
+        'candidatos_dados_insuficientes': candidatos_dados_insuficientes,
+        'amostra_limitada': amostra_limitada,
+        'aviso': aviso,
+    }
+
+
 def get_simulacao_monte_carlo(n_simulacoes: int = 10000) -> dict:
     """
     Wrapper de compatibilidade: simula os cenários presidenciais de sempre

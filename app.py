@@ -124,6 +124,7 @@ def require_login():
         'api_regional_presidente',
         'api_simulacao_segundo_turno',
         'api_monte_carlo',
+        'api_monte_carlo_governador_rj',
         'api_rejeicao',
         'apply_db'
     ]
@@ -631,6 +632,14 @@ def api_simulacao_segundo_turno():
 def api_monte_carlo():
     from database import get_simulacao_monte_carlo
     return jsonify(get_simulacao_monte_carlo())
+
+@app.route('/api/monte-carlo/governador_rj')
+@cache.cached(timeout=300)
+def api_monte_carlo_governador_rj():
+    """Chance de vitória em 1º turno por candidato pra governador RJ.
+    Formato novo, sem chaves legadas do endpoint presidencial."""
+    from database import simular_monte_carlo_cargo
+    return jsonify(simular_monte_carlo_cargo('governador_rj'))
 
 @app.route('/api/regional/presidente')
 def api_regional_presidente():

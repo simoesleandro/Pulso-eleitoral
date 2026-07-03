@@ -217,6 +217,11 @@
       <h3 class="pe-section__title" style="font-size:13px; margin-bottom:16px;">Simulação de 2º Turno</h3>
       <div id="simulacao-container" style="margin-bottom:24px;"></div>
 
+      <!-- Cenário de Vitória — Governador RJ (chance direta de vitória em 1º turno,
+           conceitualmente diferente da simulação de 2º turno acima) -->
+      <h3 class="pe-section__title" style="font-size:13px; margin-bottom:16px;">Cenário de Vitória — Governador RJ</h3>
+      <div id="cenario-vitoria-rj-container" style="margin-bottom:24px;"></div>
+
       <!-- Regional -->
       <h3 class="pe-section__title" style="font-size:13px; margin-bottom:16px;">Intenção de Voto por Estado</h3>
       <div class="pe-card"><div id="regional-container"></div></div>
@@ -853,6 +858,56 @@
       `;
     }
 
+    // ─── Cenário de Vitória — Governador RJ ────────────────────
+    // Chance de vitória em 1º turno (não é cabeça a cabeça como a
+    // Simulação de 2º Turno acima) — por isso card e função separados.
+    async function carregarCenarioVitoriaRJ() {
+      const container = document.getElementById('cenario-vitoria-rj-container');
+      try {
+        const res = await fetch('/api/monte-carlo/governador_rj');
+        const d = await res.json();
+
+        const simulados = d.candidatos_simulados || [];
+        const insuficientes = d.candidatos_dados_insuficientes || [];
+
+        const cardsSimulados = simulados.map((c, idx) => {
+          const cor = PE_CANDIDATE_COLORS[idx % PE_CANDIDATE_COLORS.length];
+          return `
+            <div class="pe-card" style="border-left:3px solid ${cor};">
+              <div class="pe-kpi__label">${c.nome}</div>
+              <div style="font-size:32px; font-weight:500; color:${cor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${c.prob_vitoria_1_turno.toFixed(1)}%</div>
+              <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">chance de vitória em 1º turno · média direta ${c.media.toFixed(1)}%</div>
+              <div style="background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
+                <div style="width:${Math.min(c.prob_vitoria_1_turno, 100)}%; height:100%; background:${cor}; border-radius:2px;"></div>
+              </div>
+            </div>`;
+        }).join('');
+
+        const listaInsuficientes = insuficientes.length ? `
+          <div class="pe-card" style="background:var(--pe-surface); border:none;">
+            <div class="pe-kpi__label" style="margin-bottom:8px;">Aguardando mais pesquisas</div>
+            ${insuficientes.map(nome => `
+              <div style="font-size:13px; color:var(--pe-text-muted); padding:4px 0;">${nome} — aguardando mais pesquisas</div>
+            `).join('')}
+          </div>` : '';
+
+        const avisoHtml = d.amostra_limitada ? `
+          <div style="background:#FFF8EC; border-left:3px solid var(--pe-warn); border-radius:0 4px 4px 0; padding:10px 14px; margin-top:12px; font-size:12px; color:var(--pe-warn);">
+            ⚠ Amostra limitada${d.aviso ? `: ${d.aviso}` : ''}
+          </div>` : '';
+
+        container.innerHTML = `
+          <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px;">
+            ${cardsSimulados || '<p class="pe-mono" style="color:var(--pe-text-muted);">Nenhum candidato com dado suficiente pra simular ainda.</p>'}
+          </div>
+          ${listaInsuficientes}
+          ${avisoHtml}
+        `;
+      } catch (e) {
+        container.innerHTML = '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar cenário de vitória — Governador RJ.</div>';
+      }
+    }
+
     // ─── Regional ─────────────────────────────────────────────
     async function carregarRegional() {
       const res = await fetch('/api/regional/presidente');
@@ -1029,6 +1084,7 @@
         carregarHistoricoMulti(),
         carregarAlertas(),
         carregarSimulacao(),
+        carregarCenarioVitoriaRJ(),
         carregarRegional(),
         carregarRejeicao(),
       ]);
