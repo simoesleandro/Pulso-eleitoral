@@ -874,6 +874,21 @@ def apply_db():
         return jsonify({'error': 'arquivo não é um banco SQLite válido do Pulso'}), 422
 
     shutil.move(new_db, current_db)
+
+    # Invalida o cache Flask-Caching logo após a troca do arquivo ter
+    # terminado sem erro (nunca antes — um clear() prematuro deixaria o
+    # cache vazio servindo o banco antigo até o próximo timeout).
+    #
+    # cache.clear() total é aceitável aqui porque, hoje, TUDO que é
+    # cacheado no processo (@cache.cached() nos endpoints) depende do
+    # SQLite que acabou de ser substituído — não existe cache de algo
+    # independente de banco de dados neste sistema. Se isso mudar no
+    # futuro (cache de um cálculo que não lê do SQLite), reavaliar pra
+    # invalidação seletiva por chave/prefixo em vez de derrubar tudo.
+    cache.clear()
+    from datetime import datetime
+    app.logger.info(f"[apply-db] cache invalidado após troca do banco em {datetime.now().isoformat()}")
+
     return jsonify({'ok': True, 'msg': 'banco aplicado'})
 
 @app.route('/api/rejeicao')
