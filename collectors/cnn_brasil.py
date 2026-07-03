@@ -1,9 +1,8 @@
-import re
 import time
 import unicodedata
 from bs4 import BeautifulSoup
 from .base import BaseCollector, logger
-from .utils import fetch_with_retry
+from .utils import fetch_with_retry, detectar_uf as _detectar_uf_utils
 
 BASE_URL = "https://www.cnnbrasil.com.br"
 LISTING_URL = "https://www.cnnbrasil.com.br/eleicoes/"
@@ -13,37 +12,6 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "pt-BR,pt;q=0.9",
     "Referer": "https://www.google.com.br/",
-}
-
-# UF_MAP mais completo que o da Gazeta (CNN cobre mais estados)
-UF_MAP = {
-    'sao paulo': 'SP', 'sp': 'SP',
-    'rio de janeiro': 'RJ', 'rj': 'RJ',
-    'minas gerais': 'MG', 'mg': 'MG',
-    'bahia': 'BA', 'ba': 'BA',
-    'rio grande do sul': 'RS', 'rs': 'RS',
-    'parana': 'PR', 'pr': 'PR',
-    'goias': 'GO', 'go': 'GO',
-    'ceara': 'CE', 'ce': 'CE',
-    'pernambuco': 'PE', 'pe': 'PE',
-    'para': 'PA', 'pa': 'PA',
-    'amazonas': 'AM', 'am': 'AM',
-    'maranhao': 'MA', 'ma': 'MA',
-    'santa catarina': 'SC', 'sc': 'SC',
-    'mato grosso do sul': 'MS', 'ms': 'MS',
-    'mato grosso': 'MT', 'mt': 'MT',
-    'espirito santo': 'ES', 'es': 'ES',
-    'distrito federal': 'DF', 'df': 'DF',
-    'rondonia': 'RO', 'ro': 'RO',
-    'tocantins': 'TO', 'to': 'TO',
-    'alagoas': 'AL', 'al': 'AL',
-    'sergipe': 'SE', 'se': 'SE',
-    'piaui': 'PI', 'pi': 'PI',
-    'rio grande do norte': 'RN', 'rn': 'RN',
-    'paraiba': 'PB', 'pb': 'PB',
-    'acre': 'AC', 'ac': 'AC',
-    'roraima': 'RR', 'rr': 'RR',
-    'amapa': 'AP', 'ap': 'AP',
 }
 
 
@@ -104,14 +72,7 @@ class CnnBrasilColetor(BaseCollector):
             return []
 
     def _detectar_uf(self, url: str, texto: str = '') -> str | None:
-        combinado = _norm(url + ' ' + texto)
-        tokens = set(re.split(r'[-/\s_]', combinado))
-        # Testa chaves multi-token primeiro (mais específicas) para evitar falso positivo
-        for chave, uf in UF_MAP.items():
-            chave_tokens = set(_norm(chave).split())
-            if chave_tokens.issubset(tokens):
-                return uf
-        return None
+        return _detectar_uf_utils(url, texto)
 
     def _salvar_regional(self, dados: list[dict], uf: str) -> None:
         if not dados:

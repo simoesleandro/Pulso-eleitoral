@@ -109,6 +109,41 @@ def test_parse_release_usa_gemini(coletor):
         assert kwargs['instituto_id'] == 7
 
 
+def test_parse_release_sem_uf_usa_permite_regional_false(coletor):
+    """Regressão: release nacional (sem menção de UF) continua com permite_regional=False,
+    como no comportamento anterior à correção do fallback."""
+    with patch.object(coletor, '_parse_com_gemini', return_value=[]) as mock_gemini:
+        coletor._parse_release(MOCK_RELEASE_HTML, "https://gazetadopovo.com.br/real-time-presidente/")
+        _, kwargs = mock_gemini.call_args
+        assert kwargs['permite_regional'] is False
+
+
+def test_parse_release_com_uf_usa_permite_regional_true(coletor):
+    """Release cujo texto/URL menciona um estado deve setar permite_regional=True,
+    roteando para o PROMPT_EXTRACAO_REGIONAL em vez do nacional."""
+    with patch.object(coletor, '_parse_com_gemini', return_value=[]) as mock_gemini:
+        coletor._parse_release(
+            "<html><body><p>Lula tem 41,6% no Rio de Janeiro</p></body></html>",
+            "https://exame.com/pesquisa-presidencial-rio-de-janeiro/",
+        )
+        _, kwargs = mock_gemini.call_args
+        assert kwargs['permite_regional'] is True
+
+
+def test_parse_release_fallback_uf_extrai_candidatos(coletor):
+    """Cenário do bug reportado: matéria de fallback (domínio não-Gazeta) mencionando
+    resultado presidencial recortado por estado deve retornar candidatos preenchidos,
+    não mais {"candidatos": []} por cair no prompt nacional."""
+    html_exame = (
+        "<html><body><h1>Pesquisa presidencial no Rio de Janeiro</h1>"
+        "<p>Lula tem 41,6% no Rio de Janeiro, Flávio Bolsonaro aparece com 38,6%</p>"
+        "</body></html>"
+    )
+    resultado = coletor._parse_release(html_exame, "https://exame.com/pesquisa-presidencial-rio-de-janeiro/")
+    # _parse_release salva em pesquisas_regionais e retorna [] quando uf é detectada e há dados
+    assert resultado == []
+
+
 def test_fetch_com_mock(coletor):
     """fetch() com _get_page mockado deve retornar lista de resultados."""
     mock_dados = [{'candidato': 'Lula', 'percentual': 45.0, 'instituto_id': 7, 'data_divulgacao': '2026-06-12'}]

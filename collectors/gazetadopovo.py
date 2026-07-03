@@ -1,10 +1,9 @@
-import re
 import time
 import unicodedata
 from bs4 import BeautifulSoup
 from .base import BaseCollector, logger
 from .playwright_base import PlaywrightCollector
-from .utils import fetch_with_retry
+from .utils import fetch_with_retry, detectar_uf as _detectar_uf_utils
 
 BASE_URL = "https://www.gazetadopovo.com.br"
 LISTING_URLS = [
@@ -47,19 +46,6 @@ INSTITUTO_ID_MAP = {
     'vox':              13,
     'gerp':             14,
     'instituto gerp':   14,
-}
-
-UF_MAP = {
-    'sao-paulo': 'SP', 'sao paulo': 'SP', 'sp': 'SP',
-    'rio-de-janeiro': 'RJ', 'rio de janeiro': 'RJ', 'rj': 'RJ',
-    'minas-gerais': 'MG', 'minas gerais': 'MG', 'mg': 'MG',
-    'bahia': 'BA', 'ba': 'BA',
-    'rio-grande-do-sul': 'RS', 'rio grande do sul': 'RS', 'rs': 'RS',
-    'parana': 'PR', 'pr': 'PR',
-    'goias': 'GO', 'go': 'GO',
-    'ceara': 'CE', 'ce': 'CE',
-    'pernambuco': 'PE', 'pe': 'PE',
-    'para': 'PA', 'pa': 'PA',
 }
 
 HEADERS = {
@@ -159,13 +145,7 @@ class GazetaDoPovoColetor(PlaywrightCollector, BaseCollector):
         return 7
 
     def _detectar_uf(self, url: str, texto: str = '') -> str | None:
-        combinado = _norm(url + ' ' + texto)
-        tokens = set(re.split(r'[-/\s_]', combinado))
-        for chave, uf in UF_MAP.items():
-            chave_tokens = set(_norm(chave).split())
-            if chave_tokens.issubset(tokens):
-                return uf
-        return None
+        return _detectar_uf_utils(url, texto)
 
     def _salvar_regional(self, dados: list[dict], uf: str) -> None:
         if not dados:
@@ -195,7 +175,7 @@ class GazetaDoPovoColetor(PlaywrightCollector, BaseCollector):
     def _parse_release(self, html: str, url: str) -> list[dict]:
         uf = self._detectar_uf(url, html[:1000])
         instituto_id = self._detectar_instituto_id(html[:2000], url)
-        dados = self._parse_com_gemini(html, url, instituto_id=instituto_id)
+        dados = self._parse_com_gemini(html, url, instituto_id=instituto_id, permite_regional=bool(uf))
 
         if uf and dados:
             self._salvar_regional(dados, uf)
