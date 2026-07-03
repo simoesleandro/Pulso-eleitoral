@@ -1,14 +1,8 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Metodologia — Pulso Eleitoral</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/tokens.css">
-  <link rel="stylesheet" href="/static/css/base.css">
+{% extends "base.html" %}
+
+{% block title %}Metodologia — Pulso Eleitoral{% endblock %}
+
+{% block head %}
   <style>
     .met-hero {
       background: var(--pe-navy);
@@ -205,33 +199,27 @@
     .met-oss-card__icon { font-size: 36px; flex-shrink: 0; }
     .met-oss-card__title { font-size: 15px; font-weight: 500; color: var(--pe-navy); margin-bottom: 6px; }
     .met-oss-card__text { font-size: 13px; color: var(--pe-text-muted); line-height: 1.5; margin-bottom: 12px; }
+
+    /* max-width mais estreito que .pe-container (leitura de texto corrido) */
+    .met-content-wrap { max-width: 900px; margin: 0 auto; padding-top: 36px; }
   </style>
-</head>
-<body class="pe-page">
+{% endblock %}
 
-  <nav class="pe-topbar">
-    <a class="pe-topbar__logo" href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pe-red)" stroke-width="2">
-        <circle cx="12" cy="12" r="3" fill="var(--pe-red)"/>
-        <circle cx="12" cy="12" r="7" stroke="var(--pe-red)" stroke-width="1.5" stroke-dasharray="2 2"/>
-        <circle cx="12" cy="12" r="10" stroke="var(--pe-red)" stroke-width="1"/>
-      </svg>
-      <span class="pe-topbar__name">Pulso Eleitoral</span>
-    </a>
-    <div class="pe-topbar__nav">
-      <a class="pe-topbar__nav-item" href="/dashboard">Dashboard</a>
-      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="/metodologia">Metodologia</a>
-    </div>
-    <div class="pe-topbar__meta"></div>
-  </nav>
+{% block topbar_nav %}
+  <a class="pe-topbar__nav-item" href="/dashboard">Dashboard</a>
+  <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="/metodologia">Metodologia</a>
+{% endblock %}
 
+{% block before_content %}
   <!-- Hero -->
   <div class="met-hero">
     <div class="met-hero__title">Como o Pulso Eleitoral funciona</div>
     <p class="met-hero__sub">Transparência total sobre coleta, cálculos e limitações — para você interpretar os números com segurança.</p>
   </div>
+{% endblock %}
 
-  <main class="pe-container" style="max-width:900px; padding-top:36px;">
+{% block content %}
+  <div class="met-content-wrap">
 
     <!-- Índice -->
     <nav class="met-toc" aria-label="Índice">
@@ -476,12 +464,12 @@
       </div>
     </section>
 
-  </main>
+  </div>
+{% endblock %}
 
+{% block footer %}
   <footer class="pe-footer">
     <p>Pulso Eleitoral · dados públicos · 2026</p>
     <a href="/dashboard">Voltar ao Dashboard</a>
   </footer>
-
-</body>
-</html>
+{% endblock %}

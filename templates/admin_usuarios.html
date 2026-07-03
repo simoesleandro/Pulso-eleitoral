@@ -1,14 +1,8 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Usuários — Pulso Eleitoral</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+{% extends "base.html" %}
+
+{% block title %}Usuários — Pulso Eleitoral{% endblock %}
+
+{% block head %}
   <style>
     .pe-alert {
       padding: var(--pe-space-3) var(--pe-space-4);
@@ -55,34 +49,18 @@
       border-color: var(--pe-navy);
     }
   </style>
-</head>
-<body class="pe-page">
+{% endblock %}
 
-  <!-- Topbar -->
-  <nav class="pe-topbar">
-    <a class="pe-topbar__logo" href="/">
-      <div class="pe-topbar__logomark">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <circle cx="7" cy="7" r="2.5" fill="#fff"/>
-          <path d="M7 1.5 Q11 4 11 7 Q11 10 7 12.5" stroke="rgba(255,255,255,0.85)" stroke-width="1.2" fill="none"/>
-          <path d="M7 1.5 Q3 4 3 7 Q3 10 7 12.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" fill="none"/>
-        </svg>
-      </div>
-      <span class="pe-topbar__name">Pulso Eleitoral — Admin</span>
-    </a>
+{% block topbar_nav %}
+  <a class="pe-topbar__nav-item" href="/">Dashboard</a>
+  <a class="pe-topbar__nav-item" href="/admin">Painel Admin</a>
+  <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="/admin/usuarios">Usuários</a>
+  <a class="pe-topbar__nav-item" href="/admin/status-coletores">Diagnóstico JSON</a>
+  <a class="pe-topbar__nav-item" href="/admin/logs">Logs JSON</a>
+  <a class="pe-topbar__nav-item" href="/logout">Sair</a>
+{% endblock %}
 
-    <div class="pe-topbar__nav">
-      <a class="pe-topbar__nav-item" href="/">Dashboard</a>
-      <a class="pe-topbar__nav-item" href="/admin">Painel Admin</a>
-      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="/admin/usuarios">Usuários</a>
-      <a class="pe-topbar__nav-item" href="/admin/status-coletores">Diagnóstico JSON</a>
-      <a class="pe-topbar__nav-item" href="/admin/logs">Logs JSON</a>
-      <a class="pe-topbar__nav-item" href="/logout">Sair</a>
-    </div>
-  </nav>
-
-  <!-- Conteúdo Principal -->
-  <main class="pe-main pe-container">
+{% block content %}
     <div style="margin-bottom: var(--pe-space-6);">
       <h1 class="pe-display">Gerenciamento de Usuários</h1>
       <p class="pe-mono" style="margin-top: var(--pe-space-1);">Controle de acesso ao painel de administração</p>
@@ -142,7 +120,7 @@
                         {% if user.ativo == 1 %}Desativar{% else %}Ativar{% endif %}
                       </button>
                     </form>
-                    
+
                     <!-- Botão Excluir -->
                     <form action="/admin/usuarios/{{ user.id }}/remover" method="POST" style="margin: 0;"
                           onsubmit="return confirm('Tem certeza que deseja excluir o usuário \'{{ user.username }}\'? Esta ação é irreversível.');">
@@ -192,8 +170,9 @@
         </form>
       </div>
     </div>
-  </main>
+{% endblock %}
 
+{% block scripts %}
   <script>
     document.getElementById('criar-usuario-form').addEventListener('submit', function(e) {
       const password = document.getElementById('password').value;
@@ -210,5 +189,4 @@
       }
     });
   </script>
-</body>
-</html>
+{% endblock %}

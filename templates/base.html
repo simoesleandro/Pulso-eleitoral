@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {% block head_meta %}{% endblock %}
   <title>{% block title %}Pulso Eleitoral 2026{% endblock %}</title>
 
   <!-- Fontes -->
@@ -35,38 +36,29 @@
     </a>
 
     <div class="pe-topbar__nav" id="topbar-nav">
-      <a class="pe-topbar__nav-item {% if request.endpoint == 'index' %}pe-topbar__nav-item--active{% endif %}"
-         href="/">visão geral</a>
-      <a class="pe-topbar__nav-item {% if request.endpoint == 'presidente' %}pe-topbar__nav-item--active{% endif %}"
-         href="/presidente">presidente</a>
-      <a class="pe-topbar__nav-item {% if request.endpoint == 'governador_rj' %}pe-topbar__nav-item--active{% endif %}"
-         href="/governador-rj">gov. rj</a>
-      <a class="pe-topbar__nav-item {% if request.endpoint == 'institutos' %}pe-topbar__nav-item--active{% endif %}"
-         href="/institutos">institutos</a>
-      <a class="pe-topbar__nav-item {% if request.endpoint == 'eventos' %}pe-topbar__nav-item--active{% endif %}"
-         href="/eventos">eventos</a>
+      {% block topbar_nav %}{% endblock %}
     </div>
 
     <div class="pe-topbar__meta">
+      {% block topbar_meta_extra %}{% endblock %}
       <span id="topbar-update">carregando...</span>
       <div class="pe-topbar__status-dot" id="topbar-dot"></div>
     </div>
     <button class="pe-topbar__burger" id="topbar-burger" aria-label="Abrir menu" aria-expanded="false" aria-controls="topbar-nav">☰</button>
   </nav>
 
+  {% block before_content %}{% endblock %}
+
   <!-- Conteúdo principal -->
-  <main class="pe-main">
+  <main class="pe-main pe-container">
     {% block content %}{% endblock %}
   </main>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  {% block footer %}{% endblock %}
 
-  <!-- Helpers Pulso Eleitoral -->
-  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+  {% block chart_libs %}{% endblock %}
 
-  <!-- Status do sistema -->
+  <!-- Status do sistema + menu hambúrguer (compartilhado por todas as páginas) -->
   <script>
     fetch('/api/status')
       .then(r => r.json())

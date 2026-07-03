@@ -22,6 +22,12 @@ body {
   top: 0;
   z-index: 100;
 }
+.pe-topbar__logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
 .pe-topbar__name {
   color: #fff;
   font-size: 15px;
@@ -214,6 +220,17 @@ body {
 }
 @media (max-width: 768px) {
   .pe-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+.pe-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 24px;
+}
+@media (max-width: 767px) {
+  .pe-grid-3 {
     grid-template-columns: 1fr;
   }
 }

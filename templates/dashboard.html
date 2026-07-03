@@ -1,14 +1,8 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard — Pulso Eleitoral</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/tokens.css">
-  <link rel="stylesheet" href="/static/css/base.css">
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Pulso Eleitoral{% endblock %}
+
+{% block head %}
   <style>
     .pe-tooltip-wrap { position:relative; display:inline-flex; align-items:center; cursor:default; }
     .pe-tooltip-wrap .pe-tooltip {
@@ -32,34 +26,22 @@
     .pe-tipo-btn:not(:last-child) { border-right:0.5px solid rgba(10,34,64,0.12); }
     .pe-tipo-btn--active { background:#E8F0FE; color:#1A56DB; font-weight:500; }
   </style>
-</head>
-<body class="pe-page">
+{% endblock %}
 
-  <nav class="pe-topbar">
-    <a class="pe-topbar__logo" href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pe-red)" stroke-width="2">
-        <circle cx="12" cy="12" r="3" fill="var(--pe-red)"/>
-        <circle cx="12" cy="12" r="7" stroke="var(--pe-red)" stroke-width="1.5" stroke-dasharray="2 2"/>
-        <circle cx="12" cy="12" r="10" stroke="var(--pe-red)" stroke-width="1"/>
-      </svg>
-      <span class="pe-topbar__name">Pulso Eleitoral</span>
-    </a>
-    <div class="pe-topbar__nav" id="topbar-nav">
-      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="#secao-visao-geral" id="nav-visao-geral">Visão Geral</a>
-      <a class="pe-topbar__nav-item" href="#secao-presidente" id="nav-presidente">Presidente</a>
-      <a class="pe-topbar__nav-item" href="#secao-governador" id="nav-governador">Gov. RJ</a>
-      <a class="pe-topbar__nav-item" href="#secao-analise" id="nav-analise">Análise</a>
-      <a class="pe-topbar__nav-item" href="#secao-dados" id="nav-dados">Dados</a>
-      <a class="pe-topbar__nav-item" href="/metodologia">Metodologia</a>
-    </div>
-    <div class="pe-topbar__meta">
-      <span id="badge-update">carregando...</span>
-      <div class="pe-topbar__status-dot"></div>
-    </div>
-    <button class="pe-topbar__burger" id="topbar-burger" aria-label="Abrir menu" aria-expanded="false" aria-controls="topbar-nav">☰</button>
-  </nav>
+{% block topbar_nav %}
+  <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="#secao-visao-geral" id="nav-visao-geral">Visão Geral</a>
+  <a class="pe-topbar__nav-item" href="#secao-presidente" id="nav-presidente">Presidente</a>
+  <a class="pe-topbar__nav-item" href="#secao-governador" id="nav-governador">Gov. RJ</a>
+  <a class="pe-topbar__nav-item" href="#secao-analise" id="nav-analise">Análise</a>
+  <a class="pe-topbar__nav-item" href="#secao-dados" id="nav-dados">Dados</a>
+  <a class="pe-topbar__nav-item" href="/metodologia">Metodologia</a>
+{% endblock %}
 
-  <main class="pe-container pe-main">
+{% block topbar_meta_extra %}
+  <span id="pres-atualizacao-badge"></span>
+{% endblock %}
+
+{% block content %}
 
     <!-- SEÇÃO 1: VISÃO GERAL -->
     <section id="secao-visao-geral" class="pe-section">
@@ -233,16 +215,22 @@
       <div class="pe-grid-institutos" id="lista-institutos"></div>
     </section>
 
-  </main>
+{% endblock %}
 
+{% block footer %}
   <footer class="pe-footer">
     <p>Pulso Eleitoral · dados públicos · 2026</p>
     <a href="/admin">Painel Administrativo</a>
   </footer>
+{% endblock %}
 
+{% block chart_libs %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
   <script src="/static/js/charts.js"></script>
+{% endblock %}
+
+{% block scripts %}
   <script>
     Chart.register(ChartDataLabels);
     Chart.defaults.color = '#5a7184';
@@ -339,7 +327,7 @@
       }
       document.getElementById('pres-data').textContent = formatarData(data.data_coleta);
       document.getElementById('pres-fonte').textContent = `Fonte: ${data.instituto} | ${formatarData(data.data_coleta)}`;
-      document.getElementById('badge-update').textContent = `atualizado em: ${formatarData(data.data_coleta)}`;
+      document.getElementById('pres-atualizacao-badge').textContent = `atualizado em: ${formatarData(data.data_coleta)}`;
 
       const ctx = document.getElementById('chart-presidente');
       if (chartPres) chartPres.destroy();
@@ -1093,6 +1081,8 @@
     document.addEventListener('DOMContentLoaded', inicializar);
   </script>
   <script>
+    // Realça o item de nav correspondente à seção visível (scroll-spy).
+    // O toggle do menu hambúrguer é tratado globalmente em base.html.
     const sections = [
       { id: 'secao-visao-geral', nav: 'nav-visao-geral' },
       { id: 'secao-presidente',  nav: 'nav-presidente' },
@@ -1126,28 +1116,5 @@
       const el = document.getElementById(s.id);
       if (el) observer.observe(el);
     });
-
-    // Menu hambúrguer (mobile)
-    const topbarBurger = document.getElementById('topbar-burger');
-    const topbarNav = document.getElementById('topbar-nav');
-    if (topbarBurger && topbarNav) {
-      topbarBurger.addEventListener('click', () => {
-        const isOpen = topbarNav.classList.toggle('pe-topbar__nav--open');
-        topbarBurger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      });
-      topbarNav.querySelectorAll('.pe-topbar__nav-item').forEach(item => {
-        item.addEventListener('click', () => {
-          topbarNav.classList.remove('pe-topbar__nav--open');
-          topbarBurger.setAttribute('aria-expanded', 'false');
-        });
-      });
-      document.addEventListener('click', (e) => {
-        if (!topbarNav.contains(e.target) && !topbarBurger.contains(e.target)) {
-          topbarNav.classList.remove('pe-topbar__nav--open');
-          topbarBurger.setAttribute('aria-expanded', 'false');
-        }
-      });
-    }
   </script>
-</body>
-</html>
+{% endblock %}

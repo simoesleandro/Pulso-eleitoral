@@ -1,15 +1,12 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
+
+{% block title %}Coletar URL — Pulso Eleitoral{% endblock %}
+
+{% block head_meta %}
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <title>Coletar URL — Pulso Eleitoral</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+{% endblock %}
+
+{% block head %}
   <style>
     .cu-card { padding: 2rem; }
 
@@ -79,31 +76,17 @@
       margin-top: var(--pe-space-3);
     }
   </style>
-</head>
-<body class="pe-page">
+{% endblock %}
 
-  <!-- Topbar -->
-  <nav class="pe-topbar">
-    <a class="pe-topbar__logo" href="/">
-      <div class="pe-topbar__logomark">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <circle cx="7" cy="7" r="2.5" fill="#fff"/>
-          <path d="M7 1.5 Q11 4 11 7 Q11 10 7 12.5" stroke="rgba(255,255,255,0.85)" stroke-width="1.2" fill="none"/>
-          <path d="M7 1.5 Q3 4 3 7 Q3 10 7 12.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" fill="none"/>
-        </svg>
-      </div>
-      <span class="pe-topbar__name">Pulso Eleitoral — Admin</span>
-    </a>
-    <div class="pe-topbar__nav">
-      <a class="pe-topbar__nav-item" href="/">Dashboard</a>
-      <a class="pe-topbar__nav-item" href="/admin">Painel Admin</a>
-      <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="/admin/coletar-url">Coletar URL</a>
-      <a class="pe-topbar__nav-item" href="/admin/usuarios">Usuários</a>
-      <a class="pe-topbar__nav-item" href="/logout">Sair</a>
-    </div>
-  </nav>
+{% block topbar_nav %}
+  <a class="pe-topbar__nav-item" href="/">Dashboard</a>
+  <a class="pe-topbar__nav-item" href="/admin">Painel Admin</a>
+  <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="/admin/coletar-url">Coletar URL</a>
+  <a class="pe-topbar__nav-item" href="/admin/usuarios">Usuários</a>
+  <a class="pe-topbar__nav-item" href="/logout">Sair</a>
+{% endblock %}
 
-  <main class="pe-main pe-container">
+{% block content %}
     <div style="margin-bottom: var(--pe-space-6);">
       <h1 class="pe-display">Coletar URL Específica</h1>
       <p class="pe-mono" style="margin-top: var(--pe-space-1); color: var(--pe-text-secondary);">
@@ -145,8 +128,9 @@
 
       </div>
     </div>
-  </main>
+{% endblock %}
 
+{% block scripts %}
   <script>
     const btn      = document.getElementById('cu-btn');
     const spinner  = document.getElementById('cu-spinner');
@@ -258,5 +242,4 @@
       urlPrev.textContent = url;
     }
   </script>
-</body>
-</html>
+{% endblock %}
