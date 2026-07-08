@@ -144,7 +144,7 @@ Limitações externas são tratadas explicitamente. Quando uma fonte muda para p
 | IA / AI | Gemini 2.5 Flash (google-genai) |
 | Scraping | Playwright, BeautifulSoup4, lxml |
 | Deploy | Fly.io (região GRU) |
-| Testes / Tests | pytest (61 testes) |
+| Testes / Tests | pytest (165 testes) |
 
 ---
 
@@ -218,7 +218,7 @@ Pulso-eleitoral/
 ├── static/css/          # Design system (tokens.css, base.css)
 ├── static/js/           # Chart.js helpers (charts.js)
 ├── templates/           # Dashboard, login, admin
-├── tests/               # 61 testes pytest
+├── tests/               # 165 testes pytest
 ├── scripts/             # sync_db.py (local → Fly.io)
 ├── app.py               # Flask + rotas + APScheduler
 ├── database.py          # SQLite helpers
@@ -257,7 +257,7 @@ pytest --cov=. --cov-report=term-missing
 pytest tests/test_dashboard.py -v
 ```
 
-> **61 testes** cobrindo coletores, dashboard, banco, scheduler, notificações e usuários.
+> **165 testes** cobrindo coletores, dashboard, banco, scheduler, notificações e usuários.
 
 ---
 

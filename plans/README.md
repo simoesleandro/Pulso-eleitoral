@@ -22,7 +22,7 @@ Planos 001–005 escritos contra o commit `2b49ba3`; planos 006–017 contra `b3
 | 008 | Cache de candidatos resiliente + invalidação no apply-db | P1 | S | — | DONE |
 | 010 | Testes numéricos do poll-of-polls + caracterização dos KPIs | P1 | M | — | DONE |
 | 009 | Cache nos endpoints, eliminação de N+1 e índices | P2 | M | **010** | DONE |
-| 011 | Empacotamento (playwright, pyproject, lockfile) e docs corretos | P2 | S–M | — | TODO |
+| 011 | Empacotamento (playwright, pyproject, lockfile) e docs corretos | P2 | S–M | — | DONE |
 | 012 | DRY camada Gemini (prompts compostos + cascata única) | P2 | M | **007** | TODO |
 | 014 | CLAUDE.md com regras não-óbvias do repo | P2 | S | 011* | TODO |
 | 013 | Contrato do coletor no ABC + remoção de código morto | P3 | S | **006, 007** | TODO |
