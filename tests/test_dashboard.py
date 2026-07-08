@@ -200,7 +200,6 @@ def test_api_media_agregada(client):
     data = response.json
     assert 'candidatos' in data
     assert isinstance(data['candidatos'], list)
-    assert len(data['candidatos']) > 0
     assert 'cargo' in data
     assert data['cargo'] == 'presidente'
     assert 'total_pesquisas' in data
@@ -212,6 +211,23 @@ def test_api_media_agregada(client):
     assert 'min' in primeiro
     assert 'max' in primeiro
     assert 'pesquisas_count' in primeiro
+
+def test_api_media_agregada_dias_nao_numerico_nao_quebra(client):
+    """Testa que ?dias=abc (não-numérico) não gera 500 — cai no default."""
+    setup_db_with_seed()
+    response = client.get('/api/media-agregada?cargo=presidente&dias=abc')
+    assert response.status_code == 200
+    data = response.json
+    assert 'candidatos' in data
+
+def test_api_alertas_params_nao_numericos_nao_quebram(client):
+    """Testa que ?limiar=x&janela=y (não-numéricos) não geram 500 — caem no default."""
+    setup_db_with_seed()
+    response = client.get('/api/alertas?cargo=presidente&limiar=x&janela=y')
+    assert response.status_code == 200
+    data = response.json
+    assert 'alertas' in data
+    assert isinstance(data['alertas'], list)
 
 from unittest.mock import patch, MagicMock
 

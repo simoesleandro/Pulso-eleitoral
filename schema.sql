@@ -93,6 +93,8 @@ CREATE INDEX IF NOT EXISTS idx_pesquisas_data_pesquisa ON pesquisas(data_pesquis
 CREATE INDEX IF NOT EXISTS idx_alertas_cargo ON alertas(cargo);
 CREATE INDEX IF NOT EXISTS idx_rejeicoes_pesquisa_id ON rejeicoes(pesquisa_id);
 CREATE INDEX IF NOT EXISTS idx_rejeicoes_candidato ON rejeicoes(candidato);
+CREATE INDEX IF NOT EXISTS idx_pesquisas_instituto_id ON pesquisas(instituto_id);
+CREATE INDEX IF NOT EXISTS idx_pesquisas_cargo_data ON pesquisas(cargo, data_pesquisa);
 
 -- 8. Dados regionais de intenção de voto por UF
 CREATE TABLE IF NOT EXISTS pesquisas_regionais (

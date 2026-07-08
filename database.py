@@ -1150,6 +1150,17 @@ def get_dados_regionais() -> dict:
     return {"candidatos": candidatos, "estados": estados}
 
 
+def _media_intervalo(pontos: list[tuple[str, float]], inicio: str, fim: str = None):
+    """Média dos percentuais com data_pesquisa em [inicio, fim) — ou
+    [inicio, ...] se fim for None. Retorna None se não houver pontos no
+    intervalo (equivalente a um AVG(...) SQL retornando NULL)."""
+    if fim:
+        vals = [pct for dt, pct in pontos if inicio <= dt < fim]
+    else:
+        vals = [pct for dt, pct in pontos if dt >= inicio]
+    return mean(vals) if vals else None
+
+
 def get_kpis_avancados(cargo: str) -> dict:
     """Calcula 6 KPIs analíticos avançados com base na média agregada dos últimos 30 dias."""
     from statistics import stdev
@@ -1160,6 +1171,22 @@ def get_kpis_avancados(cargo: str) -> dict:
 
     media_data = get_media_agregada(cargo, dias=30)
     candidatos = media_data.get("candidatos", [])
+
+    # Uma única passada: todas as intenções (estimulada/NULL) da janela de 60
+    # dias, agrupadas por candidato, para alimentar tendencia_aceleracao,
+    # campo_minado e volatilidade sem uma query por candidato.
+    with get_db() as conn:
+        rows_janela = conn.execute(
+            "SELECT i.candidato, p.data_pesquisa, i.percentual FROM intencoes i "
+            "JOIN pesquisas p ON i.pesquisa_id = p.id "
+            "WHERE p.cargo=? AND p.data_pesquisa>=? "
+            "AND (i.tipo='estimulada' OR i.tipo IS NULL) "
+            "ORDER BY i.candidato, p.data_pesquisa",
+            (cargo, d60)
+        ).fetchall()
+    por_candidato: dict[str, list[tuple[str, float]]] = {}
+    for r in rows_janela:
+        por_candidato.setdefault(r["candidato"], []).append((r["data_pesquisa"], r["percentual"]))
 
     # --- margem_lideranca ---
     if len(candidatos) >= 2:
@@ -1193,82 +1220,55 @@ def get_kpis_avancados(cargo: str) -> dict:
     # --- tendencia_aceleracao (top 3) ---
     top3_nomes = [c["candidato"] for c in candidatos[:3]]
     tendencia_aceleracao = []
-    with get_db() as conn:
-        for nome in top3_nomes:
-            def _avg(cand, c_start, c_end=None):
-                if c_end:
-                    r = conn.execute(
-                        "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
-                        "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? AND p.data_pesquisa<? "
-                        "AND (i.tipo='estimulada' OR i.tipo IS NULL)",
-                        (cand, cargo, c_start, c_end)
-                    ).fetchone()
-                else:
-                    r = conn.execute(
-                        "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
-                        "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? "
-                        "AND (i.tipo='estimulada' OR i.tipo IS NULL)",
-                        (cand, cargo, c_start)
-                    ).fetchone()
-                return r["m"] if r and r["m"] is not None else 0.0
+    for nome in top3_nomes:
+        pontos = por_candidato.get(nome, [])
+        m_rec15 = _media_intervalo(pontos, d15) or 0.0
+        m_ant15 = _media_intervalo(pontos, d30, d15) or 0.0
+        m_rec30 = _media_intervalo(pontos, d30) or 0.0
+        m_ant30 = _media_intervalo(pontos, d60, d30) or 0.0
 
-            m_rec15 = _avg(nome, d15)
-            m_ant15 = _avg(nome, d30, d15)
-            m_rec30 = _avg(nome, d30)
-            m_ant30 = _avg(nome, d60, d30)
+        t15 = round(m_rec15 - m_ant15, 1)
+        t30 = round(m_rec30 - m_ant30, 1)
 
-            t15 = round(m_rec15 - m_ant15, 1)
-            t30 = round(m_rec30 - m_ant30, 1)
+        if abs(t15) < 0.5 and abs(t30) < 0.5:
+            acel = "estavel"
+        elif t15 >= 0 and t30 >= 0:
+            acel = "acelerando_alta" if t15 >= t30 else "desacelerando_alta"
+        elif t15 < 0 and t30 < 0:
+            acel = "acelerando_queda" if t15 <= t30 else "desacelerando_queda"
+        elif t15 > 0:
+            acel = "acelerando_alta"
+        else:
+            acel = "acelerando_queda"
 
-            if abs(t15) < 0.5 and abs(t30) < 0.5:
-                acel = "estavel"
-            elif t15 >= 0 and t30 >= 0:
-                acel = "acelerando_alta" if t15 >= t30 else "desacelerando_alta"
-            elif t15 < 0 and t30 < 0:
-                acel = "acelerando_queda" if t15 <= t30 else "desacelerando_queda"
-            elif t15 > 0:
-                acel = "acelerando_alta"
-            else:
-                acel = "acelerando_queda"
-
-            tendencia_aceleracao.append({
-                "candidato": nome,
-                "tendencia_15d": t15,
-                "tendencia_30d": t30,
-                "aceleracao": acel,
-            })
+        tendencia_aceleracao.append({
+            "candidato": nome,
+            "tendencia_15d": t15,
+            "tendencia_30d": t30,
+            "aceleracao": acel,
+        })
 
     # --- campo_minado (candidatos fora do top 2, entre 2% e 15%) ---
     campo_minado = []
-    with get_db() as conn:
-        for c in candidatos[2:]:
-            if not (2.0 <= c["media"] <= 15.0):
-                continue
-            r_rec = conn.execute(
-                "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
-                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? "
-                "AND (i.tipo='estimulada' OR i.tipo IS NULL)",
-                (c["candidato"], cargo, d15)
-            ).fetchone()
-            r_ant = conn.execute(
-                "SELECT AVG(i.percentual) AS m FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
-                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? AND p.data_pesquisa<? "
-                "AND (i.tipo='estimulada' OR i.tipo IS NULL)",
-                (c["candidato"], cargo, d30, d15)
-            ).fetchone()
-            pct_atual = round(r_rec["m"] if r_rec and r_rec["m"] is not None else c["media"], 1)
-            pct_ant = r_ant["m"] if r_ant and r_ant["m"] is not None else None
-            if pct_ant and pct_ant > 0:
-                cresc = round((pct_atual - pct_ant) / pct_ant * 100, 1)
-            else:
-                cresc = 0.0
-            campo_minado.append({
-                "candidato": c["candidato"],
-                "percentual_atual": pct_atual,
-                "percentual_anterior": round(pct_ant, 1) if pct_ant else pct_atual,
-                "crescimento_relativo": cresc,
-                "em_ascensao": cresc > 20,
-            })
+    for c in candidatos[2:]:
+        if not (2.0 <= c["media"] <= 15.0):
+            continue
+        pontos = por_candidato.get(c["candidato"], [])
+        m_rec = _media_intervalo(pontos, d15)
+        m_ant = _media_intervalo(pontos, d30, d15)
+        pct_atual = round(m_rec if m_rec is not None else c["media"], 1)
+        pct_ant = m_ant
+        if pct_ant and pct_ant > 0:
+            cresc = round((pct_atual - pct_ant) / pct_ant * 100, 1)
+        else:
+            cresc = 0.0
+        campo_minado.append({
+            "candidato": c["candidato"],
+            "percentual_atual": pct_atual,
+            "percentual_anterior": round(pct_ant, 1) if pct_ant else pct_atual,
+            "crescimento_relativo": cresc,
+            "em_ascensao": cresc > 20,
+        })
     campo_minado.sort(key=lambda x: x["crescimento_relativo"], reverse=True)
     campo_minado = campo_minado[:3]
 
@@ -1291,21 +1291,15 @@ def get_kpis_avancados(cargo: str) -> dict:
 
     # --- volatilidade (top 3) ---
     vol_candidatos = []
-    with get_db() as conn:
-        for c in candidatos[:3]:
-            rows = conn.execute(
-                "SELECT i.percentual FROM intencoes i JOIN pesquisas p ON i.pesquisa_id = p.id "
-                "WHERE i.candidato=? AND p.cargo=? AND p.data_pesquisa>=? "
-                "AND (i.tipo='estimulada' OR i.tipo IS NULL) ORDER BY p.data_pesquisa",
-                (c["candidato"], cargo, d30)
-            ).fetchall()
-            pcts = [r["percentual"] for r in rows]
-            dp = round(stdev(pcts), 1) if len(pcts) >= 2 else 0.0
-            vol_candidatos.append({
-                "candidato": c["candidato"],
-                "desvio_padrao": dp,
-                "classificacao": "baixa" if dp < 2 else ("media" if dp <= 4 else "alta"),
-            })
+    for c in candidatos[:3]:
+        pontos = por_candidato.get(c["candidato"], [])
+        pcts = [pct for dt, pct in pontos if dt >= d30]
+        dp = round(stdev(pcts), 1) if len(pcts) >= 2 else 0.0
+        vol_candidatos.append({
+            "candidato": c["candidato"],
+            "desvio_padrao": dp,
+            "classificacao": "baixa" if dp < 2 else ("media" if dp <= 4 else "alta"),
+        })
 
     media_dp = mean([v["desvio_padrao"] for v in vol_candidatos]) if vol_candidatos else 0.0
     cenario_geral = "estavel" if media_dp < 2 else ("moderado" if media_dp <= 4 else "volatil")
@@ -1351,25 +1345,36 @@ def get_historico_multi(candidatos: list[str], cargo: str, tipo: str = 'estimula
     else:
         filtro_tipo = "(i.tipo = 'estimulada' OR i.tipo IS NULL)"
     candidatos = [c for c in candidatos if _e_candidato(c)]
-    series = []
+    if not candidatos:
+        return []
+
+    placeholders = ",".join("?" * len(candidatos))
     with get_db() as conn:
-        for idx, candidato in enumerate(candidatos):
-            rows = conn.execute(f"""
-                SELECT p.data_pesquisa AS data, i.percentual, p.margem_erro, inst.nome AS instituto
-                FROM intencoes i
-                JOIN pesquisas p ON i.pesquisa_id = p.id
-                JOIN institutos inst ON p.instituto_id = inst.id
-                WHERE i.candidato = ? AND p.cargo = ?
-                AND {filtro_tipo}
-                ORDER BY p.data_pesquisa ASC
-            """, (candidato, cargo)).fetchall()
-            cor = get_cores_candidatos().get(candidato, _FALLBACK_COLORS[idx % len(_FALLBACK_COLORS)])
-            series.append({
-                "candidato": candidato,
-                "cor": cor,
-                "dados": [{"data": r["data"], "percentual": r["percentual"],
-                           "margem_erro": r["margem_erro"], "instituto": r["instituto"]} for r in rows]
-            })
+        rows = conn.execute(f"""
+            SELECT i.candidato, p.data_pesquisa AS data, i.percentual, p.margem_erro, inst.nome AS instituto
+            FROM intencoes i
+            JOIN pesquisas p ON i.pesquisa_id = p.id
+            JOIN institutos inst ON p.instituto_id = inst.id
+            WHERE i.candidato IN ({placeholders}) AND p.cargo = ?
+            AND {filtro_tipo}
+            ORDER BY i.candidato, p.data_pesquisa ASC
+        """, (*candidatos, cargo)).fetchall()
+
+    por_candidato: dict[str, list] = {c: [] for c in candidatos}
+    for r in rows:
+        por_candidato[r["candidato"]].append({
+            "data": r["data"], "percentual": r["percentual"],
+            "margem_erro": r["margem_erro"], "instituto": r["instituto"]
+        })
+
+    series = []
+    for idx, candidato in enumerate(candidatos):
+        cor = get_cores_candidatos().get(candidato, _FALLBACK_COLORS[idx % len(_FALLBACK_COLORS)])
+        series.append({
+            "candidato": candidato,
+            "cor": cor,
+            "dados": por_candidato[candidato],
+        })
     return series
 
 

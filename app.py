@@ -34,7 +34,11 @@ if not _secret:
     )
 app.secret_key = _secret
 
-cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
+# NullCache em testes: SimpleCache é global no processo, então respostas
+# cacheadas por um teste vazariam para o próximo teste que reusa a mesma rota
+# com dados diferentes no banco.
+_cache_type = 'NullCache' if os.getenv('TESTING') == 'True' else 'SimpleCache'
+cache = Cache(app, config={'CACHE_TYPE': _cache_type, 'CACHE_DEFAULT_TIMEOUT': 300})
 
 # Flags de cookie de sessão (defesa contra XSS/MITM/CSRF).
 # Secure só em produção (Fly serve HTTPS); em dev local sobre HTTP ficaria inutilizável.
@@ -61,6 +65,14 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+def _parse_num(valor, tipo, default):
+    """Coage query param para int/float com fallback seguro — evita 500 em
+    endpoints públicos quando o cliente manda um valor não-numérico."""
+    try:
+        return tipo(valor)
+    except (TypeError, ValueError):
+        return default
 
 # Instancia o scheduler globalmente fora da inicialização do app
 scheduler = BackgroundScheduler()
@@ -416,6 +428,7 @@ def admin_toggle_usuario(user_id):
     return redirect(url_for('admin_usuarios'))
 
 @app.route('/api/visao-geral')
+@cache.cached(timeout=300)
 def api_visao_geral():
     """Retorna dados estatísticos e tendências consolidadas para a visão geral."""
     from database import get_visao_geral
@@ -582,15 +595,17 @@ def api_pesquisas_governador_rj():
     })
 
 @app.route('/api/alertas')
+@cache.cached(timeout=300, query_string=True)
 def api_alertas():
     """Retorna alertas de variações bruscas de percentual."""
     from database import detectar_variacoes_bruscas
     cargo = request.args.get('cargo', 'presidente')
-    limiar = float(request.args.get('limiar', 3.0))
-    janela = int(request.args.get('janela', 7))
+    limiar = _parse_num(request.args.get('limiar'), float, 3.0)
+    janela = _parse_num(request.args.get('janela'), int, 7)
     return jsonify({"alertas": detectar_variacoes_bruscas(cargo, limiar, janela)})
 
 @app.route('/api/pesquisas/historico-multi')
+@cache.cached(timeout=300, query_string=True)
 def api_pesquisas_historico_multi():
     """Retorna séries históricas de múltiplos candidatos para um cargo."""
     from database import get_historico_multi, get_top_candidatos
@@ -607,14 +622,16 @@ def api_pesquisas_historico_multi():
     return jsonify({"cargo": cargo, "series": series})
 
 @app.route('/api/media-agregada')
+@cache.cached(timeout=300, query_string=True)
 def api_media_agregada():
     """Retorna média agregada dos últimos 30 dias por candidato para um cargo."""
     from database import get_media_agregada
     cargo = request.args.get('cargo', 'presidente')
-    dias = int(request.args.get('dias', 30))
+    dias = _parse_num(request.args.get('dias'), int, 30)
     return jsonify(get_media_agregada(cargo, dias))
 
 @app.route('/api/kpis-avancados')
+@cache.cached(timeout=300, query_string=True)
 def api_kpis_avancados():
     """Retorna 6 KPIs analíticos avançados para o cargo."""
     from database import get_kpis_avancados
@@ -622,6 +639,7 @@ def api_kpis_avancados():
     return jsonify(get_kpis_avancados(cargo))
 
 @app.route('/api/simulacao-segundo-turno')
+@cache.cached(timeout=300)
 def api_simulacao_segundo_turno():
     """Retorna simulação de 2º turno com redistribuição proporcional de votos."""
     from database import get_simulacao_segundo_turno
@@ -642,12 +660,14 @@ def api_monte_carlo_governador_rj():
     return jsonify(simular_monte_carlo_cargo('governador_rj'))
 
 @app.route('/api/regional/presidente')
+@cache.cached(timeout=300)
 def api_regional_presidente():
     """Retorna dados regionais de intenção de voto por UF para mapa de calor."""
     from database import get_dados_regionais
     return jsonify(get_dados_regionais())
 
 @app.route('/api/pesquisas/historico')
+@cache.cached(timeout=300, query_string=True)
 def api_pesquisas_historico():
     """Retorna a evolução temporal das intenções de voto de um candidato."""
     candidato = request.args.get('candidato')
@@ -670,6 +690,7 @@ def api_pesquisas_historico():
     })
 
 @app.route('/api/comparativo')
+@cache.cached(timeout=300, query_string=True)
 def api_comparativo():
     """Retorna a pesquisa mais recente de cada instituto para um candidato/cargo."""
     candidato = request.args.get('candidato', '')
@@ -680,6 +701,7 @@ def api_comparativo():
     return jsonify(get_comparativo_candidato(candidato, cargo))
 
 @app.route('/api/institutos')
+@cache.cached(timeout=300)
 def api_institutos():
     """Retorna a lista de institutos com contagem de pesquisas coletadas."""
     from database import get_institutos_com_totais
@@ -898,6 +920,7 @@ def apply_db():
     return jsonify({'ok': True, 'msg': 'banco aplicado'})
 
 @app.route('/api/rejeicao')
+@cache.cached(timeout=300)
 def api_rejeicao():
     """Retorna média de rejeição por candidato nos últimos 30 dias."""
     resultado = []
