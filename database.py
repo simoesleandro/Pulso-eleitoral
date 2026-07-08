@@ -148,8 +148,11 @@ def _carregar_candidatos_cache() -> dict:
             "ignorar": ignorar,
         }
     except Exception:
-        # DB ainda sem a tabela/dados: devolve mapas vazios (normalização vira no-op).
-        _cache_candidatos = {
+        # DB ainda sem a tabela/dados (ou falha transitória): devolve mapas vazios
+        # SEM memoizar — a próxima chamada tenta carregar de novo. Memoizar o vazio
+        # aqui envenenaria a normalização para sempre num erro transitório (ex.:
+        # banco travado durante a troca de volume do apply-db).
+        return {
             "mapa": {}, "espectro": {}, "cores": {},
             "presidenciais": set(), "presidenciais_canonicos": [], "ignorar": [],
         }

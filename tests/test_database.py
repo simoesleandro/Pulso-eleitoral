@@ -165,3 +165,32 @@ def test_auth_blocks_routes_without_login(client, monkeypatch):
     response_root_after = client.get('/')
     assert response_root_after.status_code == 302
     assert response_root_after.headers['Location'].endswith('/dashboard')
+
+
+def test_falha_transitoria_no_cache_candidatos_nao_memoiza_vazio(monkeypatch):
+    """Uma falha transitória (ex.: banco travado) ao carregar o cache de
+    candidatos não deve ser memoizada para sempre — a próxima chamada deve
+    tentar recarregar em vez de reutilizar o mapa vazio indefinidamente."""
+    import database
+
+    init_db(force_seed=True)
+    database._cache_candidatos = None
+
+    original_get_db = database.get_db
+    chamadas = {"n": 0}
+
+    def get_db_instavel():
+        chamadas["n"] += 1
+        if chamadas["n"] == 1:
+            raise sqlite3.OperationalError("database is locked")
+        return original_get_db()
+
+    monkeypatch.setattr(database, "get_db", get_db_instavel)
+
+    resultado1 = database._carregar_candidatos_cache()
+    assert resultado1["mapa"] == {}
+    # A falha não deve ter sido memoizada no global.
+    assert database._cache_candidatos is None
+
+    resultado2 = database._carregar_candidatos_cache()
+    assert resultado2["mapa"] != {}

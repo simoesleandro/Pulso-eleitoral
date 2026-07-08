@@ -886,6 +886,12 @@ def apply_db():
     # futuro (cache de um cálculo que não lê do SQLite), reavaliar pra
     # invalidação seletiva por chave/prefixo em vez de derrubar tudo.
     cache.clear()
+
+    # O cache de candidatos (normalização/espectro/cores) é um global em memória
+    # separado do Flask-Caching e também depende do SQLite que acabou de trocar.
+    from database import _invalidar_cache_candidatos
+    _invalidar_cache_candidatos()
+
     from datetime import datetime
     app.logger.info(f"[apply-db] cache invalidado após troca do banco em {datetime.now().isoformat()}")
 

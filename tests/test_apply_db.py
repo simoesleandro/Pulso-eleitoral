@@ -102,6 +102,35 @@ def test_troca_bem_sucedida_invalida_cache(client, monkeypatch, data_dir):
         mock_clear.assert_called_once()
 
 
+def test_troca_bem_sucedida_invalida_cache_candidatos(client, monkeypatch, data_dir):
+    """Troca bem-sucedida do banco deve invalidar também o cache de
+    candidatos (global em memória separado do Flask-Caching) — senão a
+    normalização/espectro/cores continuam refletindo o banco antigo até o
+    processo reiniciar."""
+    import database
+    monkeypatch.setenv('ADMIN_PASS', 'senha-de-teste-008')
+    database._cache_candidatos = {"mapa": {"fixture": "antigo"}}
+
+    filename = 'pulso_upload_teste_cache_candidatos.db'
+    new_db_path = f'/data/{filename}'
+    current_db_path = '/data/pulso.db'
+    data_dir.append(new_db_path)
+    data_dir.append(current_db_path)
+
+    conn = sqlite3.connect(new_db_path)
+    conn.execute("CREATE TABLE pesquisas (id INTEGER PRIMARY KEY)")
+    conn.commit()
+    conn.close()
+
+    resp = client.post(
+        '/admin/apply-db',
+        json={'filename': filename},
+        headers={'X-Admin-Pass': 'senha-de-teste-008'},
+    )
+    assert resp.status_code == 200
+    assert database._cache_candidatos is None
+
+
 def test_falha_integridade_nao_invalida_cache(client, monkeypatch, data_dir):
     """Se a validação de integridade falhar (arquivo não é um SQLite válido
     do Pulso), cache.clear() NÃO deve ser chamado — não invalida cache bom
