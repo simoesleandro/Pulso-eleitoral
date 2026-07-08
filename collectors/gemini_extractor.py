@@ -10,6 +10,22 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
+def _to_pct(valor) -> float | None:
+    """Coage percentual vindo do LLM: aceita int/float e strings '38', '38%',
+    '38,5'. Retorna None se não for coercível ou estiver fora de [0, 100]."""
+    if valor is None:
+        return None
+    if isinstance(valor, bool):
+        return None
+    try:
+        if isinstance(valor, str):
+            valor = valor.strip().replace('%', '').replace(',', '.').strip()
+        pct = float(valor)
+    except (ValueError, TypeError):
+        return None
+    return pct if 0.0 <= pct <= 100.0 else None
+
 PROMPT_EXTRACAO = """
 Você é um extrator de dados de pesquisas eleitorais brasileiras.
 Analise o texto abaixo e extraia APENAS intenções de voto com percentuais EXPLÍCITOS.
@@ -389,14 +405,16 @@ def extrair_regional_multiestado(texto: str, fonte_url: str = "") -> list[dict]:
             if not uf or len(uf) != 2:
                 continue
             for c in estado.get("candidatos", []):
+                if not isinstance(c, dict):
+                    continue
                 nome_raw = c.get("nome", "")
-                percentual = c.get("percentual")
+                percentual = _to_pct(c.get("percentual"))
                 if not nome_raw or percentual is None:
                     continue
                 nome = normalizar_nome(nome_raw)
                 if nome is None:
                     continue
-                if not (1.0 <= float(percentual) <= 80.0):
+                if not (1.0 <= percentual <= 80.0):
                     continue
                 # Filtro de segurança: aceita só candidatos presidenciais conhecidos
                 nome_check_raw = nome_raw.lower().strip()
@@ -408,7 +426,7 @@ def extrair_regional_multiestado(texto: str, fonte_url: str = "") -> list[dict]:
                 registros.append({
                     "uf": uf,
                     "candidato": nome,
-                    "percentual": float(percentual),
+                    "percentual": percentual,
                     "data": data_pesquisa,
                 })
 
@@ -492,7 +510,22 @@ def extrair_com_gemini(texto: str, fonte_url: str = "", permite_regional: bool =
         resultado = json.loads(raw.strip())
         resultado.setdefault("pct_pode_mudar_voto", None)
 
-        candidatos = resultado.get("candidatos", [])
+        candidatos_brutos = resultado.get("candidatos", [])
+
+        # Saneamento: candidato sem nome/percentual coercível é ignorado
+        # individualmente, sem descartar a pesquisa inteira.
+        candidatos = []
+        for c in candidatos_brutos:
+            if not isinstance(c, dict):
+                logger.warning(f"Candidato malformado ignorado: {c!r}")
+                continue
+            nome = c.get("nome")
+            pct = _to_pct(c.get("percentual"))
+            if not nome or pct is None:
+                logger.warning(f"Candidato malformado ignorado: {c!r}")
+                continue
+            c["percentual"] = pct
+            candidatos.append(c)
 
         # Cenário multipolar (1º turno): percentuais > 50% são inválidos
         if len(candidatos) > 2:

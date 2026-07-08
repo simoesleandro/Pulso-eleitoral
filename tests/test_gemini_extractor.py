@@ -76,3 +76,123 @@ def test_trata_sem_api_key():
     with patch.dict(os.environ, {}, clear=True):
         resultado = extrair_com_gemini("Qualquer texto", "http://teste.com")
         assert resultado == {"candidatos": []}
+
+
+@patch('google.genai.Client')
+def test_candidato_sem_nome_nao_descarta_pesquisa_inteira(mock_client_class):
+    """Um candidato sem a chave 'nome' no meio da lista deve ser ignorado
+    individualmente — a pesquisa não deve virar {"candidatos": []}."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+
+    mock_response = MagicMock()
+    mock_response.text = """
+    {
+      "candidatos": [
+        {"nome": "Lula", "percentual": 40},
+        {"percentual": 30},
+        {"nome": "Ciro", "percentual": 10}
+      ]
+    }
+    """
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "dummy_key"}):
+        resultado = extrair_com_gemini("texto qualquer", "http://teste.com")
+
+        # O candidato sem "nome" (percentual 30) é descartado; os outros dois
+        # sobrevivem — checagem por percentual evita depender da normalização
+        # de nomes (fora do escopo deste plano).
+        percentuais = {c["percentual"] for c in resultado["candidatos"]}
+        assert percentuais == {40.0, 10.0}
+
+
+@patch('google.genai.Client')
+def test_percentual_string_com_simbolo_e_coagido(mock_client_class):
+    """'percentual': '38%' deve ser coagido para float 38.0."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+
+    mock_response = MagicMock()
+    mock_response.text = '{"candidatos": [{"nome": "Lula", "percentual": "38%"}]}'
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "dummy_key"}):
+        resultado = extrair_com_gemini("texto qualquer", "http://teste.com")
+
+        assert len(resultado["candidatos"]) == 1
+        assert resultado["candidatos"][0]["percentual"] == 38.0
+
+
+@patch('google.genai.Client')
+def test_percentual_nao_numerico_e_ignorado(mock_client_class):
+    """'percentual': 'abc' (não coercível) deve descartar só esse candidato."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+
+    mock_response = MagicMock()
+    mock_response.text = """
+    {
+      "candidatos": [
+        {"nome": "Lula", "percentual": "abc"},
+        {"nome": "Bolsonaro", "percentual": 35}
+      ]
+    }
+    """
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "dummy_key"}):
+        resultado = extrair_com_gemini("texto qualquer", "http://teste.com")
+
+        # Só o candidato com percentual coercível sobrevive.
+        assert len(resultado["candidatos"]) == 1
+        assert resultado["candidatos"][0]["percentual"] == 35.0
+
+
+@patch('google.genai.Client')
+def test_percentual_fora_da_faixa_e_ignorado(mock_client_class):
+    """'percentual': 150 (fora de [0,100]) deve descartar só esse candidato."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+
+    mock_response = MagicMock()
+    mock_response.text = """
+    {
+      "candidatos": [
+        {"nome": "Lula", "percentual": 150},
+        {"nome": "Bolsonaro", "percentual": 35}
+      ]
+    }
+    """
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "dummy_key"}):
+        resultado = extrair_com_gemini("texto qualquer", "http://teste.com")
+
+        # Só o candidato dentro da faixa [0,100] sobrevive.
+        assert len(resultado["candidatos"]) == 1
+        assert resultado["candidatos"][0]["percentual"] == 35.0
+
+
+@patch('google.genai.Client')
+def test_item_nao_dict_na_lista_e_ignorado_sem_excecao(mock_client_class):
+    """Um item que não é dict na lista de candidatos não deve gerar exceção."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+
+    mock_response = MagicMock()
+    mock_response.text = """
+    {
+      "candidatos": [
+        "not_a_dict",
+        {"nome": "Lula", "percentual": 40}
+      ]
+    }
+    """
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "dummy_key"}):
+        resultado = extrair_com_gemini("texto qualquer", "http://teste.com")
+
+        nomes = {c["nome"] for c in resultado["candidatos"]}
+        assert nomes == {"Lula"}

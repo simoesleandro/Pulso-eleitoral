@@ -270,21 +270,21 @@ class BaseCollector(ABC):
         tipo = resultado.get("tipo", "estimulada")
 
         # Normaliza rejeições (mesmo mapa de nomes)
-        from collectors.gemini_extractor import normalizar_nome
+        from collectors.gemini_extractor import normalizar_nome, _to_pct
         rejeicoes_raw = resultado.get("rejeicoes") or []
         rejeicoes = []
         for r in rejeicoes_raw:
             nome_rej = normalizar_nome(r.get("nome", ""))
-            pct_rej = r.get("percentual")
+            pct_rej = _to_pct(r.get("percentual"))
             if nome_rej and pct_rej is not None:
-                rejeicoes.append({"nome": nome_rej, "percentual": float(pct_rej)})
+                rejeicoes.append({"nome": nome_rej, "percentual": pct_rej})
 
         items = [
             {
                 "instituto_id": inst_id,
                 "cargo": resultado.get("cargo", "presidente"),
                 "candidato": c["nome"],
-                "percentual": float(c["percentual"]),
+                "percentual": _to_pct(c["percentual"]),
                 "tipo": tipo,
                 "data_pesquisa": data_real or hoje,
                 "data_coleta": hoje,
@@ -295,7 +295,7 @@ class BaseCollector(ABC):
                 "metodologia": "Espontânea" if tipo == "espontanea" else "Estimulada",
             }
             for c in candidatos
-            if c.get("nome") and c.get("percentual") is not None
+            if c.get("nome") and _to_pct(c.get("percentual")) is not None
         ]
 
         # Anexa rejeições e % pode mudar de voto ao primeiro item para save() persistir
