@@ -48,6 +48,14 @@ class BaseCollector(ABC):
         Deve retornar uma lista de dicionários contendo os dados das pesquisas e intenções."""
         pass
 
+    @abstractmethod
+    def _get_page(self, url: str) -> str:
+        """Busca o HTML de uma URL específica (usado pelo admin coletar-url)."""
+
+    def _parse_release(self, html: str, url: str) -> list[dict]:
+        """Parseia um release individual. Default: delega ao parser Gemini."""
+        return self._parse_com_gemini(html, url, self.instituto_id)
+
     def run(self) -> dict:
         """Executa o ciclo completo de coleta: busca, logs e persistência.
         Retorna {"status": "ok"|"parcial"|"erro", "salvas": int, "falhas": list}."""

@@ -25,6 +25,27 @@ def test_concrete_collectors_instantiation(tmp_path):
                 or hasattr(collector, "_parse_release")
                 or hasattr(collector, "_parse_page"))
 
+def test_coletores_disponiveis_cumprem_contrato_get_page_parse_release(tmp_path):
+    """A rota /admin/coletar-url chama coletor._get_page(url) e
+    coletor._parse_release(html, url) em qualquer classe resolvida via
+    app._COLETORES_DISPONIVEIS. Este teste transforma o AttributeError de
+    request-time em falha de CI caso um coletor novo (ou reaproveitado) não
+    implemente o contrato."""
+    import importlib
+    from app import _COLETORES_DISPONIVEIS
+
+    db_file = tmp_path / "test_collectors_contrato.db"
+    for chave, (modulo_path, classe_nome) in _COLETORES_DISPONIVEIS.items():
+        modulo = importlib.import_module(modulo_path)
+        collector_cls = getattr(modulo, classe_nome)
+        collector = collector_cls(str(db_file))
+        assert callable(getattr(collector, "_get_page", None)), (
+            f"{classe_nome} ({chave}) não implementa _get_page"
+        )
+        assert callable(getattr(collector, "_parse_release", None)), (
+            f"{classe_nome} ({chave}) não implementa _parse_release"
+        )
+
 def test_run_does_not_crash_on_empty_fetch(tmp_path):
     """Verifica que o método run() não crasha quando o fetch() retorna uma lista vazia []."""
     db_file = tmp_path / "test_collectors.db"
