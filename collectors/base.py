@@ -48,22 +48,34 @@ class BaseCollector(ABC):
         Deve retornar uma lista de dicionários contendo os dados das pesquisas e intenções."""
         pass
 
-    def run(self):
-        """Executa o ciclo completo de coleta: busca, logs e persistência."""
+    def run(self) -> dict:
+        """Executa o ciclo completo de coleta: busca, logs e persistência.
+        Retorna {"status": "ok"|"parcial"|"erro", "salvas": int, "falhas": list}."""
         logger.info("[%s] Iniciando execução do coletor...", self.name)
         try:
             pesquisas = self.fetch()
             logger.info("[%s] Coleta concluída com sucesso. %d registros obtidos.", self.name, len(pesquisas))
-            self.save(pesquisas)
-            logger.info("[%s] Dados processados e salvos com sucesso.", self.name)
+            resultado = self.save(pesquisas)
+            falhas = resultado.get("falhas", [])
+            status = "parcial" if falhas else "ok"
+            logger.info(
+                "[%s] Persistência concluída: %d pesquisas, %d intenções, %d rejeições (%d falha(s)).",
+                self.name, resultado.get("pesquisas", 0), resultado.get("intencoes", 0),
+                resultado.get("rejeicoes", 0), len(falhas)
+            )
+            return {"status": status, "salvas": resultado.get("pesquisas", 0), "falhas": falhas}
         except Exception as e:
             logger.error("[%s] Erro durante a execução do coletor: %s", self.name, str(e))
+            return {"status": "erro", "salvas": 0, "falhas": []}
 
-    def save(self, pesquisas: list[dict]):
-        """Realiza a persistência das pesquisas e intenções no banco SQLite em uma transação segura.
-        Normaliza os dados agrupando por (instituto_id, cargo, data_coleta, fonte_url)."""
+    def save(self, pesquisas: list[dict]) -> dict:
+        """Realiza a persistência das pesquisas e intenções no banco SQLite, commitando cada
+        release (grupo instituto_id+cargo+data_coleta+fonte_url) individualmente — uma falha
+        num release não derruba os demais do mesmo lote.
+        Retorna {"pesquisas": int, "intencoes": int, "rejeicoes": int, "falhas": [(url, erro), ...]}."""
+        vazio = {"pesquisas": 0, "intencoes": 0, "rejeicoes": 0, "falhas": []}
         if not pesquisas:
-            return
+            return vazio
 
         from datetime import date
 
@@ -81,11 +93,11 @@ class BaseCollector(ABC):
                 cargo = item.get("cargo", "presidente")
                 dt_coleta = item.get("data_coleta")
                 url = item.get("fonte_url") or ""
-                
+
                 # Fallback para data_coleta
                 if not dt_coleta:
                     dt_coleta = date.today().isoformat()
-                    
+
                 key = (inst_id, cargo, dt_coleta, url)
                 if key not in groups:
                     groups[key] = []
@@ -93,106 +105,120 @@ class BaseCollector(ABC):
 
             n_pesquisas = 0
             n_intencoes = 0
+            n_rejeicoes = 0
+            falhas = []
 
-            # 2. Para cada grupo
+            # 2. Para cada grupo, commit individual — uma falha não derruba os demais
             for (inst_id, cargo, dt_coleta, url), group_items in groups.items():
-                # a. Verifica se já existe registro em pesquisas com mesmo instituto_id + cargo + fonte_url
-                cursor.execute(
-                    "SELECT id FROM pesquisas WHERE instituto_id=? AND cargo=? AND fonte_url=?",
-                    (inst_id, cargo, url)
-                )
-                row = cursor.fetchone()
-                
-                if row:
-                    pesquisa_id = row[0]
-                    # Atualiza data_pesquisa se o item traz uma data real (não apenas hoje)
-                    first = group_items[0]
-                    data_pesquisa_real = first.get("data_pesquisa")
-                    if data_pesquisa_real and data_pesquisa_real != dt_coleta:
-                        cursor.execute(
-                            "UPDATE pesquisas SET data_pesquisa=? WHERE id=?",
-                            (data_pesquisa_real, pesquisa_id)
-                        )
-                    # Limpa intenções e rejeições anteriores para evitar duplicação
-                    cursor.execute("DELETE FROM intencoes WHERE pesquisa_id = ?", (pesquisa_id,))
-                    cursor.execute("DELETE FROM rejeicoes WHERE pesquisa_id = ?", (pesquisa_id,))
-                else:
-                    # b. Se não existe: INSERT INTO pesquisas
-                    first = group_items[0]
-                    import hashlib
-                    margem_erro = first.get("margem_erro")
-                    if margem_erro is not None:
-                        import re as _re
-                        _m = _re.search(r'[\d]+[.,]?[\d]*', str(margem_erro))
-                        margem_erro = float(_m.group().replace(',', '.')) if _m else 0.0
+                grupo_pesquisas = 0
+                grupo_intencoes = 0
+                grupo_rejeicoes = 0
+                try:
+                    # a. Verifica se já existe registro em pesquisas com mesmo instituto_id + cargo + fonte_url
+                    cursor.execute(
+                        "SELECT id FROM pesquisas WHERE instituto_id=? AND cargo=? AND fonte_url=?",
+                        (inst_id, cargo, url)
+                    )
+                    row = cursor.fetchone()
+
+                    if row:
+                        pesquisa_id = row[0]
+                        # Atualiza data_pesquisa se o item traz uma data real (não apenas hoje)
+                        first = group_items[0]
+                        data_pesquisa_real = first.get("data_pesquisa")
+                        if data_pesquisa_real and data_pesquisa_real != dt_coleta:
+                            cursor.execute(
+                                "UPDATE pesquisas SET data_pesquisa=? WHERE id=?",
+                                (data_pesquisa_real, pesquisa_id)
+                            )
+                        # Limpa intenções e rejeições anteriores para evitar duplicação
+                        cursor.execute("DELETE FROM intencoes WHERE pesquisa_id = ?", (pesquisa_id,))
+                        cursor.execute("DELETE FROM rejeicoes WHERE pesquisa_id = ?", (pesquisa_id,))
                     else:
-                        margem_erro = 0.0
-                    tamanho_amostra = first.get("tamanho_amostra")
-                    if tamanho_amostra is None:
-                        tamanho_amostra = 0
-                    metodologia = first.get("metodologia") or "Não informado"
-                    data_divulgacao = first.get("data_divulgacao") or dt_coleta
-                    registro_tse = first.get("registro_tse") or f"GEN-{inst_id}-{cargo}-{dt_coleta}-{hashlib.sha1(url.encode()).hexdigest()[:10]}"
+                        # b. Se não existe: INSERT INTO pesquisas
+                        first = group_items[0]
+                        import hashlib
+                        margem_erro = first.get("margem_erro")
+                        if margem_erro is not None:
+                            import re as _re
+                            _m = _re.search(r'[\d]+[.,]?[\d]*', str(margem_erro))
+                            margem_erro = float(_m.group().replace(',', '.')) if _m else 0.0
+                        else:
+                            margem_erro = 0.0
+                        tamanho_amostra = first.get("tamanho_amostra")
+                        if tamanho_amostra is None:
+                            tamanho_amostra = 0
+                        metodologia = first.get("metodologia") or "Não informado"
+                        data_divulgacao = first.get("data_divulgacao") or dt_coleta
+                        registro_tse = first.get("registro_tse") or f"GEN-{inst_id}-{cargo}-{dt_coleta}-{hashlib.sha1(url.encode()).hexdigest()[:10]}"
 
-                    data_pesquisa = first.get("data_pesquisa") or dt_coleta
-                    pct_pode_mudar_voto = first.get("pct_pode_mudar_voto")
+                        data_pesquisa = first.get("data_pesquisa") or dt_coleta
+                        pct_pode_mudar_voto = first.get("pct_pode_mudar_voto")
 
-                    cursor.execute("""
-                        INSERT INTO pesquisas
-                        (instituto_id, cargo, data_pesquisa, data_publicacao, tamanho_amostra, margem_erro, contratante, registro_tse, fonte_url, pct_pode_mudar_voto)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        inst_id,
-                        cargo,
-                        data_pesquisa,
-                        data_divulgacao,
-                        tamanho_amostra,
-                        margem_erro,
-                        metodologia,
-                        registro_tse,
-                        url,
-                        pct_pode_mudar_voto
-                    ))
-                    pesquisa_id = cursor.lastrowid
-                    n_pesquisas += 1
+                        cursor.execute("""
+                            INSERT INTO pesquisas
+                            (instituto_id, cargo, data_pesquisa, data_publicacao, tamanho_amostra, margem_erro, contratante, registro_tse, fonte_url, pct_pode_mudar_voto)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            inst_id,
+                            cargo,
+                            data_pesquisa,
+                            data_divulgacao,
+                            tamanho_amostra,
+                            margem_erro,
+                            metodologia,
+                            registro_tse,
+                            url,
+                            pct_pode_mudar_voto
+                        ))
+                        pesquisa_id = cursor.lastrowid
+                        grupo_pesquisas += 1
 
-                # d. Para cada candidato do grupo:
-                for item in group_items:
-                    candidato = item.get("candidato")
-                    percentual = item.get("percentual")
-                    partido = item.get("partido")  # None por padrão
-                    tipo = item.get("tipo") or "estimulada"
+                    # d. Para cada candidato do grupo:
+                    for item in group_items:
+                        candidato = item.get("candidato")
+                        percentual = item.get("percentual")
+                        partido = item.get("partido")  # None por padrão
+                        tipo = item.get("tipo") or "estimulada"
 
-                    cursor.execute("""
-                        INSERT OR REPLACE INTO intencoes (pesquisa_id, candidato, percentual, partido, tipo)
-                        VALUES (?, ?, ?, ?, ?)
-                    """, (
-                        pesquisa_id,
-                        candidato,
-                        percentual,
-                        partido,
-                        tipo
-                    ))
-                    n_intencoes += 1
+                        cursor.execute("""
+                            INSERT OR REPLACE INTO intencoes (pesquisa_id, candidato, percentual, partido, tipo)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (
+                            pesquisa_id,
+                            candidato,
+                            percentual,
+                            partido,
+                            tipo
+                        ))
+                        grupo_intencoes += 1
 
-                # e. Insere rejeições (vêm no primeiro item do grupo)
-                rejeicoes = group_items[0].get("rejeicoes") or []
-                n_rejeicoes = 0
-                for rej in rejeicoes:
-                    nome = rej.get("nome") or rej.get("candidato")
-                    pct = rej.get("percentual")
-                    if nome and pct is not None:
-                        cursor.execute(
-                            "INSERT INTO rejeicoes (pesquisa_id, candidato, percentual) VALUES (?, ?, ?)",
-                            (pesquisa_id, nome, float(pct))
-                        )
-                        n_rejeicoes += 1
+                    # e. Insere rejeições (vêm no primeiro item do grupo)
+                    rejeicoes = group_items[0].get("rejeicoes") or []
+                    for rej in rejeicoes:
+                        nome = rej.get("nome") or rej.get("candidato")
+                        pct = rej.get("percentual")
+                        if nome and pct is not None:
+                            cursor.execute(
+                                "INSERT INTO rejeicoes (pesquisa_id, candidato, percentual) VALUES (?, ?, ?)",
+                                (pesquisa_id, nome, float(pct))
+                            )
+                            grupo_rejeicoes += 1
 
-            conn.commit()
-            logger.info("[COLLECTOR] Salvo: %d pesquisas, %d intenções, %d rejeições", n_pesquisas, n_intencoes, n_rejeicoes)
-        except Exception as e:
-            conn.rollback()
-            logger.error("[COLLECTOR] Erro ao salvar pesquisas no banco: %s", str(e))
+                    conn.commit()
+                    n_pesquisas += grupo_pesquisas
+                    n_intencoes += grupo_intencoes
+                    n_rejeicoes += grupo_rejeicoes
+                except Exception as e:
+                    conn.rollback()
+                    logger.error("[COLLECTOR] Falha ao salvar release %s: %s", url, e)
+                    falhas.append((url, str(e)))
+
+            logger.info(
+                "[COLLECTOR] Salvo: %d pesquisas, %d intenções, %d rejeições (%d falha(s))",
+                n_pesquisas, n_intencoes, n_rejeicoes, len(falhas)
+            )
+            return {"pesquisas": n_pesquisas, "intencoes": n_intencoes, "rejeicoes": n_rejeicoes, "falhas": falhas}
         finally:
             conn.close()
 

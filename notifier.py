@@ -44,8 +44,9 @@ def montar_mensagem_coleta(resultados: list[dict],
     Monta mensagem formatada com resultado da coleta.
     """
     ok = [r for r in resultados if r["status"] == "ok"]
+    parcial = [r for r in resultados if r["status"] == "parcial"]
     erro = [r for r in resultados if r["status"] == "erro"]
-    
+
     if pesquisas_novas == 0:
         status = "⚪ Sem novidades"
     else:
@@ -62,7 +63,11 @@ def montar_mensagem_coleta(resultados: list[dict],
     
     if erro:
         linhas.append(f"❌ Erros: {', '.join(r['coletor'].replace('Collector','') for r in erro)}")
-    
+
+    if parcial:
+        total_falhas = sum(r.get("falhas", 0) for r in parcial)
+        linhas.append(f"⚠️ {total_falhas} release(s) falharam ao salvar em: {', '.join(r['coletor'].replace('Collector','') for r in parcial)}")
+
     linhas.append(f"")
     linhas.append(f"🔗 <a href='http://localhost:5080/dashboard'>Ver Dashboard</a>")
 

@@ -142,14 +142,130 @@ def test_save_normalizado(tmp_path):
     
     # Chama save() novamente com os mesmos dados
     collector.save(dados)
-    
+
     # Verifica que não duplicou pesquisas e que as intencoes foram inseridas (ou substituídas)
     conn = sqlite3.connect(str(db_file))
     cursor = conn.cursor()
-    
+
     cursor.execute("SELECT COUNT(*) FROM pesquisas")
     assert cursor.fetchone()[0] == 1
-    
+
     cursor.execute("SELECT COUNT(*) FROM intencoes")
     assert cursor.fetchone()[0] == 3
     conn.close()
+
+
+def test_save_falha_parcial_nao_derruba_lote(tmp_path):
+    """Um release com dado inválido (percentual NULL, viola NOT NULL) não deve
+    impedir que o outro release do mesmo lote seja salvo — commit é por grupo."""
+    db_file = tmp_path / "test_collectors_falha_parcial.db"
+
+    import database
+    original_db_path = database.DB_PATH
+    try:
+        database.DB_PATH = str(db_file)
+        database.init_db(force_seed=False)
+    finally:
+        database.DB_PATH = original_db_path
+
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("DELETE FROM intencoes")
+    conn.execute("DELETE FROM pesquisas")
+    conn.execute("DELETE FROM institutos")
+    conn.execute("INSERT OR REPLACE INTO institutos (id, nome) VALUES (3, 'Quaest')")
+    conn.commit()
+    conn.close()
+
+    from collectors.quaest import QuaestCollector
+    collector = QuaestCollector(str(db_file))
+
+    dados = [
+        {
+            "instituto_id": 3,
+            "cargo": "presidente",
+            "candidato": "Lula",
+            "percentual": 38.0,
+            "data_coleta": "2026-06-15",
+            "tamanho_amostra": 2000,
+            "margem_erro": 2.0,
+            "fonte_url": "https://quaest.com.br/release-ok",
+        },
+        {
+            "instituto_id": 3,
+            "cargo": "presidente",
+            "candidato": "Bolsonaro",
+            "percentual": None,  # viola NOT NULL em intencoes.percentual
+            "data_coleta": "2026-06-15",
+            "tamanho_amostra": 2000,
+            "margem_erro": 2.0,
+            "fonte_url": "https://quaest.com.br/release-quebrado",
+        },
+    ]
+
+    resultado = collector.save(dados)
+
+    assert resultado["pesquisas"] == 1
+    assert len(resultado["falhas"]) == 1
+    assert resultado["falhas"][0][0] == "https://quaest.com.br/release-quebrado"
+
+    conn = sqlite3.connect(str(db_file))
+    cursor = conn.cursor()
+    cursor.execute("SELECT fonte_url FROM pesquisas")
+    urls = [r[0] for r in cursor.fetchall()]
+    conn.close()
+    assert urls == ["https://quaest.com.br/release-ok"]
+
+
+def test_save_sucesso_total_sem_falhas(tmp_path):
+    """save() com todos os releases válidos retorna falhas vazia."""
+    db_file = tmp_path / "test_collectors_sucesso.db"
+
+    import database
+    original_db_path = database.DB_PATH
+    try:
+        database.DB_PATH = str(db_file)
+        database.init_db(force_seed=False)
+    finally:
+        database.DB_PATH = original_db_path
+
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("DELETE FROM intencoes")
+    conn.execute("DELETE FROM pesquisas")
+    conn.execute("DELETE FROM institutos")
+    conn.execute("INSERT OR REPLACE INTO institutos (id, nome) VALUES (3, 'Quaest')")
+    conn.commit()
+    conn.close()
+
+    from collectors.quaest import QuaestCollector
+    collector = QuaestCollector(str(db_file))
+
+    dados = [
+        {
+            "instituto_id": 3,
+            "cargo": "presidente",
+            "candidato": "Lula",
+            "percentual": 38.0,
+            "data_coleta": "2026-06-15",
+            "tamanho_amostra": 2000,
+            "margem_erro": 2.0,
+            "fonte_url": "https://quaest.com.br/release-2",
+        },
+    ]
+
+    resultado = collector.save(dados)
+    assert resultado["falhas"] == []
+    assert resultado["pesquisas"] == 1
+    assert resultado["intencoes"] == 1
+
+    # Contrato usado por run(): sem falhas => status "ok"
+    status = "parcial" if resultado["falhas"] else "ok"
+    assert status == "ok"
+
+
+def test_save_lote_vazio_retorna_dict_zerado():
+    """save([]) deve retornar o dict com contadores zerados e falhas vazia, não None."""
+    from collectors.quaest import QuaestCollector
+    collector = QuaestCollector("dummy_path_nao_usado.db")
+
+    resultado = collector.save([])
+    assert resultado == {"pesquisas": 0, "intencoes": 0, "rejeicoes": 0, "falhas": []}

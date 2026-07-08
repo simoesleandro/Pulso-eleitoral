@@ -65,11 +65,15 @@ def main():
     resultados = []
     for c in coletores:
         try:
-            c.run()
-            resultados.append({
+            resultado = c.run()
+            entrada = {
                 "coletor": c.__class__.__name__,
-                "status": "ok"
-            })
+                "status": resultado.get("status", "ok"),
+            }
+            falhas = resultado.get("falhas") or []
+            if falhas:
+                entrada["falhas"] = len(falhas)
+            resultados.append(entrada)
         except Exception as e:
             logger.error(f"Erro no coletor {c.__class__.__name__}: {e}")
             resultados.append({
