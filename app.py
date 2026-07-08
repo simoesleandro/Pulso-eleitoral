@@ -482,27 +482,14 @@ def api_visao_geral_analise():
         
     try:
         from google import genai
+        from collectors.gemini_extractor import gerar_com_cascata
         client = genai.Client(api_key=api_key)
-        
-        MODELOS = [
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-8b",
-            "gemini-2.5-pro",
-        ]
-        
-        analise_texto = None
-        for modelo in MODELOS:
-            try:
-                response = client.models.generate_content(
-                    model=modelo,
-                    contents=prompt
-                )
-                analise_texto = response.text.strip()
-                if analise_texto:
-                    break
-            except Exception as e:
-                app.logger.warning(f"Erro ao gerar analise com {modelo}: {e}")
-                
+
+        analise_texto, _ = gerar_com_cascata(
+            client, prompt,
+            modelos=["gemini-2.5-flash", "gemini-2.5-flash-8b", "gemini-2.5-pro"]
+        )
+
         if not analise_texto:
             return jsonify({"analise": "Erro ao gerar análise de IA.", "gerado_em": ""}), 500
             

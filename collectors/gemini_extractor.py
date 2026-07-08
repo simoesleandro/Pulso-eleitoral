@@ -26,16 +26,43 @@ def _to_pct(valor) -> float | None:
         return None
     return pct if 0.0 <= pct <= 100.0 else None
 
-PROMPT_EXTRACAO = """
+
+def gerar_com_cascata(client, prompt: str, modelos: list[str] | None = None,
+                       max_retries: int = 2) -> tuple[str | None, str | None]:
+    """Tenta cada modelo em ordem; retry com backoff (5s, 10s) apenas em 503.
+    Retorna (texto, modelo_usado) ou (None, None) se todos falharem."""
+    if modelos is None:
+        modelos = ["gemini-2.5-flash", "gemini-2.5-pro"]
+
+    for modelo in modelos:
+        for tentativa in range(max_retries):
+            try:
+                response = client.models.generate_content(model=modelo, contents=prompt)
+                return response.text.strip(), modelo
+            except Exception as e:
+                if '503' in str(e) and tentativa < max_retries - 1:
+                    wait = 5 * (tentativa + 1)
+                    logger.warning(f"Gemini 503 para {modelo}, tentativa {tentativa+1}/{max_retries}, aguardando {wait}s")
+                    time.sleep(wait)
+                else:
+                    logger.warning(f"Falha no modelo {modelo} na tentativa {tentativa+1}/{max_retries}: {e}")
+                    break
+    return None, None
+
+# Base compartilhada dos dois prompts de extração (~90 linhas antes quase
+# idênticas entre PROMPT_EXTRACAO e PROMPT_EXTRACAO_REGIONAL, já divergentes
+# no bloco de rejeições). Composta a partir de uma base única + deltas
+# nomeados; um ajuste de regra comum agora é feito uma vez só.
+_PROMPT_BASE_EXTRACAO = """
 Você é um extrator de dados de pesquisas eleitorais brasileiras.
 Analise o texto abaixo e extraia APENAS intenções de voto com percentuais EXPLÍCITOS.
 
 REGRAS CRÍTICAS:
 - Extraia SOMENTE quando houver percentual numérico explícito (ex: "38%", "38 por cento")
 - NÃO invente percentuais — se não há número claro, não inclua o candidato
-- Extraia SOMENTE intenções de voto no 1º turno NACIONAL
+@@ESCOPO_TURNO@@
 - IGNORE percentuais de 2º turno (geralmente acima de 50% em confronto direto)
-- IGNORE pesquisas estaduais/regionais — apenas âmbito nacional
+@@EXTRA_REGIONAL_NACIONAL@@
 - IGNORE aprovação/rejeição de governo
 - Se o release apresentar múltiplos cenários de 1º turno, escolha o cenário
   com MAIS candidatos listados
@@ -49,11 +76,7 @@ REGRAS CRÍTICAS:
 - Se a soma for maior que 120%, provavelmente são cenários de 2º turno — retorne []
 - Cargo deve ser "presidente", "governador_rj", "governador_sp" etc
 - Se o texto for sobre aprovação/rejeição de governo sem intenção de voto, retorne lista vazia
-- IGNORE pesquisas estaduais — só extraia se for âmbito NACIONAL (Brasil inteiro)
-- Se o texto mencionar um estado específico como contexto principal da pesquisa,
-  retorne {"candidatos": []}
-- Pesquisas nacionais geralmente mencionam "todo o Brasil", "nível nacional",
-  "eleitorado brasileiro" ou não mencionam estado nenhum
+@@EXTRA_NACIONAL_FIM_REGRAS@@
 
 EXTRAÇÃO DE "% PODE MUDAR DE VOTO":
 - Se o texto mencionar EXPLICITAMENTE o percentual de eleitores que podem
@@ -104,12 +127,41 @@ Retorne SOMENTE JSON válido, sem markdown, sem explicação:
     {"nome": "Nome Candidato", "percentual": 38.0},
     {"nome": "Nome Candidato 2", "percentual": 32.0}
   ],
-  "rejeicoes": [
-    {"nome": "Nome Candidato", "percentual": 46.0}
-  ],
+@@BLOCO_REJEICOES_SCHEMA@@
   "pct_pode_mudar_voto": numero ou null
 }
+@@BLOCO_EXTRACAO_REJEICAO@@
 
+EXTRAÇÃO DE NOMES DE CANDIDATOS:
+- Extraia o nome completo e correto
+- Exemplos de nomes brasileiros frequentes:
+  - "Rui Costa Pimenta" (não "ii Costa Pimenta")
+  - "Flávio Bolsonaro" (com acento)
+  - "Ronaldo Caiado"
+- Se o nome aparecer truncado ou com erro, corrija com base no contexto
+- Nunca retorne nome com menos de 3 caracteres
+
+Se não encontrar intenções de voto com percentuais explícitos, retorne:
+@@RETORNO_VAZIO@@
+
+Ano de referência: 2026. Se o texto mencionar apenas mês e dia sem ano, assuma 2026.
+
+TEXTO:
+{texto}
+"""
+
+_ESCOPO_NACIONAL = '- Extraia SOMENTE intenções de voto no 1º turno NACIONAL'
+_ESCOPO_REGIONAL = '- Extraia intenções de voto no 1º turno (nacional ou estadual)'
+_APENAS_NACIONAL_TOPO = '- IGNORE pesquisas estaduais/regionais — apenas âmbito nacional'
+_APENAS_NACIONAL_FIM = """- IGNORE pesquisas estaduais — só extraia se for âmbito NACIONAL (Brasil inteiro)
+- Se o texto mencionar um estado específico como contexto principal da pesquisa,
+  retorne {"candidatos": []}
+- Pesquisas nacionais geralmente mencionam "todo o Brasil", "nível nacional",
+  "eleitorado brasileiro" ou não mencionam estado nenhum"""
+_BLOCO_REJEICOES_SCHEMA = """  "rejeicoes": [
+    {"nome": "Nome Candidato", "percentual": 46.0}
+  ],"""
+_BLOCO_EXTRACAO_REJEICAO = """
 EXTRAÇÃO DE REJEIÇÃO:
 - Se o release incluir seção de rejeição / voto negativo / "não votaria de jeito nenhum" /
   "rejeitam votar", extraia em "rejeicoes" os candidatos com percentual explícito.
@@ -118,118 +170,25 @@ EXTRAÇÃO DE REJEIÇÃO:
   - "46% rejeitam votar no atual presidente"
   - "Fulano tem rejeição de 23%"
 - Se não houver seção de rejeição no texto, retorne "rejeicoes": []
-- NÃO confunda rejeição de candidato com aprovação/rejeição de governo
+- NÃO confunda rejeição de candidato com aprovação/rejeição de governo"""
+_RETORNO_VAZIO_NACIONAL = '{"candidatos": [], "rejeicoes": []}'
+_RETORNO_VAZIO_REGIONAL = '{"candidatos": []}'
 
-EXTRAÇÃO DE NOMES DE CANDIDATOS:
-- Extraia o nome completo e correto
-- Exemplos de nomes brasileiros frequentes:
-  - "Rui Costa Pimenta" (não "ii Costa Pimenta")
-  - "Flávio Bolsonaro" (com acento)
-  - "Ronaldo Caiado"
-- Se o nome aparecer truncado ou com erro, corrija com base no contexto
-- Nunca retorne nome com menos de 3 caracteres
+PROMPT_EXTRACAO = (_PROMPT_BASE_EXTRACAO
+    .replace('@@ESCOPO_TURNO@@', _ESCOPO_NACIONAL)
+    .replace('@@EXTRA_REGIONAL_NACIONAL@@' + "\n", _APENAS_NACIONAL_TOPO + "\n")
+    .replace('@@EXTRA_NACIONAL_FIM_REGRAS@@' + "\n", _APENAS_NACIONAL_FIM + "\n")
+    .replace('@@BLOCO_REJEICOES_SCHEMA@@' + "\n", _BLOCO_REJEICOES_SCHEMA + "\n")
+    .replace('@@BLOCO_EXTRACAO_REJEICAO@@' + "\n", _BLOCO_EXTRACAO_REJEICAO + "\n")
+    .replace('@@RETORNO_VAZIO@@', _RETORNO_VAZIO_NACIONAL))
 
-Se não encontrar intenções de voto com percentuais explícitos, retorne:
-{"candidatos": [], "rejeicoes": []}
-
-Ano de referência: 2026. Se o texto mencionar apenas mês e dia sem ano, assuma 2026.
-
-TEXTO:
-{texto}
-"""
-
-PROMPT_EXTRACAO_REGIONAL = """
-Você é um extrator de dados de pesquisas eleitorais brasileiras.
-Analise o texto abaixo e extraia APENAS intenções de voto com percentuais EXPLÍCITOS.
-
-REGRAS CRÍTICAS:
-- Extraia SOMENTE quando houver percentual numérico explícito (ex: "38%", "38 por cento")
-- NÃO invente percentuais — se não há número claro, não inclua o candidato
-- Extraia intenções de voto no 1º turno (nacional ou estadual)
-- IGNORE percentuais de 2º turno (geralmente acima de 50% em confronto direto)
-- IGNORE aprovação/rejeição de governo
-- Se o release apresentar múltiplos cenários de 1º turno, escolha o cenário
-  com MAIS candidatos listados
-- Se o release misturar 1º e 2º turno, extraia APENAS o cenário de 1º turno
-- IGNORE: cenários de 2º turno, cenários hipotéticos com candidatos
-  que ainda não declararam candidatura ({lista_ignorar})
-- Percentuais válidos para presidente: entre 1% e 60% por candidato
-- A soma dos percentuais dos candidatos deve ser <= 100%
-- Se a soma ultrapassar 100%, os percentuais provavelmente são de
-  cenários diferentes — retorne {"candidatos": []}
-- Se a soma for maior que 120%, provavelmente são cenários de 2º turno — retorne []
-- Cargo deve ser "presidente", "governador_rj", "governador_sp" etc
-- Se o texto for sobre aprovação/rejeição de governo sem intenção de voto, retorne lista vazia
-
-EXTRAÇÃO DE "% PODE MUDAR DE VOTO":
-- Se o texto mencionar EXPLICITAMENTE o percentual de eleitores que podem
-  mudar de voto / ainda podem trocar de candidato / não têm voto decidido
-  até a eleição (ex.: "34% dos eleitores podem mudar de voto até outubro"),
-  capture esse número em "pct_pode_mudar_voto"
-- Se não houver menção clara e explícita desse dado no texto, retorne
-  "pct_pode_mudar_voto": null — NUNCA infira, estime ou calcule esse valor
-  a partir de indecisos/outros/nulos
-
-DETERMINAÇÃO DO CAMPO "tipo":
-Retorne "espontanea" ou "estimulada" com base nas pistas abaixo:
-
-  "espontanea" quando:
-  - O texto usa palavras como "espontânea", "sem lista", "sem apresentação de nomes",
-    "de cabeça", "citou espontaneamente", "mencionou sem estímulo"
-  - Os candidatos principais (Lula, Flávio Bolsonaro) aparecem com percentuais
-    anormalmente baixos para corrida bipolar: Flávio abaixo de 25% e/ou
-    muitos candidatos menores com 1–5% cada
-  - REGRA FORTE: se Flávio Bolsonaro aparecer abaixo de 25% em corrida presidencial
-    2026, classifique como "espontanea" — EXCETO se o texto usar explicitamente
-    as palavras "estimulada", "com lista" ou "ao ouvir os nomes"
-  - A soma dos percentuais é notavelmente baixa (abaixo de 70%), indicando
-    alto percentual de "não sabe / não respondeu" implícito
-
-  "estimulada" quando:
-  - O texto usa explicitamente palavras como "estimulada", "com lista",
-    "ao ouvir os nomes", "escolheria entre", "ao ser apresentada lista"
-  - Os candidatos principais estão acima de 25% cada em corrida bipolar
-
-  Na dúvida, analise os percentuais: soma abaixo de 80% ou candidato principal
-  abaixo de 25% indica "espontanea"; caso contrário, use "estimulada".
-
-Retorne SOMENTE JSON válido, sem markdown, sem explicação:
-{
-  "cargo": "presidente",
-  "tipo": "espontanea",
-  "instituto": "nome do instituto mencionado",
-  "data": "YYYY-MM-DD ou null",
-  "tamanho_amostra": numero ou null,
-  "margem_erro": extraia de expressões como:
-    - "margem de erro de X pontos percentuais"
-    - "margem de erro é de X%"
-    - "erro amostral de X pontos"
-    - "intervalo de confiança de 95%, margem de X pp"
-    Se não encontrar, retorne null — nunca retorne 0,
-  "candidatos": [
-    {"nome": "Nome Candidato", "percentual": 38.0},
-    {"nome": "Nome Candidato 2", "percentual": 32.0}
-  ],
-  "pct_pode_mudar_voto": numero ou null
-}
-
-EXTRAÇÃO DE NOMES DE CANDIDATOS:
-- Extraia o nome completo e correto
-- Exemplos de nomes brasileiros frequentes:
-  - "Rui Costa Pimenta" (não "ii Costa Pimenta")
-  - "Flávio Bolsonaro" (com acento)
-  - "Ronaldo Caiado"
-- Se o nome aparecer truncado ou com erro, corrija com base no contexto
-- Nunca retorne nome com menos de 3 caracteres
-
-Se não encontrar intenções de voto com percentuais explícitos, retorne:
-{"candidatos": []}
-
-Ano de referência: 2026. Se o texto mencionar apenas mês e dia sem ano, assuma 2026.
-
-TEXTO:
-{texto}
-"""
+PROMPT_EXTRACAO_REGIONAL = (_PROMPT_BASE_EXTRACAO
+    .replace('@@ESCOPO_TURNO@@', _ESCOPO_REGIONAL)
+    .replace('@@EXTRA_REGIONAL_NACIONAL@@' + "\n", "")
+    .replace('@@EXTRA_NACIONAL_FIM_REGRAS@@' + "\n", "")
+    .replace('@@BLOCO_REJEICOES_SCHEMA@@' + "\n", "")
+    .replace('@@BLOCO_EXTRACAO_REJEICAO@@' + "\n", "")
+    .replace('@@RETORNO_VAZIO@@', _RETORNO_VAZIO_REGIONAL))
 
 # MAPA_NOMES, CANDIDATOS_PRESIDENCIAIS_2026 e as listas de nomes nos prompts
 # foram unificados na tabela `candidatos` (fonte única de verdade). Os acessores
@@ -361,29 +320,7 @@ def extrair_regional_multiestado(texto: str, fonte_url: str = "") -> list[dict]:
         prompt = _montar_prompt(PROMPT_MULTIESTADO, texto_truncado)
         presidenciais = _presidenciais()
 
-        MODELOS = [
-            "gemini-2.5-flash",
-            "gemini-2.5-pro",
-        ]
-
-        raw = None
-        modelo_usado = None
-
-        for modelo in MODELOS:
-            for tentativa in range(2):
-                try:
-                    response = client.models.generate_content(model=modelo, contents=prompt)
-                    raw = response.text.strip()
-                    modelo_usado = modelo
-                    break
-                except Exception as e:
-                    if '503' in str(e) and tentativa == 0:
-                        time.sleep(5)
-                    else:
-                        logger.warning(f"Falha no modelo {modelo} tentativa {tentativa+1}: {e}")
-                        break
-            if raw is not None:
-                break
+        raw, modelo_usado = gerar_com_cascata(client, prompt)
 
         if raw is None:
             logger.error("extrair_regional_multiestado: todos os modelos falharam")
@@ -465,39 +402,9 @@ def extrair_com_gemini(texto: str, fonte_url: str = "", permite_regional: bool =
 
         template = PROMPT_EXTRACAO_REGIONAL if permite_regional else PROMPT_EXTRACAO
         prompt = _montar_prompt(template, texto_truncado)
-        
-        MODELOS = [
-            "gemini-2.5-flash",
-            "gemini-2.5-pro",
-        ]
-        
-        raw = None
-        modelo_usado = None
-        
-        for modelo in MODELOS:
-            max_retries = 2
-            sucesso_modelo = False
-            for tentativa in range(max_retries):
-                try:
-                    response = client.models.generate_content(
-                        model=modelo,
-                        contents=prompt
-                    )
-                    raw = response.text.strip()
-                    modelo_usado = modelo
-                    sucesso_modelo = True
-                    break  # sucesso, sai do loop do modelo
-                except Exception as e:
-                    if '503' in str(e) and tentativa < max_retries - 1:
-                        wait = 5 * (tentativa + 1)
-                        logger.warning(f"Gemini 503 para {modelo}, tentativa {tentativa+1}/{max_retries}, aguardando {wait}s")
-                        time.sleep(wait)
-                    else:
-                        logger.warning(f"Falha no modelo {modelo} na tentativa {tentativa+1}/{max_retries}: {e}")
-                        break  # passa para o próximo modelo
-            if sucesso_modelo:
-                break
-                
+
+        raw, modelo_usado = gerar_com_cascata(client, prompt)
+
         if raw is None:
             logger.error("Todos os modelos em cascata falharam.")
             return {"candidatos": []}

@@ -1,7 +1,24 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock
-from collectors.gemini_extractor import extrair_com_gemini
+from collectors.gemini_extractor import (
+    extrair_com_gemini, PROMPT_EXTRACAO, PROMPT_EXTRACAO_REGIONAL,
+)
+
+
+def test_prompts_compostos_contem_ancoras_chave():
+    """Âncora permanente pós-composição (plano 012): os prompts compostos a
+    partir da base compartilhada precisam conter os marcadores-chave que o
+    parsing e a extração dependem — regressão aqui indica que a composição
+    dos deltas (escopo/rejeições) quebrou."""
+    for prompt in (PROMPT_EXTRACAO, PROMPT_EXTRACAO_REGIONAL):
+        assert "REGRAS CRÍTICAS" in prompt
+        assert "{lista_ignorar}" in prompt
+        assert "pct_pode_mudar_voto" in prompt
+        assert "{texto}" in prompt
+    # Delta específico do nacional: bloco de rejeições só existe no não-regional.
+    assert "EXTRAÇÃO DE REJEIÇÃO" in PROMPT_EXTRACAO
+    assert "EXTRAÇÃO DE REJEIÇÃO" not in PROMPT_EXTRACAO_REGIONAL
 
 @patch('google.genai.Client')
 def test_extrai_percentuais_explicitos(mock_client_class):
