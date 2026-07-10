@@ -64,7 +64,7 @@
       .then(r => r.json())
       .then(d => {
         document.getElementById('topbar-update').textContent =
-          d.ultima_coleta ? 'atualizado ' + d.ultima_coleta : 'sem dados';
+          d.ultima_coleta ? 'coleta: ' + d.ultima_coleta : 'sem dados';
         document.getElementById('topbar-dot').style.background =
           d.online ? '#1a7a4a' : '#A32D2D';
       })

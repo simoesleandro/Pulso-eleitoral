@@ -327,7 +327,7 @@
       }
       document.getElementById('pres-data').textContent = formatarData(data.data_coleta);
       document.getElementById('pres-fonte').textContent = `Fonte: ${data.instituto} | ${formatarData(data.data_coleta)}`;
-      document.getElementById('pres-atualizacao-badge').textContent = `atualizado em: ${formatarData(data.data_coleta)}`;
+      document.getElementById('pres-atualizacao-badge').textContent = `pesquisa: ${formatarData(data.data_coleta)}`;
 
       const ctx = document.getElementById('chart-presidente');
       if (chartPres) chartPres.destroy();
