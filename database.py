@@ -409,42 +409,61 @@ def detectar_variacoes_bruscas(cargo: str = 'presidente',
     """Detecta candidatos com variação >= limiar_pp nos últimos janela_dias."""
     data_limite = (date.today() - timedelta(days=janela_dias)).isoformat()
 
+    # Um candidato pode ter mais de um par (recente, anterior) qualificado —
+    # ex.: dois institutos com pesquisa na mesma data máxima. Um `GROUP BY
+    # candidato` com colunas não-agregadas deixava o SQLite escolher pct/
+    # instituto/datas de uma linha ARBITRÁRIA (podia não bater com o maior |Δ|
+    # do ORDER BY). Aqui, ROW_NUMBER seleciona por candidato o par de MAIOR |Δ|
+    # de forma determinística, mantendo pct/instituto/datas coerentes entre si.
     query = """
-    SELECT
-        i_recente.candidato,
-        i_recente.percentual AS pct_atual,
-        p_recente.data_pesquisa AS data_atual,
-        inst_recente.nome AS instituto_atual,
-        i_anterior.percentual AS pct_anterior,
-        p_anterior.data_pesquisa AS data_anterior,
-        inst_anterior.nome AS instituto_anterior
-    FROM intencoes i_recente
-    JOIN pesquisas p_recente ON i_recente.pesquisa_id = p_recente.id
-    JOIN institutos inst_recente ON p_recente.instituto_id = inst_recente.id
-    JOIN intencoes i_anterior ON i_anterior.candidato = i_recente.candidato
-    JOIN pesquisas p_anterior ON i_anterior.pesquisa_id = p_anterior.id
-    JOIN institutos inst_anterior ON p_anterior.instituto_id = inst_anterior.id
-    WHERE p_recente.cargo = ?
-    AND p_recente.data_pesquisa = (
-        SELECT MAX(p2.data_pesquisa) FROM pesquisas p2
-        JOIN intencoes i2 ON i2.pesquisa_id = p2.id
-        WHERE i2.candidato = i_recente.candidato AND p2.cargo = ?
+    WITH pares AS (
+        SELECT
+            i_recente.candidato AS candidato,
+            i_recente.percentual AS pct_atual,
+            p_recente.data_pesquisa AS data_atual,
+            inst_recente.nome AS instituto_atual,
+            i_anterior.percentual AS pct_anterior,
+            p_anterior.data_pesquisa AS data_anterior,
+            inst_anterior.nome AS instituto_anterior,
+            ABS(i_recente.percentual - i_anterior.percentual) AS delta
+        FROM intencoes i_recente
+        JOIN pesquisas p_recente ON i_recente.pesquisa_id = p_recente.id
+        JOIN institutos inst_recente ON p_recente.instituto_id = inst_recente.id
+        JOIN intencoes i_anterior ON i_anterior.candidato = i_recente.candidato
+        JOIN pesquisas p_anterior ON i_anterior.pesquisa_id = p_anterior.id
+        JOIN institutos inst_anterior ON p_anterior.instituto_id = inst_anterior.id
+        WHERE p_recente.cargo = ?
+        AND p_recente.data_pesquisa = (
+            SELECT MAX(p2.data_pesquisa) FROM pesquisas p2
+            JOIN intencoes i2 ON i2.pesquisa_id = p2.id
+            WHERE i2.candidato = i_recente.candidato AND p2.cargo = ?
+        )
+        AND p_anterior.data_pesquisa <= ?
+        AND p_anterior.data_pesquisa = (
+            SELECT MAX(p3.data_pesquisa) FROM pesquisas p3
+            JOIN intencoes i3 ON i3.pesquisa_id = p3.id
+            WHERE i3.candidato = i_recente.candidato
+            AND p3.cargo = ?
+            AND p3.data_pesquisa <= ?
+        )
+        AND p_anterior.instituto_id = p_recente.instituto_id
+        AND ABS(i_recente.percentual - i_anterior.percentual) >= ?
+        AND LOWER(i_recente.candidato) NOT LIKE '%outros%'
+        AND LOWER(i_recente.candidato) NOT LIKE '%nulos%'
+        AND LOWER(i_recente.candidato) NOT LIKE '%brancos%'
+    ),
+    ranked AS (
+        SELECT *, ROW_NUMBER() OVER (
+            PARTITION BY candidato
+            ORDER BY delta DESC, data_atual DESC, instituto_atual
+        ) AS rn
+        FROM pares
     )
-    AND p_anterior.data_pesquisa <= ?
-    AND p_anterior.data_pesquisa = (
-        SELECT MAX(p3.data_pesquisa) FROM pesquisas p3
-        JOIN intencoes i3 ON i3.pesquisa_id = p3.id
-        WHERE i3.candidato = i_recente.candidato
-        AND p3.cargo = ?
-        AND p3.data_pesquisa <= ?
-    )
-    AND p_anterior.instituto_id = p_recente.instituto_id
-    AND ABS(i_recente.percentual - i_anterior.percentual) >= ?
-    AND LOWER(i_recente.candidato) NOT LIKE '%outros%'
-    AND LOWER(i_recente.candidato) NOT LIKE '%nulos%'
-    AND LOWER(i_recente.candidato) NOT LIKE '%brancos%'
-    GROUP BY i_recente.candidato
-    ORDER BY ABS(i_recente.percentual - i_anterior.percentual) DESC
+    SELECT candidato, pct_atual, data_atual, instituto_atual,
+           pct_anterior, data_anterior, instituto_anterior
+    FROM ranked
+    WHERE rn = 1
+    ORDER BY delta DESC
     """
 
     with get_db() as conn:
