@@ -108,6 +108,23 @@ CREATE TABLE IF NOT EXISTS pesquisas_regionais (
     UNIQUE(instituto_id, data_pesquisa, uf, candidato)
 );
 
+-- Confrontos diretos de 2º turno vindos das próprias pesquisas (par A x B).
+-- Alimenta get_simulacao_segundo_turno quando há dado real; sem linhas, a
+-- função cai na simulação por redistribuição (comportamento legado).
+CREATE TABLE IF NOT EXISTS confrontos_2turno (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    instituto_id  INTEGER,
+    cargo         TEXT NOT NULL DEFAULT 'presidente',
+    candidato_a   TEXT NOT NULL,
+    candidato_b   TEXT NOT NULL,
+    pct_a         REAL NOT NULL,
+    pct_b         REAL NOT NULL,
+    data_pesquisa TEXT NOT NULL,
+    tamanho_amostra INTEGER,
+    fonte_url     TEXT,
+    UNIQUE(instituto_id, cargo, data_pesquisa, candidato_a, candidato_b)
+);
+
 -- 9. Tabela de usuários para controle de acesso
 CREATE TABLE IF NOT EXISTS usuarios (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

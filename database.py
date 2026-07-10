@@ -220,6 +220,10 @@ def init_db(force_seed=False):
     from scripts.migrate_pesquisas_volatilidade import aplicar_migracao as _aplicar_migracao_volatilidade
     _aplicar_migracao_volatilidade(conn)
 
+    # Migration idempotente: tabela confrontos_2turno (2º turno real das pesquisas)
+    from scripts.migrate_confrontos_2turno import aplicar_migracao as _aplicar_migracao_confrontos
+    _aplicar_migracao_confrontos(conn)
+
     # Verifica se os dados já foram populados
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM institutos")
@@ -596,8 +600,80 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
     }
 
 
+def get_confronto_2turno_real(nome_a: str, nome_b: str, cargo: str = 'presidente',
+                              dias: int = 30) -> dict | None:
+    """Média das pesquisas REAIS de confronto direto de 2º turno entre A e B,
+    dentro da janela. Pondera por amostra × recência (0.9 ^ dias) e usa uma
+    pesquisa por instituto (a mais recente) — mesmo espírito do poll-of-polls.
+
+    O par é casado independente da ordem em que o instituto listou A e B, e o
+    resultado é orientado para (a=nome_a, b=nome_b). Retorna None se não houver
+    nenhuma pesquisa de 2º turno na janela (aí o chamador cai na simulação).
+    """
+    data_limite = (date.today() - timedelta(days=dias)).isoformat()
+    try:
+        with get_db() as conn:
+            rows = conn.execute("""
+                SELECT instituto_id, candidato_a, candidato_b, pct_a, pct_b,
+                       data_pesquisa, tamanho_amostra
+                FROM confrontos_2turno
+                WHERE cargo = ? AND data_pesquisa >= ?
+                  AND ((candidato_a = ? AND candidato_b = ?)
+                    OR (candidato_a = ? AND candidato_b = ?))
+                ORDER BY data_pesquisa
+            """, (cargo, data_limite, nome_a, nome_b, nome_b, nome_a)).fetchall()
+    except sqlite3.OperationalError:
+        # Tabela ainda não migrada (ex.: banco antigo antes do deploy) — cai na simulação.
+        return None
+
+    if not rows:
+        return None
+
+    # Uma pesquisa por instituto: a mais recente (desempate por rowid via ordem).
+    recente_por_instituto: dict = {}
+    for r in rows:
+        inst = r['instituto_id']
+        atual = recente_por_instituto.get(inst)
+        if atual is None or r['data_pesquisa'] >= atual['data_pesquisa']:
+            recente_por_instituto[inst] = r
+
+    hoje = date.today()
+    num_a = num_b = den = 0.0
+    institutos = 0
+    for r in recente_por_instituto.values():
+        # Orienta para (nome_a, nome_b)
+        if r['candidato_a'] == nome_a:
+            pa, pb = r['pct_a'], r['pct_b']
+        else:
+            pa, pb = r['pct_b'], r['pct_a']
+        peso_amostra = r['tamanho_amostra'] if r['tamanho_amostra'] and r['tamanho_amostra'] > 0 else 1000
+        try:
+            dias_desde = max(0, (hoje - date.fromisoformat(r['data_pesquisa'])).days)
+        except (ValueError, TypeError):
+            dias_desde = 0
+        score = peso_amostra * (0.9 ** dias_desde)
+        num_a += pa * score
+        num_b += pb * score
+        den += score
+        institutos += 1
+
+    if den == 0:
+        return None
+    return {
+        "a": round(num_a / den, 1),
+        "b": round(num_b / den, 1),
+        "n_institutos": institutos,
+    }
+
+
 def get_simulacao_segundo_turno() -> dict:
-    """Simula resultado de 2º turno Lula x Flávio com redistribuição proporcional de votos."""
+    """Resultado de 2º turno Lula x Flávio.
+
+    Usa a MÉDIA das pesquisas reais de confronto direto quando existem na janela
+    (get_confronto_2turno_real); caso contrário, cai na simulação por
+    redistribuição proporcional de votos (comportamento legado). O campo `fonte`
+    ('pesquisas' | 'simulacao') indica qual caminho foi usado.
+    """
     DIREITA = get_candidatos_por_espectro({'direita'})
     ESQUERDA_CENTRO = get_candidatos_por_espectro({'esquerda', 'centro'})
 
@@ -628,16 +704,28 @@ def get_simulacao_segundo_turno() -> dict:
     lula_total = lula_direto + lula_redist
     flavio_total = flavio_direto + flavio_redist
 
-    return {
-        "primeiro_turno": {
-            "candidatos": [
-                {"candidato": c['candidato'], "media": c['media'], "variacao": c.get('variacao_30d')}
-                for c in candidatos[:5]
-            ],
-            "segundo_turno_provavel": lula_direto < 50,
-            "data_atualizacao": date.today().strftime('%d/%m/%Y'),
-        },
-        "segundo_turno": {
+    # Prefere o confronto direto REAL das pesquisas, se houver na janela.
+    real = get_confronto_2turno_real('Lula', 'Flávio Bolsonaro', cargo='presidente', dias=30)
+    if real:
+        segundo_turno = {
+            "lula": {
+                "votos_diretos": real['a'],
+                "votos_redistribuidos": 0.0,
+                "total_estimado": real['a'],
+                "vencedor": real['a'] > real['b'],
+            },
+            "flavio": {
+                "votos_diretos": real['b'],
+                "votos_redistribuidos": 0.0,
+                "total_estimado": real['b'],
+                "vencedor": real['b'] > real['a'],
+            },
+            "indefinido": round(max(0.0, 100.0 - real['a'] - real['b']), 1),
+            "fonte": "pesquisas",
+            "nota": f"Média de pesquisas de 2º turno ({real['n_institutos']} instituto(s))",
+        }
+    else:
+        segundo_turno = {
             "lula": {
                 "votos_diretos": round(lula_direto, 1),
                 "votos_redistribuidos": round(lula_redist, 1),
@@ -651,8 +739,20 @@ def get_simulacao_segundo_turno() -> dict:
                 "vencedor": flavio_total > lula_total,
             },
             "indefinido": round(indefinido, 1),
+            "fonte": "simulacao",
             "nota": "Simulação baseada em redistribuição histórica de votos",
+        }
+
+    return {
+        "primeiro_turno": {
+            "candidatos": [
+                {"candidato": c['candidato'], "media": c['media'], "variacao": c.get('variacao_30d')}
+                for c in candidatos[:5]
+            ],
+            "segundo_turno_provavel": lula_direto < 50,
+            "data_atualizacao": date.today().strftime('%d/%m/%Y'),
         },
+        "segundo_turno": segundo_turno,
     }
 
 
