@@ -7,12 +7,11 @@ from .poder360 import Poder360Collector
 from .verita import VeritaCollector
 from .cnn_brasil import CnnBrasilColetor
 from .quaest_regional import QuaestRegionalColetor
+from .paraná_pesquisas import ParanaPesquisasCollector
 
 # Lista com todas as classes de coletores concretos para fácil iteração.
-# ParanaPesquisasCollector (collectors/paraná_pesquisas.py) já está implementado
-# (pipeline de PDF → extrair_governador_rj), mas fica FORA desta lista até uma
-# validação ao vivo do prompt de governador RJ contra um PDF real. Para ativar:
-# importe-o acima e adicione à lista.
+# ParanaPesquisasCollector (governador RJ via PDF) foi validado ao vivo em
+# 2026-07-10 (extração limpa, sem contaminação de senador) e entrou na rotação.
 ALL_COLLECTORS = [
     DatafolhaCollector,
     QuaestCollector,
@@ -21,4 +20,5 @@ ALL_COLLECTORS = [
     VeritaCollector,
     CnnBrasilColetor,
     QuaestRegionalColetor,
+    ParanaPesquisasCollector,
 ]

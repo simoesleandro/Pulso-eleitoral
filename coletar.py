@@ -42,6 +42,7 @@ def main():
     from collectors.verita import VeritaCollector
     from collectors.cnn_brasil import CnnBrasilColetor
     from collectors.quaest_regional import QuaestRegionalColetor
+    from collectors.paraná_pesquisas import ParanaPesquisasCollector
     from database import salvar_log_scheduler
     from notifier import send_telegram, montar_mensagem_coleta
 
@@ -60,6 +61,7 @@ def main():
         VeritaCollector(db_path=DB_PATH),
         CnnBrasilColetor(db_path=DB_PATH),
         QuaestRegionalColetor(db_path=DB_PATH),
+        ParanaPesquisasCollector(db_path=DB_PATH),
     ]
     
     resultados = []
