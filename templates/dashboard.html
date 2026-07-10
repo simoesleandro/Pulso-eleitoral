@@ -414,6 +414,53 @@
     // ─── Histórico multi-candidato ─────────────────────────────
     let chartHistoricoMulti = null;
     let ultimasSeries = [];
+    window.eventosTimeline = [];
+
+    async function carregarEventos() {
+      try {
+        const res = await fetch('/api/eventos?cargo=presidente');
+        const data = await res.json();
+        window.eventosTimeline = data.eventos || [];
+      } catch (e) {
+        window.eventosTimeline = [];
+      }
+    }
+
+    // Marcadores verticais de eventos no gráfico de tendência. Ancorados na
+    // data plotada mais próxima <= data do evento (datas de pesquisa raramente
+    // coincidem exatamente com a data do evento). >8 eventos: só a linha.
+    const eventosMarkerPlugin = {
+      id: 'eventosMarkers',
+      afterDatasetsDraw(chart) {
+        if (!window.eventosTimeline?.length) return;
+        const { ctx, chartArea, scales } = chart;
+        const brutas = chart.$_datasBrutas || [];
+        if (!brutas.length) return;
+        let desenhados = 0;
+        window.eventosTimeline.forEach(ev => {
+          // índice da data plotada mais próxima <= data do evento
+          let idx = -1;
+          for (let i = 0; i < brutas.length; i++) {
+            if (brutas[i] <= ev.data) idx = i; else break;
+          }
+          if (idx === -1) return;
+          const x = scales.x.getPixelForValue(idx);
+          ctx.save();
+          ctx.strokeStyle = 'rgba(10,34,64,0.35)';
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath(); ctx.moveTo(x, chartArea.top); ctx.lineTo(x, chartArea.bottom); ctx.stroke();
+          ctx.setLineDash([]);
+          if (desenhados < 8) {
+            ctx.font = '10px "JetBrains Mono", monospace';
+            ctx.fillStyle = 'rgba(10,34,64,0.6)';
+            ctx.textAlign = 'left';
+            ctx.fillText((ev.titulo || '').slice(0, 18), x + 4, chartArea.top + 10);
+          }
+          ctx.restore();
+          desenhados++;
+        });
+      }
+    };
 
     async function carregarHistoricoMulti() {
       const res = await fetch('/api/pesquisas/historico-multi?cargo=presidente&candidatos=Lula,Fl%C3%A1vio%20Bolsonaro&tipo=' + tipoPres);
@@ -469,6 +516,7 @@
 
       chartHistoricoMulti = new Chart(ctx, {
         type: 'line',
+        plugins: [eventosMarkerPlugin],
         data: { labels: todasDatas.map(formatarData), datasets },
         options: {
           responsive: true, maintainAspectRatio: false,
@@ -496,6 +544,7 @@
           }
         }
       });
+      chartHistoricoMulti.$_datasBrutas = todasDatas;
     }
 
     function toggleCandidato() {
@@ -1061,6 +1110,8 @@
 
     // ─── Inicialização ────────────────────────────────────────
     async function inicializar() {
+      // Eventos antes do gráfico para os marcadores já aparecerem no 1º render.
+      await carregarEventos();
       await Promise.all([
         carregarVisaoGeral(),
         carregarKpisAvancados(),
