@@ -61,7 +61,9 @@ REGRAS CRÍTICAS:
 - Extraia SOMENTE quando houver percentual numérico explícito (ex: "38%", "38 por cento")
 - NÃO invente percentuais — se não há número claro, não inclua o candidato
 @@ESCOPO_TURNO@@
-- IGNORE percentuais de 2º turno (geralmente acima de 50% em confronto direto)
+- NÃO inclua percentuais de 2º turno na lista "candidatos" (o 1º turno é o
+  cenário multicandidato). O confronto direto de 2º turno vai para o campo
+  separado "confrontos_2turno" (ver abaixo)
 @@EXTRA_REGIONAL_NACIONAL@@
 - IGNORE aprovação/rejeição de governo
 - Se o release apresentar múltiplos cenários de 1º turno (o mesmo instituto
@@ -82,6 +84,14 @@ REGRAS CRÍTICAS:
 - Cargo deve ser "presidente", "governador_rj", "governador_sp" etc
 - Se o texto for sobre aprovação/rejeição de governo sem intenção de voto, retorne lista vazia
 @@EXTRA_NACIONAL_FIM_REGRAS@@
+
+CONFRONTO DE 2º TURNO:
+- Se o texto trouxer simulação de 2º turno (confronto direto entre DOIS
+  candidatos, ex.: "No 2º turno, Lula tem 48% contra 46% de Flávio Bolsonaro"),
+  capture o par em "confrontos_2turno". NÃO inclua esses números em "candidatos".
+- Cada confronto é um objeto: {"candidato_a": nome, "pct_a": num, "candidato_b": nome, "pct_b": num}.
+- Capture um objeto por par distinto (pode haver mais de um confronto no texto).
+- Se não houver simulação de 2º turno, retorne "confrontos_2turno": [].
 
 EXTRAÇÃO DE "% PODE MUDAR DE VOTO":
 - Se o texto mencionar EXPLICITAMENTE o percentual de eleitores que podem
@@ -131,6 +141,9 @@ Retorne SOMENTE JSON válido, sem markdown, sem explicação:
   "candidatos": [
     {"nome": "Nome Candidato", "percentual": 38.0},
     {"nome": "Nome Candidato 2", "percentual": 32.0}
+  ],
+  "confrontos_2turno": [
+    {"candidato_a": "Lula", "pct_a": 48.0, "candidato_b": "Flávio Bolsonaro", "pct_b": 46.0}
   ],
 @@BLOCO_REJEICOES_SCHEMA@@
   "pct_pode_mudar_voto": numero ou null
@@ -459,9 +472,24 @@ def extrair_com_gemini(texto: str, fonte_url: str = "", permite_regional: bool =
         candidatos = list(vistos.values())
 
         resultado["candidatos"] = candidatos
-        
+
+        # Sanea confrontos de 2º turno (par A x B). Cada par é validado
+        # individualmente; um par malformado é descartado sem derrubar o resto.
+        confrontos = []
+        for cf in resultado.get("confrontos_2turno") or []:
+            if not isinstance(cf, dict):
+                continue
+            a = normalizar_nome(cf.get("candidato_a"))
+            b = normalizar_nome(cf.get("candidato_b"))
+            pa = _to_pct(cf.get("pct_a"))
+            pb = _to_pct(cf.get("pct_b"))
+            if not a or not b or a == b or pa is None or pb is None:
+                continue
+            confrontos.append({"candidato_a": a, "candidato_b": b, "pct_a": pa, "pct_b": pb})
+        resultado["confrontos_2turno"] = confrontos
+
         n = len(resultado.get("candidatos", []))
-        logger.info(f"Gemini extraiu {n} candidatos usando {modelo_usado}")
+        logger.info(f"Gemini extraiu {n} candidatos e {len(confrontos)} confronto(s) de 2º turno usando {modelo_usado}")
         return resultado
         
     except json.JSONDecodeError as e:

@@ -213,6 +213,25 @@ class BaseCollector(ABC):
                             )
                             grupo_rejeicoes += 1
 
+                    # f. Insere confrontos de 2º turno (par A x B, no primeiro item
+                    # do grupo). Keyed por instituto/cargo/data (não por pesquisa_id):
+                    # UNIQUE + INSERT OR REPLACE dedup/atualiza a mesma peça.
+                    first = group_items[0]
+                    data_pesq_cf = first.get("data_pesquisa") or dt_coleta
+                    amostra_cf = first.get("tamanho_amostra")
+                    for cf in first.get("confrontos_2turno") or []:
+                        a = cf.get("candidato_a")
+                        b = cf.get("candidato_b")
+                        pa = cf.get("pct_a")
+                        pb = cf.get("pct_b")
+                        if a and b and pa is not None and pb is not None:
+                            cursor.execute(
+                                "INSERT OR REPLACE INTO confrontos_2turno "
+                                "(instituto_id, cargo, candidato_a, candidato_b, pct_a, pct_b, data_pesquisa, tamanho_amostra, fonte_url) "
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                (inst_id, cargo, a, b, float(pa), float(pb), data_pesq_cf, amostra_cf, url)
+                            )
+
                     conn.commit()
                     n_pesquisas += grupo_pesquisas
                     n_intencoes += grupo_intencoes
@@ -311,6 +330,7 @@ class BaseCollector(ABC):
             items[0]["rejeicoes"] = rejeicoes
         if items:
             items[0]["pct_pode_mudar_voto"] = resultado.get("pct_pode_mudar_voto")
+            items[0]["confrontos_2turno"] = resultado.get("confrontos_2turno") or []
 
         return items
 

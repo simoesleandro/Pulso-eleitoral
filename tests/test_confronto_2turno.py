@@ -87,3 +87,45 @@ def test_simulacao_cai_na_simulacao_sem_dado_real():
     assert st['fonte'] == 'simulacao'
     assert 'nota' in st
     assert 'total_estimado' in st['lula'] and 'total_estimado' in st['flavio']
+
+
+def test_save_persiste_confrontos_2turno(tmp_path):
+    """base.save grava os confrontos_2turno anexados ao primeiro item do grupo,
+    num banco temporário isolado (sem tocar o pulso_test.db compartilhado)."""
+    import os as _os
+    import sqlite3
+    from collectors.cnn_brasil import CnnBrasilColetor
+
+    db = str(tmp_path / "t.db")
+    base_dir = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+    conn = sqlite3.connect(db)
+    with open(_os.path.join(base_dir, "schema.sql"), encoding="utf-8") as f:
+        conn.executescript(f.read())
+    # Colunas que vêm de migration (não estão no schema.sql base)
+    from scripts.migrate_pesquisas_volatilidade import aplicar_migracao as _mig_vol
+    _mig_vol(conn)
+    conn.execute("INSERT INTO institutos (id, nome, sigla, site) VALUES (3, 'Quaest', 'Q', 'http://q')")
+    conn.commit()
+    conn.close()
+
+    col = CnnBrasilColetor(db_path=db)
+    itens = [{
+        "instituto_id": 3, "cargo": "presidente", "candidato": "Lula", "percentual": 40.0,
+        "tipo": "estimulada", "data_pesquisa": "2026-07-05", "data_coleta": "2026-07-05",
+        "fonte_url": "http://x/1", "tamanho_amostra": 2000,
+        "confrontos_2turno": [
+            {"candidato_a": "Lula", "candidato_b": "Flávio Bolsonaro", "pct_a": 48.0, "pct_b": 46.0},
+        ],
+    }]
+    res = col.save(itens)
+    assert res["pesquisas"] == 1
+
+    conn = sqlite3.connect(db)
+    rows = conn.execute(
+        "SELECT candidato_a, candidato_b, pct_a, pct_b, cargo FROM confrontos_2turno"
+    ).fetchall()
+    conn.close()
+    assert len(rows) == 1
+    assert rows[0][0] == "Lula" and rows[0][1] == "Flávio Bolsonaro"
+    assert rows[0][2] == 48.0 and rows[0][3] == 46.0
+    assert rows[0][4] == "presidente"

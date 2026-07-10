@@ -213,3 +213,63 @@ def test_item_nao_dict_na_lista_e_ignorado_sem_excecao(mock_client_class):
 
         nomes = {c["nome"] for c in resultado["candidatos"]}
         assert nomes == {"Lula"}
+
+
+@patch('google.genai.Client')
+def test_extrai_confronto_2turno(mock_client_class):
+    """Captura o par de 2º turno em confrontos_2turno, sem poluir candidatos."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+
+    mock_response = MagicMock()
+    mock_response.text = """
+    {
+      "cargo": "presidente",
+      "candidatos": [
+        {"nome": "Lula", "percentual": 40.0},
+        {"nome": "Flávio Bolsonaro", "percentual": 35.0}
+      ],
+      "confrontos_2turno": [
+        {"candidato_a": "Lula", "pct_a": 48.0, "candidato_b": "Flávio Bolsonaro", "pct_b": 46.0}
+      ]
+    }
+    """
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "dummy_key"}):
+        resultado = extrair_com_gemini("texto", "http://teste.com")
+
+    conf = resultado["confrontos_2turno"]
+    assert len(conf) == 1
+    assert conf[0]["candidato_a"] == "Lula"
+    assert conf[0]["pct_a"] == 48.0
+    assert conf[0]["pct_b"] == 46.0
+    # não vaza pro 1º turno
+    assert all(c["percentual"] <= 40.0 for c in resultado["candidatos"])
+
+
+@patch('google.genai.Client')
+def test_confronto_2turno_malformado_descartado(mock_client_class):
+    """Par sem percentual coercível ou com A==B é descartado sem derrubar o resto."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+
+    mock_response = MagicMock()
+    mock_response.text = """
+    {
+      "candidatos": [{"nome": "Lula", "percentual": 40.0}],
+      "confrontos_2turno": [
+        {"candidato_a": "Lula", "pct_a": "xx", "candidato_b": "Flávio Bolsonaro", "pct_b": 46.0},
+        {"candidato_a": "Lula", "pct_a": 50.0, "candidato_b": "Lula", "pct_b": 50.0},
+        {"candidato_a": "Lula", "pct_a": 47.0, "candidato_b": "Flávio Bolsonaro", "pct_b": 45.0}
+      ]
+    }
+    """
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "dummy_key"}):
+        resultado = extrair_com_gemini("texto", "http://teste.com")
+
+    conf = resultado["confrontos_2turno"]
+    assert len(conf) == 1
+    assert conf[0]["pct_a"] == 47.0
