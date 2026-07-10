@@ -248,11 +248,21 @@ def test_migracao_volatilidade_resiliente_a_race_condition(monkeypatch):
 # ─── Endpoint GET /api/monte-carlo/governador_rj ───────────────────────────
 
 def test_endpoint_governador_rj_amostra_limitada_com_seed(client):
-    """Com o seed padrão, só a pesquisa mais recente de governador_rj
-    (2026-06-05) cai dentro dos últimos 30 dias — nenhum candidato tem 2+
-    pesquisas na janela, então amostra_limitada deve ser True e
-    candidatos_simulados vazio."""
-    init_db(force_seed=True)
+    """Com apenas UMA pesquisa recente de governador_rj na janela de 30 dias,
+    nenhum candidato tem 2+ pesquisas — então amostra_limitada deve ser True,
+    candidatos_simulados vazio e os candidatos caem em dados_insuficientes.
+    (Data relativa a hoje para não depender das datas fixas do seed padrão,
+    que saem da janela conforme o tempo passa.)"""
+    init_db(force_seed=False)
+    conn = get_conn()
+    conn.execute("DELETE FROM intencoes")
+    conn.execute("DELETE FROM pesquisas")
+    conn.commit()
+    from datetime import date, timedelta
+    data_recente = (date.today() - timedelta(days=5)).isoformat()
+    _inserir_pesquisa_teste(conn, 'governador_rj', data_recente,
+                            [('Candidato X', 40.0), ('Candidato Y', 30.0)])
+    conn.close()
 
     response = client.get('/api/monte-carlo/governador_rj')
     assert response.status_code == 200
