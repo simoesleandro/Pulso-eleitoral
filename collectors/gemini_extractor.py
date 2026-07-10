@@ -64,8 +64,13 @@ REGRAS CRÍTICAS:
 - IGNORE percentuais de 2º turno (geralmente acima de 50% em confronto direto)
 @@EXTRA_REGIONAL_NACIONAL@@
 - IGNORE aprovação/rejeição de governo
-- Se o release apresentar múltiplos cenários de 1º turno, escolha o cenário
-  com MAIS candidatos listados
+- Se o release apresentar múltiplos cenários de 1º turno (o mesmo instituto
+  testando o líder contra adversários diferentes), escolha o cenário cujo
+  PRINCIPAL adversário do líder (o 2º colocado) seja um candidato DECLARADO
+  da lista: {lista_presidenciais}. Os cenários em que o 2º colocado é um nome
+  hipotético/alternativo fora dessa lista (ex.: Michelle Bolsonaro, Astronauta
+  Marcos Pontes, Damares, Rogério Marinho) são projeções — IGNORE-OS.
+  NUNCA escolha um cenário só porque ele tem MAIS candidatos listados
 - Se o release misturar 1º e 2º turno, extraia APENAS o cenário de 1º turno
 - IGNORE: cenários de 2º turno, cenários hipotéticos com candidatos
   que ainda não declararam candidatura ({lista_ignorar})
