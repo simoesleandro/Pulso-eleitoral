@@ -22,6 +22,16 @@
       <p class="pe-mono" style="margin-top: var(--pe-space-1);">Gerenciamento e monitoramento da coleta automática</p>
     </div>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="pe-alert pe-alert--{% if category == 'danger' %}danger{% else %}success{% endif %}" style="margin-bottom: var(--pe-space-4);">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
     <!-- Status do Scheduler -->
     <div class="pe-grid-3" style="margin-bottom: var(--pe-space-6);">
       <div class="pe-kpi">
@@ -92,6 +102,75 @@
             <tr>
               <td colspan="4" style="text-align: center; padding: var(--pe-space-4);" class="pe-mono">Nenhum log gravado no banco de dados.</td>
             </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Eventos da campanha (marcadores no gráfico de tendência) -->
+    <div class="pe-card" style="margin-top: var(--pe-space-6);">
+      <div class="pe-card__title">Eventos da campanha</div>
+      <p class="pe-mono" style="color: var(--pe-text-muted); font-size: 12px; margin-bottom: var(--pe-space-4);">
+        Marcadores verticais no gráfico de tendência (debate, escândalo, comício…).
+      </p>
+
+      <form action="/admin/eventos/criar" method="POST" style="margin-bottom: var(--pe-space-5);">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div style="display: flex; gap: var(--pe-space-3); flex-wrap: wrap; align-items: flex-end;">
+          <div>
+            <label class="pe-mono" style="display:block; font-size:11px; color:var(--pe-text-muted);">Data</label>
+            <input class="form-input" type="date" name="data" required>
+          </div>
+          <div style="flex: 1; min-width: 200px;">
+            <label class="pe-mono" style="display:block; font-size:11px; color:var(--pe-text-muted);">Título</label>
+            <input class="form-input" type="text" name="titulo" required maxlength="120" placeholder="Ex: Debate na Globo" style="width:100%;">
+          </div>
+          <div>
+            <label class="pe-mono" style="display:block; font-size:11px; color:var(--pe-text-muted);">Cargo</label>
+            <select class="form-input" name="cargo">
+              <option value="presidente">Presidente</option>
+              <option value="governador_rj">Governador RJ</option>
+              <option value="geral">Geral</option>
+            </select>
+          </div>
+          <div>
+            <label class="pe-mono" style="display:block; font-size:11px; color:var(--pe-text-muted);">Impacto</label>
+            <select class="form-input" name="impacto">
+              <option value="indefinido">Indefinido</option>
+              <option value="positivo">Positivo</option>
+              <option value="negativo">Negativo</option>
+              <option value="neutro">Neutro</option>
+            </select>
+          </div>
+          <button type="submit" class="pe-btn pe-btn--primary">Adicionar</button>
+        </div>
+        <div style="margin-top: var(--pe-space-2);">
+          <input class="form-input" type="text" name="descricao" maxlength="240" placeholder="Descrição (opcional)" style="width:100%;">
+        </div>
+      </form>
+
+      <div style="overflow-x: auto;">
+        <table class="pe-table">
+          <thead>
+            <tr><th>Data</th><th>Título</th><th>Cargo</th><th>Impacto</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for ev in eventos %}
+            <tr>
+              <td class="pe-mono">{{ ev.data }}</td>
+              <td>{{ ev.titulo }}</td>
+              <td class="pe-mono">{{ ev.cargo }}</td>
+              <td class="pe-mono">{{ ev.impacto }}</td>
+              <td>
+                <form action="/admin/eventos/{{ ev.id }}/remover" method="POST" style="margin:0;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="pe-btn pe-btn--danger" style="padding: 4px 8px; font-size: 11px;">Remover</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align:center; padding: var(--pe-space-4);" class="pe-mono">Nenhum evento cadastrado.</td></tr>
             {% endfor %}
           </tbody>
         </table>

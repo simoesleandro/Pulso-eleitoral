@@ -138,6 +138,7 @@ def require_login():
         'api_monte_carlo',
         'api_monte_carlo_governador_rj',
         'api_rejeicao',
+        'api_eventos',
         'apply_db'
     ]
     if request.endpoint in allowed_endpoints:
@@ -248,12 +249,19 @@ def admin():
     except Exception:
         pass
         
+    from database import listar_eventos
+    try:
+        eventos = listar_eventos()
+    except Exception:
+        eventos = []
+
     return render_template(
         'admin.html',
         proximo_run=proximo_run,
         ultimo_run=ultimo_run,
         total_pesquisas=total_pesquisas,
-        logs=logs
+        logs=logs,
+        eventos=eventos
     )
 
 @app.route('/admin/coletar', methods=['GET', 'POST'])
@@ -424,8 +432,41 @@ def admin_toggle_usuario(user_id):
         flash("Status do usuário alterado com sucesso!", "success")
     else:
         flash("Erro ao alterar status do usuário.", "danger")
-        
+
     return redirect(url_for('admin_usuarios'))
+
+@app.route('/admin/eventos/criar', methods=['POST'])
+@login_required
+def admin_criar_evento():
+    """Cadastra um evento da campanha (marcador no gráfico)."""
+    from flask import flash
+    from database import criar_evento
+    try:
+        criar_evento(
+            data=request.form.get('data', ''),
+            titulo=request.form.get('titulo', ''),
+            cargo=request.form.get('cargo', ''),
+            impacto=request.form.get('impacto', ''),
+            descricao=request.form.get('descricao') or None,
+        )
+        cache.clear()  # invalida /api/eventos (cacheado) para refletir na hora
+        flash("Evento criado com sucesso!", "success")
+    except ValueError as e:
+        flash(f"Evento inválido: {e}", "danger")
+    return redirect(url_for('admin'))
+
+@app.route('/admin/eventos/<int:evento_id>/remover', methods=['POST'])
+@login_required
+def admin_remover_evento(evento_id):
+    """Remove um evento da campanha."""
+    from flask import flash
+    from database import remover_evento
+    if remover_evento(evento_id):
+        cache.clear()  # invalida /api/eventos (cacheado)
+        flash("Evento removido.", "success")
+    else:
+        flash("Evento não encontrado.", "danger")
+    return redirect(url_for('admin'))
 
 @app.route('/api/visao-geral')
 @cache.cached(timeout=300)
@@ -616,6 +657,15 @@ def api_media_agregada():
     cargo = request.args.get('cargo', 'presidente')
     dias = _parse_num(request.args.get('dias'), int, 30)
     return jsonify(get_media_agregada(cargo, dias))
+
+@app.route('/api/eventos')
+@cache.cached(timeout=300, query_string=True)
+def api_eventos():
+    """Eventos da campanha (marcadores no gráfico). ?cargo= opcional filtra
+    pelo cargo + 'geral'. Público (conteúdo editorial)."""
+    from database import listar_eventos
+    cargo = request.args.get('cargo')
+    return jsonify({"eventos": listar_eventos(cargo)})
 
 @app.route('/api/kpis-avancados')
 @cache.cached(timeout=300, query_string=True)

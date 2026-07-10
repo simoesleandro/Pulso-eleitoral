@@ -324,3 +324,62 @@ def test_api_analise_cache(mock_client_class, client):
     mock_client_class.assert_not_called()
     mock_client.models.generate_content.assert_not_called()
 
+
+
+# ─── Eventos da campanha (plano 015) ───────────────────────────────────────
+
+def test_api_eventos_publico(client):
+    """GET /api/eventos é público e retorna {"eventos": [...]}."""
+    setup_db_with_seed()
+    resp = client.get('/api/eventos')
+    assert resp.status_code == 200
+    assert 'eventos' in resp.json
+    assert isinstance(resp.json['eventos'], list)
+
+
+def test_criar_evento_exige_login(client):
+    """POST /admin/eventos/criar sem sessão redireciona para /login."""
+    resp = client.post('/admin/eventos/criar', data={
+        'data': '2026-08-01', 'titulo': 'X', 'cargo': 'presidente', 'impacto': 'neutro'
+    }, follow_redirects=False)
+    assert resp.status_code == 302
+    assert '/login' in resp.headers['Location']
+
+
+def _login(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['username'] = 'admin'
+        sess['nome'] = 'Administrador'
+
+
+def test_fluxo_criar_listar_remover_evento(client):
+    """Criar evento válido → aparece na API; impacto inválido → nada criado;
+    remover → some da lista."""
+    setup_db_with_seed()
+    _login(client)
+
+    # cria válido
+    resp = client.post('/admin/eventos/criar', data={
+        'data': '2026-08-01', 'titulo': 'Debate Globo', 'cargo': 'presidente',
+        'impacto': 'positivo', 'descricao': 'primeiro debate'
+    }, follow_redirects=False)
+    assert resp.status_code == 302
+
+    eventos = client.get('/api/eventos?cargo=presidente').json['eventos']
+    achado = [e for e in eventos if e['titulo'] == 'Debate Globo']
+    assert len(achado) == 1
+    ev_id = achado[0]['id']
+
+    # impacto inválido não cria nada
+    antes = len(client.get('/api/eventos').json['eventos'])
+    client.post('/admin/eventos/criar', data={
+        'data': '2026-08-02', 'titulo': 'Y', 'cargo': 'presidente', 'impacto': 'INVALIDO'
+    }, follow_redirects=False)
+    depois = len(client.get('/api/eventos').json['eventos'])
+    assert depois == antes
+
+    # remove
+    client.post(f'/admin/eventos/{ev_id}/remover', follow_redirects=False)
+    eventos2 = client.get('/api/eventos?cargo=presidente').json['eventos']
+    assert not any(e['id'] == ev_id for e in eventos2)
