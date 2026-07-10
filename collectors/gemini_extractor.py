@@ -470,3 +470,114 @@ def extrair_com_gemini(texto: str, fonte_url: str = "", permite_regional: bool =
     except Exception as e:
         logger.error(f"Gemini erro: {e}")
         return {"candidatos": []}
+
+
+# Prompt dedicado a governador do RJ. O PROMPT_EXTRACAO nacional ignora
+# pesquisas estaduais de propósito, então governador precisa de um prompt
+# próprio (não deriva da base compartilhada, que é presidencial-cêntrica).
+PROMPT_EXTRACAO_GOVERNADOR_RJ = """
+Você é um extrator de dados de pesquisas eleitorais brasileiras.
+Extraia APENAS intenções de voto de 1º turno para GOVERNADOR DO RIO DE JANEIRO
+(eleição estadual de 2026).
+
+REGRAS CRÍTICAS:
+- Extraia SOMENTE o cargo de GOVERNADOR do Rio de Janeiro. IGNORE completamente
+  senador, presidente, deputado ou qualquer outro cargo — mesmo com percentuais
+  explícitos (as pesquisas do RJ costumam trazer governador E senador na mesma peça).
+- Extraia SOMENTE quando houver percentual numérico explícito (ex: "38%", "38 por cento").
+- NÃO invente percentuais — se não há número claro, não inclua o candidato.
+- IGNORE percentuais de 2º turno (confronto direto entre 2 candidatos, um acima de 50%).
+- Se houver múltiplos cenários de 1º turno, escolha o cenário com MAIS candidatos listados.
+- Percentuais válidos por candidato: entre 1% e 80%.
+- IGNORE aprovação/rejeição de governo, brancos/nulos e "não sabe/não respondeu".
+
+DETERMINAÇÃO DO CAMPO "tipo":
+- "estimulada" quando o texto apresenta uma lista de nomes ao entrevistado
+  ("com lista", "ao ouvir os nomes", "escolheria entre").
+- "espontanea" quando é sem apresentação de nomes ("espontânea", "sem lista").
+- Na dúvida, use "estimulada".
+
+Retorne SOMENTE JSON válido, sem markdown, sem explicação:
+{
+  "cargo": "governador_rj",
+  "tipo": "estimulada",
+  "instituto": "nome do instituto mencionado ou null",
+  "data": "YYYY-MM-DD ou null",
+  "tamanho_amostra": numero ou null,
+  "margem_erro": numero ou null,
+  "candidatos": [
+    {"nome": "Nome Candidato", "percentual": 38.0}
+  ]
+}
+
+Se não encontrar intenções de voto para governador do RJ com percentuais
+explícitos, retorne:
+{"candidatos": []}
+
+Ano de referência: 2026. Se o texto mencionar apenas mês e dia sem ano, assuma 2026.
+
+TEXTO:
+{texto}
+"""
+
+
+def extrair_governador_rj(texto: str, fonte_url: str = "") -> dict:
+    """Extrai intenções de voto de 1º turno para GOVERNADOR do RJ a partir de
+    texto (ex.: PDF do Paraná Pesquisas). Mesma sanitização tolerante de
+    extrair_com_gemini (candidato malformado é descartado individualmente); o
+    cargo é forçado para 'governador_rj'. Em erro/sem dados: {"candidatos": []}.
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        logger.error("GEMINI_API_KEY não configurada")
+        return {"candidatos": []}
+
+    try:
+        client = genai.Client(api_key=api_key)
+        prompt = PROMPT_EXTRACAO_GOVERNADOR_RJ.replace("{texto}", texto[:8000])
+
+        raw, modelo_usado = gerar_com_cascata(client, prompt)
+        if raw is None:
+            logger.error("extrair_governador_rj: todos os modelos falharam")
+            return {"candidatos": []}
+
+        start_idx = raw.find("{")
+        end_idx = raw.rfind("}")
+        if start_idx == -1 or end_idx == -1:
+            return {"candidatos": []}
+        resultado = json.loads(raw[start_idx:end_idx + 1])
+
+        candidatos = []
+        for c in resultado.get("candidatos", []):
+            if not isinstance(c, dict):
+                logger.warning(f"Candidato malformado ignorado: {c!r}")
+                continue
+            nome = c.get("nome")
+            pct = _to_pct(c.get("percentual"))
+            if not nome or pct is None or not (1.0 <= pct <= 80.0):
+                continue
+            nome_norm = normalizar_nome(nome)
+            if nome_norm is None:  # candidato marcado para descarte
+                continue
+            candidatos.append({"nome": nome_norm, "percentual": pct})
+
+        # Remove duplicatas após normalização (mantém maior percentual)
+        vistos = {}
+        for c in candidatos:
+            if c["nome"] not in vistos or c["percentual"] > vistos[c["nome"]]["percentual"]:
+                vistos[c["nome"]] = c
+
+        resultado["candidatos"] = list(vistos.values())
+        resultado["cargo"] = "governador_rj"
+        resultado.setdefault("tipo", "estimulada")
+        resultado.setdefault("pct_pode_mudar_voto", None)
+        logger.info("extrair_governador_rj: %d candidatos via %s",
+                    len(resultado["candidatos"]), modelo_usado)
+        return resultado
+
+    except json.JSONDecodeError as e:
+        logger.warning(f"extrair_governador_rj JSON inválido: {e}")
+        return {"candidatos": []}
+    except Exception as e:
+        logger.error(f"extrair_governador_rj erro: {e}")
+        return {"candidatos": []}
