@@ -862,8 +862,9 @@ def apply_db():
             or not filename.endswith('.db')):
         return jsonify({'error': 'filename inválido'}), 400
 
-    new_db = f'/data/{filename}'
-    current_db = '/data/pulso.db'
+    import database
+    new_db = os.path.join(database.DATA_DIR, filename)
+    current_db = os.path.join(database.DATA_DIR, 'pulso.db')
     if not os.path.exists(new_db):
         return jsonify({'error': f'{filename} não encontrado'}), 404
 

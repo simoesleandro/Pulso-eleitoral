@@ -19,19 +19,13 @@ def client():
 
 
 @pytest.fixture
-def data_dir():
-    """Garante /data (caminho hardcoded em apply_db) e limpa só o que este
-    teste criou — não mexe em nada que já existisse ali antes."""
-    existia = os.path.isdir('/data')
-    if not existia:
-        os.makedirs('/data')
-    criados = []
-    yield criados
-    for path in criados:
-        if os.path.exists(path):
-            os.remove(path)
-    if not existia and os.path.isdir('/data') and not os.listdir('/data'):
-        os.rmdir('/data')
+def data_dir(tmp_path, monkeypatch):
+    """Aponta database.DATA_DIR (usado por apply_db) para um diretório
+    temporário — evita o path de produção '/data', que não é gravável no
+    runner de CI (Linux sem root). tmp_path é descartado automaticamente."""
+    import database
+    monkeypatch.setattr(database, 'DATA_DIR', str(tmp_path))
+    return tmp_path
 
 
 def test_sem_admin_pass_e_sem_header_recusa(client, monkeypatch):
@@ -81,10 +75,7 @@ def test_troca_bem_sucedida_invalida_cache(client, monkeypatch, data_dir):
     monkeypatch.setenv('ADMIN_PASS', 'senha-de-teste-006')
 
     filename = 'pulso_upload_teste_sucesso.db'
-    new_db_path = f'/data/{filename}'
-    current_db_path = '/data/pulso.db'
-    data_dir.append(new_db_path)
-    data_dir.append(current_db_path)
+    new_db_path = str(data_dir / filename)
 
     conn = sqlite3.connect(new_db_path)
     conn.execute("CREATE TABLE pesquisas (id INTEGER PRIMARY KEY)")
@@ -112,10 +103,7 @@ def test_troca_bem_sucedida_invalida_cache_candidatos(client, monkeypatch, data_
     database._cache_candidatos = {"mapa": {"fixture": "antigo"}}
 
     filename = 'pulso_upload_teste_cache_candidatos.db'
-    new_db_path = f'/data/{filename}'
-    current_db_path = '/data/pulso.db'
-    data_dir.append(new_db_path)
-    data_dir.append(current_db_path)
+    new_db_path = str(data_dir / filename)
 
     conn = sqlite3.connect(new_db_path)
     conn.execute("CREATE TABLE pesquisas (id INTEGER PRIMARY KEY)")
@@ -138,8 +126,7 @@ def test_falha_integridade_nao_invalida_cache(client, monkeypatch, data_dir):
     monkeypatch.setenv('ADMIN_PASS', 'senha-de-teste-007')
 
     filename = 'pulso_upload_teste_falha.db'
-    new_db_path = f'/data/{filename}'
-    data_dir.append(new_db_path)
+    new_db_path = str(data_dir / filename)
 
     with open(new_db_path, 'wb') as f:
         f.write(b'isso nao e um banco sqlite valido')
