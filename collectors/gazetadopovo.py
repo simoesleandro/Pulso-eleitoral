@@ -172,13 +172,41 @@ class GazetaDoPovoColetor(PlaywrightCollector, BaseCollector):
         except Exception as e:
             self.logger.error("[GazetaDoPovo] Erro ao salvar regional %s: %s", uf, e)
 
+    def _filtrar_presidenciais(self, dados: list[dict]) -> list[dict]:
+        """A tabela pesquisas_regionais é presidencial-por-estado. Quando a UF é
+        detectada na URL, uma matéria de eleição ESTADUAL (governador de GO/RS
+        etc.) também casa e traz candidatos a governador — que poluiriam a visão
+        presidencial por estado. Descarta quem não for candidato presidencial
+        conhecido. Fail-open: se a lista não carregar, não filtra (no-op seguro,
+        mesma política da normalização)."""
+        from collectors.gemini_extractor import normalizar_nome
+        try:
+            from database import get_nomes_presidenciais
+            pres = get_nomes_presidenciais()
+        except Exception:
+            pres = set()
+        if not pres:
+            return dados
+        filtrados = []
+        for d in dados:
+            raw = (d.get('candidato') or '').lower().strip()
+            norm = (normalizar_nome(d.get('candidato')) or '').lower().strip()
+            if raw in pres or norm in pres:
+                filtrados.append(d)
+        descartados = len(dados) - len(filtrados)
+        if descartados:
+            self.logger.info("[GazetaDoPovo] Regional: descartados %d candidatos não-presidenciais", descartados)
+        return filtrados
+
     def _parse_release(self, html: str, url: str) -> list[dict]:
         uf = self._detectar_uf(url, html[:1000])
         instituto_id = self._detectar_instituto_id(html[:2000], url)
         dados = self._parse_com_gemini(html, url, instituto_id=instituto_id, permite_regional=bool(uf))
 
         if uf and dados:
-            self._salvar_regional(dados, uf)
+            dados = self._filtrar_presidenciais(dados)
+            if dados:
+                self._salvar_regional(dados, uf)
             return []
 
         return dados
