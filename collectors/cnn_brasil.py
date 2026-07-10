@@ -74,31 +74,6 @@ class CnnBrasilColetor(BaseCollector):
     def _detectar_uf(self, url: str, texto: str = '') -> str | None:
         return _detectar_uf_utils(url, texto)
 
-    def _salvar_regional(self, dados: list[dict], uf: str) -> None:
-        if not dados:
-            return
-        try:
-            import sqlite3 as _sqlite3
-            conn = _sqlite3.connect(self.db_path)
-            inseridos = 0
-            for d in dados:
-                conn.execute(
-                    "INSERT OR REPLACE INTO pesquisas_regionais "
-                    "(instituto_id, data_pesquisa, uf, candidato, percentual) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (d.get('instituto_id', self.instituto_id),
-                     d.get('data_pesquisa', ''),
-                     uf,
-                     d['candidato'],
-                     d['percentual'])
-                )
-                inseridos += 1
-            conn.commit()
-            conn.close()
-            self.logger.info("[CnnBrasil] Regional %s: %d intenções salvas", uf, inseridos)
-        except Exception as e:
-            self.logger.error("[CnnBrasil] Erro ao salvar regional %s: %s", uf, e)
-
     def _parse_release(self, html: str, url: str) -> list[dict]:
         uf = self._detectar_uf(url, html[:500])
         dados = self._parse_com_gemini(
@@ -108,6 +83,7 @@ class CnnBrasilColetor(BaseCollector):
         )
 
         if uf and dados:
+            # _salvar_regional (BaseCollector) filtra não-presidenciais antes de persistir.
             self._salvar_regional(dados, uf)
             return []
 

@@ -161,3 +161,33 @@ def test_fetch_pagina_vazia(coletor):
     with patch.object(coletor, '_get_page', return_value=""):
         resultado = coletor.fetch()
     assert resultado == []
+
+
+def test_filtrar_presidenciais_descarta_governador(coletor):
+    """Regressão: _filtrar_presidenciais (BaseCollector, usado por _salvar_regional
+    em GazetaDoPovo e CnnBrasil) descarta candidatos não-presidenciais. Foi o bug
+    do Daniel Vilela (governador de GO) contaminando a visão presidencial por
+    estado. Testa o filtro puro sem tocar em banco (mocka a lista de presidenciais
+    e a normalização), pra não vazar estado no pulso_test.db compartilhado."""
+    dados = [
+        {"candidato": "Lula", "percentual": 40.0},
+        {"candidato": "Flávio Bolsonaro", "percentual": 35.0},
+        {"candidato": "Daniel Vilela", "percentual": 43.0},   # governador GO — deve sair
+    ]
+    # get_nomes_presidenciais retorna chaves minúsculas; ambos os imports são
+    # tardios dentro do método, então patchamos na origem de cada um.
+    with patch('database.get_nomes_presidenciais', return_value={"lula", "flávio bolsonaro"}), \
+         patch('collectors.gemini_extractor.normalizar_nome', side_effect=lambda n: n):
+        filtrados = coletor._filtrar_presidenciais(dados)
+
+    nomes = {d["candidato"] for d in filtrados}
+    assert "Daniel Vilela" not in nomes
+    assert nomes == {"Lula", "Flávio Bolsonaro"}
+
+
+def test_filtrar_presidenciais_fail_open_sem_lista(coletor):
+    """Se a lista de presidenciais não carregar (vazia), o filtro é no-op:
+    não descarta nada (fail-open seguro, mesma política da normalização)."""
+    dados = [{"candidato": "Fulano Qualquer", "percentual": 10.0}]
+    with patch('database.get_nomes_presidenciais', return_value=set()):
+        assert coletor._filtrar_presidenciais(dados) == dados
