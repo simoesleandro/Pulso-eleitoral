@@ -46,6 +46,15 @@
     <!-- SEÇÃO 1: VISÃO GERAL -->
     <section id="secao-visao-geral" class="pe-section">
 
+      <!-- Aviso de defasagem (ativado por JS quando a última pesquisa passa do limiar) -->
+      <div id="aviso-defasagem" style="display:none; padding:10px 14px; border-radius:8px;
+           background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.4);
+           color:var(--pe-text); font-size:13px; margin-bottom:12px;">
+        ⏳ <strong>Dados defasados:</strong> a pesquisa mais recente é de
+        <span id="aviso-defasagem-data"></span> (<span id="aviso-defasagem-dias"></span> dias atrás).
+        Interprete as médias com cautela.
+      </div>
+
       <!-- KPI grid 4 cards -->
       <div class="pe-kpi-grid" id="kpi-grid"></div>
 
@@ -607,9 +616,20 @@
     }
 
     // ─── Visão Geral ──────────────────────────────────────────
+    // Pesquisas presidenciais saem a cada 1–2 semanas: 10 dias é "esperando a
+    // próxima", 20+ é seca real. Trivialmente ajustável.
+    const LIMIAR_DEFASAGEM_DIAS = 10;
+
     async function carregarVisaoGeral() {
       const res = await fetch('/api/visao-geral');
       const data = await res.json();
+
+      const dias = data.kpis?.dias_desde_ultima;
+      if (dias != null && dias > LIMIAR_DEFASAGEM_DIAS) {
+        document.getElementById('aviso-defasagem-data').textContent = data.kpis.ultima_atualizacao || '—';
+        document.getElementById('aviso-defasagem-dias').textContent = dias;
+        document.getElementById('aviso-defasagem').style.display = 'block';
+      }
 
       document.getElementById('kpi-grid').innerHTML = `
         <div class="pe-card pe-kpi">

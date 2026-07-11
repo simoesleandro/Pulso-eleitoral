@@ -28,7 +28,7 @@ Planos 001–005 escritos contra o commit `2b49ba3`; planos 006–017 contra `b3
 | 013 | Contrato do coletor no ABC + remoção de código morto | P3 | S | **006, 007** | DONE |
 | 015 | Linha do tempo de eventos (F4 do PRD): CRUD admin + marcadores no gráfico | P2 | M | 009* | DONE |
 | 016 | House effects por instituto (#5 roadmap / F7 PRD) | P3 | M | **010, 015** | DONE |
-| 017 | Aviso de defasagem no dashboard (#10c roadmap) | P3 | S | **016** | TODO |
+| 017 | Aviso de defasagem no dashboard (#10c roadmap) | P3 | S | **016** | DONE |
 
 Valores de status: TODO | IN PROGRESS | DONE | BLOCKED (motivo em uma linha) | REJECTED (motivo).
 Dependências em **negrito** são obrigatórias; com `*` são só ordem recomendada

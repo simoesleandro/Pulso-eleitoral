@@ -241,7 +241,10 @@ def test_api_visao_geral(client):
     assert 'lider_presidente' in data
     assert 'lider_governador' in data
     assert 'tendencias' in data
-    
+    # Chaves do aviso de defasagem (plano 017): aninhadas sob kpis
+    assert 'dias_desde_ultima' in data['kpis']
+    assert 'ultima_atualizacao' in data['kpis']
+
     assert data['kpis']['total_pesquisas'] > 0
     assert data['lider_presidente']['candidato'] is not None
     assert len(data['tendencias']) > 0
