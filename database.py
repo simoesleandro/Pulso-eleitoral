@@ -674,6 +674,72 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
     }
 
 
+def get_house_effects(cargo: str = 'presidente', dias: int = 90) -> dict:
+    """Desvio sistemático (house effect) de cada instituto vs. a média dos DEMAIS
+    institutos, por candidato, na janela de `dias`.
+
+    Para cada candidato com pesquisas de >= 3 institutos na janela, e cada
+    instituto com >= 2 pesquisas desse candidato:
+        efeito = média_do_instituto(cand) - média das médias dos OUTROS institutos(cand)
+    Thresholds evitam reportar ruído como viés. Não ajusta a média agregada —
+    é só leitura/contexto (documentado em /metodologia).
+    """
+    data_limite = (date.today() - timedelta(days=dias)).isoformat()
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT i.candidato, i.percentual, inst.nome AS instituto
+            FROM intencoes i
+            JOIN pesquisas p ON i.pesquisa_id = p.id
+            JOIN institutos inst ON p.instituto_id = inst.id
+            LEFT JOIN candidatos c ON c.nome_canonico = i.candidato
+            WHERE p.cargo = ? AND p.data_pesquisa >= ?
+            AND (i.tipo = 'estimulada' OR i.tipo IS NULL)
+            AND (c.status IS NULL OR c.status = 'ativo')
+            AND LOWER(i.candidato) NOT LIKE '%outros%'
+            AND LOWER(i.candidato) NOT LIKE '%nulos%'
+            AND LOWER(i.candidato) NOT LIKE '%brancos%'
+            AND LOWER(i.candidato) NOT LIKE '%indecisos%'
+            AND LOWER(i.candidato) NOT LIKE '%não sabe%'
+            AND LOWER(i.candidato) NOT LIKE '%não respondeu%'
+        """, (cargo, data_limite)).fetchall()
+
+    # pcts[candidato][instituto] = [percentuais]
+    pcts: dict[str, dict[str, list]] = {}
+    for r in rows:
+        pcts.setdefault(r['candidato'], {}).setdefault(r['instituto'], []).append(r['percentual'])
+
+    efeitos_por_instituto: dict[str, list] = {}
+    for candidato, por_inst in pcts.items():
+        if len(por_inst) < 3:   # precisa de >= 3 institutos para ter "os demais"
+            continue
+        medias = {inst: mean(lst) for inst, lst in por_inst.items()}
+        for inst, lst in por_inst.items():
+            if len(lst) < 2:    # instituto com 1 pesquisa é ruído, não viés
+                continue
+            demais = [m for i2, m in medias.items() if i2 != inst]
+            efeito = round(medias[inst] - mean(demais), 1)
+            if efeito == 0:
+                efeito = 0.0  # normaliza -0.0
+
+            efeitos_por_instituto.setdefault(inst, []).append({
+                "candidato": candidato,
+                "efeito_pp": efeito,
+                "n_pesquisas": len(lst),
+            })
+
+    institutos = []
+    for inst in sorted(efeitos_por_instituto):
+        efeitos = sorted(efeitos_por_instituto[inst], key=lambda e: e['candidato'])
+        institutos.append({"instituto": inst, "efeitos": efeitos})
+
+    return {
+        "cargo": cargo,
+        "janela_dias": dias,
+        "institutos": institutos,
+        "atualizado_em": date.today().strftime("%d/%m/%Y"),
+    }
+
+
 def get_confronto_2turno_real(nome_a: str, nome_b: str, cargo: str = 'presidente',
                               dias: int = 30) -> dict | None:
     """Média das pesquisas REAIS de confronto direto de 2º turno entre A e B,

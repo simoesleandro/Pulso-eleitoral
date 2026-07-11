@@ -139,6 +139,7 @@ def require_login():
         'api_monte_carlo_governador_rj',
         'api_rejeicao',
         'api_eventos',
+        'api_house_effects',
         'apply_db'
     ]
     if request.endpoint in allowed_endpoints:
@@ -666,6 +667,15 @@ def api_eventos():
     from database import listar_eventos
     cargo = request.args.get('cargo')
     return jsonify({"eventos": listar_eventos(cargo)})
+
+@app.route('/api/house-effects')
+@cache.cached(timeout=300, query_string=True)
+def api_house_effects():
+    """Desvio sistemático (house effect) de cada instituto vs. os demais, por
+    candidato, nos últimos 90 dias. ?cargo= opcional (default presidente)."""
+    from database import get_house_effects
+    cargo = request.args.get('cargo', 'presidente')
+    return jsonify(get_house_effects(cargo))
 
 @app.route('/api/kpis-avancados')
 @cache.cached(timeout=300, query_string=True)

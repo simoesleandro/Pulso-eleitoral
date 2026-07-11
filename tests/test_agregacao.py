@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from database import DB_PATH, init_db, get_conn, get_media_agregada, get_kpis_avancados, get_historico_multi
+from database import DB_PATH, init_db, get_conn, get_media_agregada, get_kpis_avancados, get_historico_multi, get_house_effects
 
 
 @pytest.fixture(autouse=True)
@@ -370,3 +370,60 @@ def test_historico_multi_candidato_inexistente_retorna_serie_vazia():
     assert len(series) == 1
     assert series[0]["candidato"] == "Candidato Inexistente"
     assert series[0]["dados"] == []
+
+
+# ─── House effects (plano 016) ─────────────────────────────────────────────
+
+def test_house_effect_desvio_vs_demais():
+    """A=40 (2 pesquisas), B=36, C=38 → efeito de A = 40 - mean(36,38) = +3.0.
+    Só A (>=2 pesquisas) é reportado; B e C (1 cada) entram só na média dos demais."""
+    _init_limpo()
+    conn = get_conn()
+    try:
+        _seed_pesquisa(conn, "Quaest", 5, 2000, {"Lula": 40.0})
+        _seed_pesquisa(conn, "Quaest", 10, 2000, {"Lula": 40.0})
+        _seed_pesquisa(conn, "Datafolha", 5, 2000, {"Lula": 36.0})
+        _seed_pesquisa(conn, "Atlas", 5, 2000, {"Lula": 38.0})
+    finally:
+        conn.close()
+
+    res = get_house_effects('presidente', dias=90)
+    # Só Quaest reportado (Datafolha/Atlas têm 1 pesquisa cada)
+    assert [i['instituto'] for i in res['institutos']] == ['Quaest']
+    ef = res['institutos'][0]['efeitos'][0]
+    assert ef['candidato'] == 'Lula'
+    assert ef['efeito_pp'] == 3.0
+    assert ef['n_pesquisas'] == 2
+
+
+def test_house_effect_menos_de_3_institutos_nao_reporta():
+    """Candidato com pesquisas de apenas 2 institutos não gera house effect."""
+    _init_limpo()
+    conn = get_conn()
+    try:
+        _seed_pesquisa(conn, "Quaest", 5, 2000, {"Lula": 40.0})
+        _seed_pesquisa(conn, "Quaest", 10, 2000, {"Lula": 40.0})
+        _seed_pesquisa(conn, "Datafolha", 5, 2000, {"Lula": 36.0})
+        _seed_pesquisa(conn, "Datafolha", 10, 2000, {"Lula": 36.0})
+    finally:
+        conn.close()
+
+    res = get_house_effects('presidente', dias=90)
+    assert res['institutos'] == []
+
+
+def test_house_effect_fora_da_janela_ignorado():
+    """Pesquisa fora dos 90 dias não conta — a 2ª Quaest (100 dias atrás) some,
+    Quaest fica com 1 pesquisa na janela → ninguém tem >=2 → resultado vazio."""
+    _init_limpo()
+    conn = get_conn()
+    try:
+        _seed_pesquisa(conn, "Quaest", 5, 2000, {"Lula": 40.0})
+        _seed_pesquisa(conn, "Quaest", 100, 2000, {"Lula": 40.0})  # fora da janela
+        _seed_pesquisa(conn, "Datafolha", 5, 2000, {"Lula": 36.0})
+        _seed_pesquisa(conn, "Atlas", 5, 2000, {"Lula": 38.0})
+    finally:
+        conn.close()
+
+    res = get_house_effects('presidente', dias=90)
+    assert res['institutos'] == []

@@ -213,6 +213,15 @@
     <section id="secao-dados" class="pe-section">
       <h2 class="pe-section__title">Integridade dos Coletores</h2>
       <div class="pe-grid-institutos" id="lista-institutos"></div>
+
+      <div class="pe-card" id="house-effects-card" style="margin-top: var(--pe-space-6);">
+        <div class="pe-card__title">Tendência por instituto (house effect)</div>
+        <div id="house-effects-container"></div>
+        <p class="pe-mono" style="color:var(--pe-text-muted); font-size:11px; margin-top:var(--pe-space-3);">
+          Desvio médio de cada instituto vs. os demais nos últimos 90 dias.
+          Não é erro — é diferença metodológica. <a href="/metodologia#house-effects">Ver metodologia</a>.
+        </p>
+      </div>
     </section>
 
 {% endblock %}
@@ -1108,6 +1117,50 @@
       }
     }
 
+    async function carregarHouseEffects() {
+      const container = document.getElementById('house-effects-container');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/house-effects?cargo=presidente');
+        const data = await res.json();
+        const institutos = data.institutos || [];
+        // achata para linhas (instituto, candidato, efeito, n)
+        const linhas = [];
+        institutos.forEach(inst => (inst.efeitos || []).forEach(ef => linhas.push({
+          instituto: inst.instituto, ...ef
+        })));
+        if (linhas.length === 0) {
+          container.innerHTML = '<div class="pe-mono" style="color:var(--pe-text-muted);">Dados insuficientes para estimar tendência (mín. 3 institutos por candidato).</div>';
+          return;
+        }
+        const rows = linhas.map(l => {
+          const sinal = l.efeito_pp > 0 ? '+' : '';
+          const cor = l.efeito_pp > 0 ? '#1a7a4a' : l.efeito_pp < 0 ? 'var(--pe-red)' : 'var(--pe-text-muted)';
+          return `
+            <tr>
+              <td style="padding:8px 12px 8px 0; font-size:13px;">${l.instituto}</td>
+              <td style="padding:8px 12px 8px 0; font-size:13px;">${l.candidato}</td>
+              <td style="padding:8px 0 8px 12px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:500; color:${cor}; text-align:right;">${sinal}${l.efeito_pp.toFixed(1)}pp</td>
+              <td style="padding:8px 0 8px 12px; font-size:11px; color:var(--pe-text-muted); text-align:right;">${l.n_pesquisas} pesq.</td>
+            </tr>`;
+        }).join('');
+        container.innerHTML = `
+          <table style="width:100%; border-collapse:collapse;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--pe-surface);">
+                <th style="padding:4px 12px 4px 0; font-size:11px; color:var(--pe-text-muted); text-align:left; font-weight:500;">Instituto</th>
+                <th style="padding:4px 12px 4px 0; font-size:11px; color:var(--pe-text-muted); text-align:left; font-weight:500;">Candidato</th>
+                <th style="padding:4px 0 4px 12px; font-size:11px; color:var(--pe-text-muted); text-align:right; font-weight:500;">Desvio</th>
+                <th style="padding:4px 0 4px 12px; font-size:11px; color:var(--pe-text-muted); text-align:right; font-weight:500;">Pesquisas</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>`;
+      } catch (e) {
+        container.innerHTML = '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar house effects.</div>';
+      }
+    }
+
     // ─── Inicialização ────────────────────────────────────────
     async function inicializar() {
       // Eventos antes do gráfico para os marcadores já aparecerem no 1º render.
@@ -1126,6 +1179,7 @@
         carregarCenarioVitoriaRJ(),
         carregarRegional(),
         carregarRejeicao(),
+        carregarHouseEffects(),
       ]);
     }
 

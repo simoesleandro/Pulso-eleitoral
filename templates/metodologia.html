@@ -357,6 +357,20 @@
       <div class="met-callout">
         A variação de 30 dias exibida ao lado de cada candidato compara a média atual com a média calculada 30 dias atrás, usando o mesmo método.
       </div>
+
+      <div id="house-effects" style="margin-top: var(--pe-space-5); padding-top: var(--pe-space-4); border-top: 1px solid var(--pe-border);">
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: var(--pe-space-2);">Tendência por instituto (house effect)</h3>
+        <div class="met-prose">
+          <p>Para cada candidato com pesquisas de ao menos <strong>3 institutos</strong> nos últimos <strong>90 dias</strong>, calculamos o <em>house effect</em> de cada instituto: o quanto ele diverge, em média, dos <strong>demais</strong> institutos para aquele candidato.</p>
+        </div>
+        <div class="met-formula">
+          Desvio(instituto, candidato) = média_do_instituto − média das médias dos demais institutos<br>
+          <span>reportado só quando o instituto tem ≥ 2 pesquisas do candidato na janela</span>
+        </div>
+        <div class="met-callout">
+          O desvio <strong>não é erro</strong> — é diferença metodológica (amostragem, ponderação, momento do campo). Expor isso é prática padrão de agregadores sérios. O house effect é apenas contexto de leitura: <strong>não ajusta</strong> a média agregada.
+        </div>
+      </div>
     </section>
 
     <!-- 4. Monte Carlo -->

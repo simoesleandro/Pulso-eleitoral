@@ -383,3 +383,13 @@ def test_fluxo_criar_listar_remover_evento(client):
     client.post(f'/admin/eventos/{ev_id}/remover', follow_redirects=False)
     eventos2 = client.get('/api/eventos?cargo=presidente').json['eventos']
     assert not any(e['id'] == ev_id for e in eventos2)
+
+
+def test_api_house_effects(client):
+    """GET /api/house-effects é público e retorna shape com 'institutos' (lista)."""
+    setup_db_with_seed()
+    resp = client.get('/api/house-effects')
+    assert resp.status_code == 200
+    assert 'institutos' in resp.json
+    assert isinstance(resp.json['institutos'], list)
+    assert resp.json['cargo'] == 'presidente'
