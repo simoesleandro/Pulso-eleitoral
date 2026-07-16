@@ -176,6 +176,91 @@ def test_save_normalizado(tmp_path):
     conn.close()
 
 
+def test_save_recoleta_atualiza_metadados(tmp_path):
+    """Recoleta da mesma pesquisa (mesmo fonte_url) atualiza margem_erro,
+    tamanho_amostra, contratante e pct_pode_mudar_voto — não só as
+    intencoes. Um valor None na reextração preserva o valor existente
+    (evita apagar um dado bom com uma reextração parcial)."""
+    db_file = tmp_path / "test_collectors_recoleta.db"
+
+    import database
+    original_db_path = database.DB_PATH
+    try:
+        database.DB_PATH = str(db_file)
+        database.init_db(force_seed=False)
+    finally:
+        database.DB_PATH = original_db_path
+
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("DELETE FROM intencoes")
+    conn.execute("DELETE FROM pesquisas")
+    conn.execute("DELETE FROM institutos")
+    conn.execute("INSERT OR REPLACE INTO institutos (id, nome) VALUES (3, 'Quaest')")
+    conn.commit()
+    conn.close()
+
+    from collectors.quaest import QuaestCollector
+    collector = QuaestCollector(str(db_file))
+
+    def _dados(margem_erro, tamanho_amostra, contratante, pct_pode_mudar_voto=None):
+        base = {
+            "instituto_id": 3,
+            "cargo": "presidente",
+            "data_coleta": "2026-06-15",
+            "data_divulgacao": "2026-06-16",
+            "tamanho_amostra": tamanho_amostra,
+            "margem_erro": margem_erro,
+            "contratante": contratante,
+            "pct_pode_mudar_voto": pct_pode_mudar_voto,
+            "fonte_url": "https://quaest.com.br/release-recoleta",
+            "metodologia": "Espontânea"
+        }
+        return [
+            {**base, "candidato": "Lula", "percentual": 38.0},
+            {**base, "candidato": "Bolsonaro", "percentual": 32.0},
+        ]
+
+    # 1a coleta: margem_erro=2.0, tamanho_amostra=1000, contratante=None
+    collector.save(_dados(2.0, 1000, None))
+
+    conn = sqlite3.connect(str(db_file))
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT margem_erro, tamanho_amostra, contratante, pct_pode_mudar_voto FROM pesquisas"
+    )
+    row = cursor.fetchone()
+    assert row == (2.0, 1000, None, None)
+    conn.close()
+
+    # 2a coleta (recoleta, mesma fonte_url): valores novos e diferentes
+    collector.save(_dados(2.5, 1500, "Cliente X", 15.0))
+
+    conn = sqlite3.connect(str(db_file))
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM pesquisas")
+    assert cursor.fetchone()[0] == 1  # não duplicou a pesquisa
+
+    cursor.execute(
+        "SELECT margem_erro, tamanho_amostra, contratante, pct_pode_mudar_voto FROM pesquisas"
+    )
+    row = cursor.fetchone()
+    assert row == (2.5, 1500, "Cliente X", 15.0)
+    conn.close()
+
+    # 3a coleta (recoleta parcial): margem_erro=None simula reextração que não
+    # encontrou o dado — o valor existente (2.5) deve ser preservado, não zerado/nulo.
+    collector.save(_dados(None, None, None, None))
+
+    conn = sqlite3.connect(str(db_file))
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT margem_erro, tamanho_amostra, contratante, pct_pode_mudar_voto FROM pesquisas"
+    )
+    row = cursor.fetchone()
+    assert row == (2.5, 1500, "Cliente X", 15.0)
+    conn.close()
+
+
 def test_save_falha_parcial_nao_derruba_lote(tmp_path):
     """Um release com dado inválido (percentual NULL, viola NOT NULL) não deve
     impedir que o outro release do mesmo lote seja salvo — commit é por grupo."""

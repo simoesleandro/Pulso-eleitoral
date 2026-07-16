@@ -146,6 +146,31 @@ class BaseCollector(ABC):
                                     "UPDATE pesquisas SET data_pesquisa=? WHERE id=?",
                                     (data_pesquisa_real, pesquisa_id)
                                 )
+
+                        # Atualiza metadados (margem_erro, tamanho_amostra, contratante,
+                        # pct_pode_mudar_voto) com o valor da reextração quando presente,
+                        # preservando o valor já existente quando a reextração não trouxe
+                        # essa informação (None não deve apagar um dado bom já salvo).
+                        margem_erro_nova = first.get("margem_erro")
+                        if margem_erro_nova is not None:
+                            import re as _re
+                            _m = _re.search(r'[\d]+[.,]?[\d]*', str(margem_erro_nova))
+                            margem_erro_nova = float(_m.group().replace(',', '.')) if _m else None
+
+                        tamanho_amostra_novo = first.get("tamanho_amostra")
+                        contratante_novo = first.get("contratante")
+                        pct_pode_mudar_voto_novo = first.get("pct_pode_mudar_voto")
+
+                        cursor.execute(
+                            """UPDATE pesquisas SET
+                                   margem_erro = COALESCE(?, margem_erro),
+                                   tamanho_amostra = COALESCE(?, tamanho_amostra),
+                                   contratante = COALESCE(?, contratante),
+                                   pct_pode_mudar_voto = COALESCE(?, pct_pode_mudar_voto)
+                               WHERE id = ?""",
+                            (margem_erro_nova, tamanho_amostra_novo, contratante_novo, pct_pode_mudar_voto_novo, pesquisa_id)
+                        )
+
                         # Limpa intenções e rejeições anteriores para evitar duplicação
                         cursor.execute("DELETE FROM intencoes WHERE pesquisa_id = ?", (pesquisa_id,))
                         cursor.execute("DELETE FROM rejeicoes WHERE pesquisa_id = ?", (pesquisa_id,))
