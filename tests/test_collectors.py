@@ -46,6 +46,21 @@ def test_coletores_disponiveis_cumprem_contrato_get_page_parse_release(tmp_path)
             f"{classe_nome} ({chave}) não implementa _parse_release"
         )
 
+
+def test_detectar_coletor_parana():
+    from app import _detectar_coletor
+    assert _detectar_coletor('https://paranapesquisas.com.br/pesquisas/x') == 'parana'
+    assert _detectar_coletor('https://www.paranapesquisas.com.br/pesquisas/x') == 'parana'
+
+
+def test_detectar_coletor_institutos_existentes():
+    """Regressão do bug de urlparse não importado (NameError engolido pelo
+    except Exception, tudo caindo no fallback gazetadopovo)."""
+    from app import _detectar_coletor
+    assert _detectar_coletor('https://cnnbrasil.com.br/algo') == 'cnn_brasil'
+    assert _detectar_coletor('https://datafolha.folha.uol.com.br/algo') == 'datafolha'
+    assert _detectar_coletor('https://institutoverita.com.br/algo') == 'verita'
+
 def test_run_does_not_crash_on_empty_fetch(tmp_path):
     """Verifica que o método run() não crasha quando o fetch() retorna uma lista vazia []."""
     db_file = tmp_path / "test_collectors.db"

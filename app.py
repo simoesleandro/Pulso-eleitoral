@@ -5,6 +5,7 @@ import json
 import hmac
 import sqlite3
 from functools import wraps
+from urllib.parse import urlparse
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
 from flask_caching import Cache
 from flask_wtf.csrf import CSRFProtect
@@ -769,6 +770,7 @@ _COLETORES_DISPONIVEIS = {
     'cnn_brasil':     ('collectors.cnn_brasil',        'CnnBrasilColetor'),
     'verita':         ('collectors.verita',            'VeritaCollector'),
     'quaest_regional':('collectors.quaest_regional',   'QuaestRegionalColetor'),
+    'parana':         ('collectors.paraná_pesquisas',  'ParanaPesquisasCollector'),
 }
 
 # Mapeia domínio → coletor. A chave é casada por sufixo no hostname, então
@@ -779,6 +781,7 @@ _DOMINIO_COLETOR = {
     'datafolha.folha.uol.com.br':   'datafolha',
     'quaest.com.br':                'quaest_regional',
     'institutoverita.com.br':       'verita',
+    'paranapesquisas.com.br':       'parana',
 }
 
 # Coletor genérico usado quando o domínio não é reconhecido (extrai via Gemini).
