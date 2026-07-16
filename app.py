@@ -968,9 +968,10 @@ def apply_db():
     return jsonify({'ok': True, 'msg': 'banco aplicado'})
 
 @app.route('/api/rejeicao')
-@cache.cached(timeout=300)
+@cache.cached(timeout=300, query_string=True)
 def api_rejeicao():
-    """Retorna média de rejeição por candidato nos últimos 30 dias."""
+    """Retorna média de rejeição por candidato nos últimos 30 dias. ?cargo= opcional (default presidente)."""
+    cargo = request.args.get('cargo', 'presidente')
     resultado = []
     try:
         with get_db() as conn:
@@ -980,10 +981,10 @@ def api_rejeicao():
                 FROM rejeicoes r
                 JOIN pesquisas p ON p.id = r.pesquisa_id
                 WHERE p.data_pesquisa >= date('now', '-30 days')
-                  AND p.cargo = 'presidente'
+                  AND p.cargo = ?
                 GROUP BY r.candidato
                 ORDER BY media DESC
-            """)
+            """, (cargo,))
             rows = cursor.fetchall()
             resultado = [
                 {"candidato": row["candidato"], "media": round(row["media"], 1), "n_pesquisas": row["n_pesquisas"]}

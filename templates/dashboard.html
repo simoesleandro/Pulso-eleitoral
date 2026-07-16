@@ -195,6 +195,14 @@
           <div id="gov-fonte" class="pe-mono" style="margin-top:8px;">Fonte: —</div>
         </div>
       </div>
+
+      <!-- Rejeição -->
+      <h3 class="pe-section__title" style="font-size:13px; margin-top:24px;">Rejeição — Governador RJ — últimos 30 dias</h3>
+      <div class="pe-card" id="rejeicao-rj-card">
+        <div id="rejeicao-rj-container">
+          <div class="pe-mono" style="color:var(--pe-text-muted);">Carregando...</div>
+        </div>
+      </div>
     </section>
 
     <!-- SEÇÃO 4: ANÁLISE -->
@@ -1098,11 +1106,13 @@
     }
 
     // ─── Rejeição ─────────────────────────────────────────────
-    async function carregarRejeicao() {
+    async function carregarRejeicao(cargo, containerId) {
+      cargo = cargo || 'presidente';
+      containerId = containerId || 'rejeicao-container';
       try {
-        const res = await fetch('/api/rejeicao');
+        const res = await fetch(`/api/rejeicao?cargo=${cargo}`);
         const data = await res.json();
-        const container = document.getElementById('rejeicao-container');
+        const container = document.getElementById(containerId);
         if (!data.rejeicoes || data.rejeicoes.length === 0) {
           container.innerHTML = '<div class="pe-mono" style="color:var(--pe-text-muted);">Sem dados de rejeição disponíveis.</div>';
           return;
@@ -1138,7 +1148,7 @@
             <tbody>${rows}</tbody>
           </table>`;
       } catch (e) {
-        document.getElementById('rejeicao-container').innerHTML =
+        document.getElementById(containerId).innerHTML =
           '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar rejeição.</div>';
       }
     }
@@ -1205,7 +1215,8 @@
         carregarSimulacao(),
         carregarCenarioVitoriaRJ(),
         carregarRegional(),
-        carregarRejeicao(),
+        carregarRejeicao('presidente', 'rejeicao-container'),
+        carregarRejeicao('governador_rj', 'rejeicao-rj-container'),
         carregarHouseEffects(),
       ]);
     }

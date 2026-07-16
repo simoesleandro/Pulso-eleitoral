@@ -396,3 +396,58 @@ def test_api_house_effects(client):
     assert 'institutos' in resp.json
     assert isinstance(resp.json['institutos'], list)
     assert resp.json['cargo'] == 'presidente'
+
+
+def _seed_pesquisa_com_rejeicao(cargo, candidato, percentual_rejeicao):
+    """Insere uma pesquisa mínima (com instituto) e uma linha em `rejeicoes`
+    associada, para o `cargo` informado. Retorna o id da pesquisa criada."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        inst = conn.execute("SELECT id FROM institutos LIMIT 1").fetchone()
+        assert inst is not None, "seed deve conter ao menos um instituto"
+        inst_id = inst["id"]
+
+        cur = conn.execute("""
+            INSERT INTO pesquisas
+            (instituto_id, cargo, data_pesquisa, data_publicacao, tamanho_amostra, margem_erro, contratante, registro_tse, fonte_url)
+            VALUES (?, ?, date('now'), date('now'), 2000, 2.0, 'Teste', ?, 'http://teste.com')
+        """, (inst_id, cargo, f"TEST-REJ-{cargo}-{candidato}"))
+        pesquisa_id = cur.lastrowid
+        conn.execute(
+            "INSERT INTO rejeicoes (pesquisa_id, candidato, percentual) VALUES (?, ?, ?)",
+            (pesquisa_id, candidato, percentual_rejeicao)
+        )
+        conn.commit()
+        return pesquisa_id
+    finally:
+        conn.close()
+
+
+def test_api_rejeicao_aceita_cargo_governador_rj(client):
+    """GET /api/rejeicao?cargo=governador_rj retorna dados de rejeição
+    específicos do governador RJ, não mais o hardcode de presidente."""
+    setup_db_with_seed()
+    _seed_pesquisa_com_rejeicao('governador_rj', 'Eduardo Paes', 30.0)
+
+    resp = client.get('/api/rejeicao?cargo=governador_rj')
+    assert resp.status_code == 200
+    data = resp.json
+    assert 'rejeicoes' in data
+    candidatos = [r['candidato'] for r in data['rejeicoes']]
+    assert 'Eduardo Paes' in candidatos
+
+
+def test_api_rejeicao_default_mantem_presidente(client):
+    """GET /api/rejeicao sem ?cargo= continua retornando apenas dados de
+    presidente (compatibilidade retroativa), mesmo havendo dados de RJ."""
+    setup_db_with_seed()
+    _seed_pesquisa_com_rejeicao('presidente', 'Lula', 45.0)
+    _seed_pesquisa_com_rejeicao('governador_rj', 'Eduardo Paes', 30.0)
+
+    resp = client.get('/api/rejeicao')
+    assert resp.status_code == 200
+    data = resp.json
+    candidatos = [r['candidato'] for r in data['rejeicoes']]
+    assert 'Lula' in candidatos
+    assert 'Eduardo Paes' not in candidatos
