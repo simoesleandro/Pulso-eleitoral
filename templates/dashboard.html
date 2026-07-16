@@ -127,6 +127,11 @@
             </div>
           </div>
           <div id="pres-fonte" class="pe-mono" style="margin-top:8px;">Fonte: —</div>
+          <div id="pres-fallback-aviso" style="display:none; margin-top:10px; padding:10px 14px; border-radius:8px;
+               background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.4);
+               color:var(--pe-text); font-size:12px;">
+            ⚠️ Dados de exemplo — falha ao carregar a pesquisa real. Recarregue a página.
+          </div>
         </div>
       </div>
 
@@ -142,7 +147,7 @@
 
       <!-- Evolução -->
       <h3 class="pe-section__title" style="font-size:13px;">Evolução nas Pesquisas</h3>
-      <div class="pe-card">
+      <div class="pe-card" id="historico-multi-card">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
           <div id="candidatos-toggle" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
           <div style="display:flex; gap:8px; align-items:center;">
@@ -193,6 +198,11 @@
             </div>
           </div>
           <div id="gov-fonte" class="pe-mono" style="margin-top:8px;">Fonte: —</div>
+          <div id="gov-fallback-aviso" style="display:none; margin-top:10px; padding:10px 14px; border-radius:8px;
+               background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.4);
+               color:var(--pe-text); font-size:12px;">
+            ⚠️ Dados de exemplo — falha ao carregar a pesquisa real de governador. Recarregue a página.
+          </div>
         </div>
       </div>
 
@@ -331,13 +341,17 @@
     // ─── Presidente ───────────────────────────────────────────
     async function carregarPresidente() {
       let data = fallbackPres;
+      let usouFallback = true;
       try {
         const res = await fetch('/api/pesquisas/presidente?tipo=' + tipoPres);
         if (res.ok) {
           const json = await res.json();
-          if (json.candidatos && json.candidatos.length > 0) data = json;
+          if (json.candidatos && json.candidatos.length > 0) { data = json; usouFallback = false; }
         }
       } catch (err) { console.warn('Erro presidente:', err); }
+
+      const presFallbackAviso = document.getElementById('pres-fallback-aviso');
+      if (presFallbackAviso) presFallbackAviso.style.display = usouFallback ? 'block' : 'none';
 
       document.getElementById('pres-instituto').textContent = data.instituto;
       const presTipoBadge = tipoBadgeHTML(data.tipo);
@@ -386,13 +400,17 @@
     // ─── Governador ───────────────────────────────────────────
     async function carregarGovernador() {
       let data = fallbackGov;
+      let usouFallback = true;
       try {
         const res = await fetch('/api/pesquisas/governador-rj');
         if (res.ok) {
           const json = await res.json();
-          if (json.candidatos && json.candidatos.length > 0) data = json;
+          if (json.candidatos && json.candidatos.length > 0) { data = json; usouFallback = false; }
         }
       } catch (err) { console.warn('Erro governador:', err); }
+
+      const govFallbackAviso = document.getElementById('gov-fallback-aviso');
+      if (govFallbackAviso) govFallbackAviso.style.display = usouFallback ? 'block' : 'none';
 
       document.getElementById('gov-instituto').textContent = data.instituto;
       const govTipoBadge = tipoBadgeHTML(data.tipo);
@@ -489,18 +507,23 @@
     };
 
     async function carregarHistoricoMulti() {
-      const res = await fetch('/api/pesquisas/historico-multi?cargo=presidente&candidatos=Lula,Fl%C3%A1vio%20Bolsonaro&tipo=' + tipoPres);
-      const data = await res.json();
-      ultimasSeries = data.series;
+      try {
+        const res = await fetch('/api/pesquisas/historico-multi?cargo=presidente&candidatos=Lula,Fl%C3%A1vio%20Bolsonaro&tipo=' + tipoPres);
+        const data = await res.json();
+        ultimasSeries = data.series;
 
-      document.getElementById('candidatos-toggle').innerHTML = data.series.map(s => `
-        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
-          <input type="checkbox" value="${s.candidato}" checked style="accent-color:${s.cor};" onchange="toggleCandidato()">
-          <span style="color:${s.cor}; font-weight:500;">${s.candidato}</span>
-        </label>
-      `).join('');
+        document.getElementById('candidatos-toggle').innerHTML = data.series.map(s => `
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+            <input type="checkbox" value="${s.candidato}" checked style="accent-color:${s.cor};" onchange="toggleCandidato()">
+            <span style="color:${s.cor}; font-weight:500;">${s.candidato}</span>
+          </label>
+        `).join('');
 
-      renderizarHistoricoMulti(data.series);
+        renderizarHistoricoMulti(data.series);
+      } catch (e) {
+        document.getElementById('historico-multi-card').innerHTML =
+          '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar evolução nas pesquisas.</div>';
+      }
     }
 
     function renderizarHistoricoMulti(series) {
@@ -629,61 +652,66 @@
     const LIMIAR_DEFASAGEM_DIAS = 10;
 
     async function carregarVisaoGeral() {
-      const res = await fetch('/api/visao-geral');
-      const data = await res.json();
+      try {
+        const res = await fetch('/api/visao-geral');
+        const data = await res.json();
 
-      const dias = data.kpis?.dias_desde_ultima;
-      if (dias != null && dias > LIMIAR_DEFASAGEM_DIAS) {
-        document.getElementById('aviso-defasagem-data').textContent = data.kpis.ultima_atualizacao || '—';
-        document.getElementById('aviso-defasagem-dias').textContent = dias;
-        document.getElementById('aviso-defasagem').style.display = 'block';
+        const dias = data.kpis?.dias_desde_ultima;
+        if (dias != null && dias > LIMIAR_DEFASAGEM_DIAS) {
+          document.getElementById('aviso-defasagem-data').textContent = data.kpis.ultima_atualizacao || '—';
+          document.getElementById('aviso-defasagem-dias').textContent = dias;
+          document.getElementById('aviso-defasagem').style.display = 'block';
+        }
+
+        document.getElementById('kpi-grid').innerHTML = `
+          <div class="pe-card pe-kpi">
+            <div class="pe-kpi__label">Total de Pesquisas</div>
+            <div class="pe-kpi__value">${data.kpis.total_pesquisas}</div>
+            <div class="pe-kpi__sub">desde jan/2026</div>
+          </div>
+          <div class="pe-card pe-kpi">
+            <div class="pe-kpi__label">Institutos Ativos</div>
+            <div class="pe-kpi__value">${data.kpis.institutos_ativos}</div>
+            <div class="pe-kpi__sub">últimos 30 dias</div>
+          </div>
+          <div class="pe-card pe-kpi">
+            <div class="pe-kpi__label">Líder Presidente</div>
+            <div class="pe-kpi__value" style="font-size:20px;">${data.lider_presidente?.candidato || '—'}</div>
+            <div class="pe-kpi__sub">${data.lider_presidente?.percentual || '—'}% · ${data.lider_presidente?.instituto || '—'}</div>
+          </div>
+          <div class="pe-card pe-kpi">
+            <div class="pe-kpi__label">Líder Gov. RJ</div>
+            <div class="pe-kpi__value" style="font-size:20px;">${data.lider_governador?.candidato || '—'}</div>
+            <div class="pe-kpi__sub">${data.lider_governador?.percentual || '—'}% · ${data.lider_governador?.instituto || '—'}</div>
+          </div>
+        `;
+
+        const tend = document.getElementById('tendencias-container');
+        tend.innerHTML = data.tendencias.map(t => {
+          const arrow = t.direcao === 'up' ? '▲' : t.direcao === 'down' ? '▼' : '—';
+          const cls = t.direcao === 'up' ? 'pe-tendencia__arrow-up' : t.direcao === 'down' ? 'pe-tendencia__arrow-down' : 'pe-tendencia__arrow-flat';
+          const sinal = t.variacao > 0 ? '+' : '';
+          return `
+            <div class="pe-tendencia-row">
+              <span class="${cls}">${arrow}</span>
+              <span style="flex:1;font-size:13px;">${t.candidato}</span>
+              <span class="pe-mono">${t.percentual_atual.toFixed(1)}%</span>
+              <span class="${cls} pe-mono" style="font-size:11px;">${sinal}${t.variacao.toFixed(1)}pp</span>
+              <span class="pe-badge pe-badge--inst">${t.cargo === 'presidente' ? 'Pres.' : 'Gov. RJ'}</span>
+            </div>`;
+        }).join('');
+
+        fetch('/api/visao-geral/analise')
+          .then(r => r.json())
+          .then(d => {
+            document.getElementById('ia-analise').textContent = d.analise;
+            document.getElementById('ia-meta').textContent = `gerado por gemini · ${d.gerado_em}`;
+          })
+          .catch(() => { document.getElementById('ia-analise').textContent = 'Análise indisponível no momento.'; });
+      } catch (e) {
+        document.getElementById('kpi-grid').innerHTML =
+          '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar visão geral.</div>';
       }
-
-      document.getElementById('kpi-grid').innerHTML = `
-        <div class="pe-card pe-kpi">
-          <div class="pe-kpi__label">Total de Pesquisas</div>
-          <div class="pe-kpi__value">${data.kpis.total_pesquisas}</div>
-          <div class="pe-kpi__sub">desde jan/2026</div>
-        </div>
-        <div class="pe-card pe-kpi">
-          <div class="pe-kpi__label">Institutos Ativos</div>
-          <div class="pe-kpi__value">${data.kpis.institutos_ativos}</div>
-          <div class="pe-kpi__sub">últimos 30 dias</div>
-        </div>
-        <div class="pe-card pe-kpi">
-          <div class="pe-kpi__label">Líder Presidente</div>
-          <div class="pe-kpi__value" style="font-size:20px;">${data.lider_presidente?.candidato || '—'}</div>
-          <div class="pe-kpi__sub">${data.lider_presidente?.percentual || '—'}% · ${data.lider_presidente?.instituto || '—'}</div>
-        </div>
-        <div class="pe-card pe-kpi">
-          <div class="pe-kpi__label">Líder Gov. RJ</div>
-          <div class="pe-kpi__value" style="font-size:20px;">${data.lider_governador?.candidato || '—'}</div>
-          <div class="pe-kpi__sub">${data.lider_governador?.percentual || '—'}% · ${data.lider_governador?.instituto || '—'}</div>
-        </div>
-      `;
-
-      const tend = document.getElementById('tendencias-container');
-      tend.innerHTML = data.tendencias.map(t => {
-        const arrow = t.direcao === 'up' ? '▲' : t.direcao === 'down' ? '▼' : '—';
-        const cls = t.direcao === 'up' ? 'pe-tendencia__arrow-up' : t.direcao === 'down' ? 'pe-tendencia__arrow-down' : 'pe-tendencia__arrow-flat';
-        const sinal = t.variacao > 0 ? '+' : '';
-        return `
-          <div class="pe-tendencia-row">
-            <span class="${cls}">${arrow}</span>
-            <span style="flex:1;font-size:13px;">${t.candidato}</span>
-            <span class="pe-mono">${t.percentual_atual.toFixed(1)}%</span>
-            <span class="${cls} pe-mono" style="font-size:11px;">${sinal}${t.variacao.toFixed(1)}pp</span>
-            <span class="pe-badge pe-badge--inst">${t.cargo === 'presidente' ? 'Pres.' : 'Gov. RJ'}</span>
-          </div>`;
-      }).join('');
-
-      fetch('/api/visao-geral/analise')
-        .then(r => r.json())
-        .then(d => {
-          document.getElementById('ia-analise').textContent = d.analise;
-          document.getElementById('ia-meta').textContent = `gerado por gemini · ${d.gerado_em}`;
-        })
-        .catch(() => { document.getElementById('ia-analise').textContent = 'Análise indisponível no momento.'; });
     }
 
     // ─── Comparativo ──────────────────────────────────────────
@@ -728,14 +756,19 @@
     }
 
     async function inicializarComparativo() {
-      const res = await fetch('/api/pesquisas/presidente');
-      const data = await res.json();
-      const select = document.getElementById('select-comp-candidato');
-      if (data.candidatos) {
-        select.innerHTML = data.candidatos.map(c => `<option value="${c}">${c}</option>`).join('');
-        carregarComparativo(data.candidatos[0]);
+      try {
+        const res = await fetch('/api/pesquisas/presidente');
+        const data = await res.json();
+        const select = document.getElementById('select-comp-candidato');
+        if (data.candidatos) {
+          select.innerHTML = data.candidatos.map(c => `<option value="${c}">${c}</option>`).join('');
+          carregarComparativo(data.candidatos[0]);
+        }
+        select.addEventListener('change', e => carregarComparativo(e.target.value));
+      } catch (e) {
+        document.getElementById('comparativo-container').innerHTML =
+          '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar comparativo entre institutos.</div>';
       }
-      select.addEventListener('change', e => carregarComparativo(e.target.value));
     }
 
     // ─── Alertas ──────────────────────────────────────────────
@@ -798,6 +831,8 @@
 
     // ─── Simulação 2º Turno ───────────────────────────────────
     async function carregarSimulacao() {
+      const container = document.getElementById('simulacao-container');
+      try {
       const [resSim, resMC] = await Promise.all([
         fetch('/api/simulacao-segundo-turno'),
         fetch('/api/monte-carlo'),
@@ -805,7 +840,6 @@
       const d = await resSim.json();
       const mc = resMC.ok ? await resMC.json() : null;
       const st = d.segundo_turno;
-      const container = document.getElementById('simulacao-container');
       const nSim = mc ? mc.n_simulacoes.toLocaleString('pt-BR') : null;
       const cenarios = mc && mc.cenarios ? mc.cenarios : [];
       let cenarioAtivo = cenarios.length ? cenarios[0].id : 'lula_flavio';
@@ -930,6 +964,9 @@
           </div>` : ''}
         </div>
       `;
+      } catch (e) {
+        container.innerHTML = '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar simulação de 2º turno.</div>';
+      }
     }
 
     // ─── Cenário de Vitória — Governador RJ ────────────────────
@@ -984,9 +1021,10 @@
 
     // ─── Regional ─────────────────────────────────────────────
     async function carregarRegional() {
+      const container = document.getElementById('regional-container');
+      try {
       const res = await fetch('/api/regional/presidente');
       const data = await res.json();
-      const container = document.getElementById('regional-container');
 
       if (!data.estados || Object.keys(data.estados).length === 0) {
         container.innerHTML = '<p class="pe-mono" style="color:var(--pe-text-muted);">Sem dados regionais disponíveis. Aguardando próxima coleta.</p>';
@@ -1028,6 +1066,9 @@
           </tbody>
         </table>
       `;
+      } catch (e) {
+        container.innerHTML = '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar dados regionais.</div>';
+      }
     }
 
     // ─── KPIs Avançados ───────────────────────────────────────
