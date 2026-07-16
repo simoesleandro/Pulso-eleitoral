@@ -344,15 +344,15 @@
       </h2>
       <div class="met-prose">
         <p>A média agregada que aparece no dashboard não é uma média simples de todos os números disponíveis. O cálculo usa uma <strong>janela móvel de 30 dias</strong>: apenas pesquisas com data de campo nos últimos 30 dias entram na conta.</p>
-        <p>Dentro dessa janela, cada instituto contribui com sua pesquisa mais recente. O resultado é a média aritmética dos percentuais de cada candidato entre os institutos incluídos.</p>
+        <p>Dentro dessa janela, cada instituto contribui com sua pesquisa mais recente. O resultado é uma <strong>média ponderada</strong> dos percentuais de cada candidato entre os institutos incluídos, dando mais peso a pesquisas com amostra maior e a pesquisas mais recentes dentro da janela.</p>
       </div>
       <div class="met-formula">
-        Média(candidato) = <span>Σ</span> percentual_instituto_i / N<br>
-        <span>onde N = institutos com pesquisa nos últimos 30 dias</span><br>
-        <span>e cada instituto contribui com apenas 1 pesquisa (a mais recente)</span>
+        Média(candidato) = <span>Σ</span> (percentual_i × peso_i) / <span>Σ</span> peso_i<br>
+        <span>peso_i = tamanho_amostra_i × 0,9<sup>dias_desde_a_pesquisa_i</sup></span><br>
+        <span>onde i percorre os institutos com pesquisa nos últimos 30 dias, cada um contribuindo com apenas 1 pesquisa (a mais recente)</span>
       </div>
       <div class="met-prose">
-        <p>O sistema não aplica pesos por tamanho de amostra ou histórico de acertos — todos os institutos têm o mesmo peso. Isso evita viés de seleção sobre qual instituto "merece" mais peso, algo que exigiria julgamentos subjetivos.</p>
+        <p>Amostras maiores pesam mais (menor margem de erro estatístico) e pesquisas mais antigas dentro da janela perdem peso gradualmente — uma pesquisa de hoje pesa mais que uma de 20 dias atrás. Isso não é um julgamento sobre a qualidade metodológica de cada instituto: nenhum instituto recebe peso extra por reputação ou histórico de acertos.</p>
       </div>
       <div class="met-callout">
         A variação de 30 dias exibida ao lado de cada candidato compara a média atual com a média calculada 30 dias atrás, usando o mesmo método.

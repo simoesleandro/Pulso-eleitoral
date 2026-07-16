@@ -131,14 +131,21 @@ class BaseCollector(ABC):
 
                     if row:
                         pesquisa_id = row[0]
-                        # Atualiza data_pesquisa se o item traz uma data real (não apenas hoje)
+                        # Atualiza data_pesquisa se o item traz uma data real (não apenas hoje),
+                        # mas nunca aceita uma data de campo posterior à publicação já registrada
+                        # (reextração não-determinística do Gemini já produziu esse absurdo).
                         first = group_items[0]
                         data_pesquisa_real = first.get("data_pesquisa")
                         if data_pesquisa_real and data_pesquisa_real != dt_coleta:
                             cursor.execute(
-                                "UPDATE pesquisas SET data_pesquisa=? WHERE id=?",
-                                (data_pesquisa_real, pesquisa_id)
+                                "SELECT data_publicacao FROM pesquisas WHERE id=?", (pesquisa_id,)
                             )
+                            data_publicacao_atual = cursor.fetchone()[0]
+                            if data_pesquisa_real <= data_publicacao_atual:
+                                cursor.execute(
+                                    "UPDATE pesquisas SET data_pesquisa=? WHERE id=?",
+                                    (data_pesquisa_real, pesquisa_id)
+                                )
                         # Limpa intenções e rejeições anteriores para evitar duplicação
                         cursor.execute("DELETE FROM intencoes WHERE pesquisa_id = ?", (pesquisa_id,))
                         cursor.execute("DELETE FROM rejeicoes WHERE pesquisa_id = ?", (pesquisa_id,))
@@ -156,7 +163,7 @@ class BaseCollector(ABC):
                         tamanho_amostra = first.get("tamanho_amostra")
                         if tamanho_amostra is None:
                             tamanho_amostra = 0
-                        metodologia = first.get("metodologia") or "Não informado"
+                        contratante = first.get("contratante")
                         data_divulgacao = first.get("data_divulgacao") or dt_coleta
                         registro_tse = first.get("registro_tse") or f"GEN-{inst_id}-{cargo}-{dt_coleta}-{hashlib.sha1(url.encode()).hexdigest()[:10]}"
 
@@ -174,7 +181,7 @@ class BaseCollector(ABC):
                             data_divulgacao,
                             tamanho_amostra,
                             margem_erro,
-                            metodologia,
+                            contratante,
                             registro_tse,
                             url,
                             pct_pode_mudar_voto

@@ -1054,6 +1054,12 @@
           <div style="font-size:11px; color:var(--pe-text-muted); margin-top:4px;">${d.concentracao_voto.terceira_via_possivel ? '🟡 Terceira via tem espaço' : '🔴 Terceira via improvável'}</div>
         </div>
       `;
+    }
+
+    // ─── KPIs Análise (RJ) ────────────────────────────────────
+    async function carregarKpisAnaliseRJ() {
+      const res = await fetch('/api/kpis-avancados?cargo=governador_rj');
+      const d = await res.json();
 
       // Análise: campo minado, volatilidade, aceleração → #kpis-analise-grid
       const volLabel = { estavel: '🟢 Estável', moderado: '🟡 Moderada', volatil: '🔴 Alta' }[d.volatilidade.cenario_geral];
@@ -1188,6 +1194,7 @@
       await Promise.all([
         carregarVisaoGeral(),
         carregarKpisAvancados(),
+        carregarKpisAnaliseRJ(),
         carregarPresidente(),
         carregarGovernador(),
         carregarInstitutos(),
