@@ -8,6 +8,8 @@ from functools import wraps
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
 from flask_caching import Cache
 from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -39,6 +41,19 @@ app.secret_key = _secret
 # com dados diferentes no banco.
 _cache_type = 'NullCache' if os.getenv('TESTING') == 'True' else 'SimpleCache'
 cache = Cache(app, config={'CACHE_TYPE': _cache_type, 'CACHE_DEFAULT_TIMEOUT': 300})
+
+# Rate limiting (Flask-Limiter). Limite alto sob TESTING para não afetar a
+# suíte (test client chama rotas repetidas vezes "da mesma IP"); em dev/produção
+# o limite padrão cobre os endpoints /api/* públicos, e /login recebe um limite
+# mais estrito (ver decorator na rota). Armazenamento em memória — válido apenas
+# porque o app roda como processo único (Waitress, sem múltiplos workers).
+_limiter_default = "10000 per minute" if os.getenv('TESTING') == 'True' else "60 per minute"
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=[_limiter_default],
+    storage_uri="memory://",
+)
 
 # Flags de cookie de sessão (defesa contra XSS/MITM/CSRF).
 # Secure só em produção (Fly serve HTTPS); em dev local sobre HTTP ficaria inutilizável.
@@ -179,6 +194,7 @@ def index():
     return redirect(url_for('dashboard'))
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def login():
     """Rota de controle de acesso (login)."""
     error = None
