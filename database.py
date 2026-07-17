@@ -52,16 +52,18 @@ from db.eventos import listar_eventos, criar_evento, remover_evento
 from db.pesquisas import (
     get_comparativo_candidato, get_pesquisas_mais_recentes, detectar_variacoes_bruscas,
     get_media_agregada, get_house_effects, get_historico_multi, get_historico_candidato,
-    get_top_candidatos, get_institutos_com_totais, get_dados_regionais,
+    get_top_candidatos, get_institutos_com_totais, get_dados_regionais, _e_candidato,
 )
 
 # ─── KPIs analíticos avançados e visão geral ───────────────────────────────
-from db.kpis import get_kpis_avancados, get_visao_geral
+from db.kpis import get_kpis_avancados, get_visao_geral, _media_intervalo
 
 # ─── Motor de Monte Carlo (genérico, qualquer cargo) + 2º turno ────────────
 from db.monte_carlo import (
     fator_volatilidade, _redistribuir_indecisos, prob_vitoria_primeiro_turno,
-    _simular_cenario, simular_monte_carlo_cenarios, simular_prob_vitoria_1_turno,
+    _margens_por_candidato, _pct_mudar_voto_recente, _pct_indecisos_medio,
+    _simular_cenario, simular_monte_carlo_cenarios, _contagem_pesquisas_por_candidato,
+    _aviso_amostra_limitada, simular_prob_vitoria_1_turno,
     simular_monte_carlo_cargo, get_simulacao_monte_carlo,
     get_confronto_2turno_real, get_simulacao_segundo_turno,
 )
