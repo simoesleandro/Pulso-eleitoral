@@ -174,6 +174,41 @@ def test_integracao_login_post(client):
     # Verifica se a página contém links/conteúdos da dashboard
     assert b"Dashboard" in response.data or "Visão Geral".encode('utf-8') in response.data or b"presidente" in response.data
 
+def test_politica_senha_rejeita_curta(client):
+    """Garante que /admin/usuarios/criar rejeita senha com menos de 8 caracteres."""
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['username'] = 'admin'
+        sess['nome'] = 'Administrador'
+
+    response = client.post(
+        '/admin/usuarios/criar',
+        data={'username': 'curta_demais', 'password': '1234567', 'nome': 'Teste'},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    user = verificar_usuario('curta_demais', '1234567')
+    assert user is None
+    assert listar_usuarios() == [] or all(u['username'] != 'curta_demais' for u in listar_usuarios())
+
+def test_politica_senha_aceita_oito_caracteres(client):
+    """Garante que senha com exatamente 8 caracteres ainda é aceita (guarda de regressão)."""
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['username'] = 'admin'
+        sess['nome'] = 'Administrador'
+
+    response = client.post(
+        '/admin/usuarios/criar',
+        data={'username': 'oito_chars', 'password': '12345678', 'nome': 'Teste'},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    user = verificar_usuario('oito_chars', '12345678')
+    assert user is not None
+
 def test_bloqueio_acesso_sem_sessao(client):
     """Garante que o acesso a /admin/usuarios sem sessão ativa seja redirecionado para /login."""
     response = client.get('/admin/usuarios', follow_redirects=False)
