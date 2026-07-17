@@ -2,7 +2,6 @@ import os
 import json
 import logging
 import sqlite3
-from contextlib import contextmanager
 import bcrypt
 
 logger = logging.getLogger(__name__)
@@ -20,258 +19,31 @@ else:
 DB_NAME = 'pulso_test.db' if os.getenv('TESTING') == 'True' else 'pulso.db'
 DB_PATH = os.path.join(DATA_DIR, DB_NAME)
 
-def get_conn():
-    """Retorna uma conexão aberta com o SQLite, configurando a row_factory."""
-    # Garante que a pasta 'data' exista
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR, exist_ok=True)
-        
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    # Habilita chaves estrangeiras
-    conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
+# Façade: get_conn/get_db/init_db/limpar_cache_analises/salvar_log_scheduler/
+# buscar_ultimo_log vivem em db/core.py, que lê DATA_DIR/DB_PATH/BASE_DIR
+# daqui via `import database` (live attribute lookup) — não copiar esses
+# nomes por valor aqui em cima, senão o monkeypatch de database.DB_PATH nos
+# testes (tests/test_collectors.py, tests/test_variacoes.py) para de
+# propagar para as conexões reais. Ver db/core.py para detalhes.
+from db.core import get_conn, get_db, init_db, limpar_cache_analises, salvar_log_scheduler, buscar_ultimo_log
 
 # ─── Candidatos: fonte única de verdade ────────────────────────────────────
-# Roster canônico que popula a tabela `candidatos`. Cada item:
-# (nome_canonico, [apelidos...], espectro, cor_hex, is_presidencial, ativo)
-# ativo=0 → menções devem ser descartadas (hipotéticos / inelegíveis / não declarados).
-_CANDIDATOS_SEED = [
-    # Presidenciais ativos
-    ("Lula", ["luiz inácio lula da silva", "luiz inacio lula da silva", "lula", "lula da silva"], "esquerda", "#0A2240", 1, 1),
-    ("Flávio Bolsonaro", ["flávio bolsonaro", "flavio bolsonaro", "bolsonaro", "flavio", "flávio"], "direita", "#C0392B", 1, 1),
-    ("Ronaldo Caiado", ["ronaldo caiado", "caiado"], "direita", "#5a7184", 1, 1),
-    ("Romeu Zema", ["romeu zema", "zema"], "direita", "#B4B2A9", 1, 1),
-    ("Renan Santos", ["renan santos", "renan santos (missão)"], "direita", "#1D9E75", 1, 1),
-    ("Tarcísio de Freitas", ["tarcísio de freitas", "tarcisio de freitas", "tarcísio", "tarcisio"], "direita", None, 1, 1),
-    ("Pablo Marçal", ["pablo marçal", "pablo marcal"], "direita", None, 1, 1),
-    ("Ciro Gomes", ["ciro gomes", "ciro"], "centro", None, 1, 1),
-    ("Simone Tebet", ["simone tebet", "simone"], "centro", None, 1, 1),
-    ("Augusto Cury", ["augusto cury"], "centro", None, 1, 1),
-    ("Rui Costa Pimenta", ["rui costa pimenta"], "esquerda", None, 1, 1),
-    ("Samara Martins", ["samara martins"], "esquerda", None, 1, 1),
-    ("Cabo Daciolo", ["cabo daciolo"], "direita", None, 1, 1),
-    ("Edmilson Costa", ["edmilson costa"], "esquerda", None, 1, 1),
-    ("Hertz Dias", ["hertz dias"], "esquerda", None, 1, 1),
-    # Governador RJ (não presidenciais)
-    ("Eduardo Paes", ["eduardo paes"], "centro", None, 0, 1),
-    ("Cláudio Castro", ["cláudio castro", "claudio castro"], "direita", None, 0, 1),
-    ("Marcelo Freixo", ["marcelo freixo"], "esquerda", None, 0, 1),
-    ("Rodrigo Neves", ["rodrigo neves"], "centro", None, 0, 1),
-    # Descartar (hipotéticos / inelegíveis / não declarados)
-    ("Jair Bolsonaro", ["jair bolsonaro", "jair messias bolsonaro", "bolsonaro pai"], None, None, 1, 0),
-    ("Michelle Bolsonaro", ["michelle bolsonaro", "michele bolsonaro", "michelle"], None, None, 1, 0),
-    ("Aécio Neves", ["aécio neves", "aecio neves"], None, None, 1, 0),
-    ("Aldo Rebelo", ["aldo rebelo"], None, None, 1, 0),
-    ("Eduardo Bolsonaro", ["eduardo bolsonaro"], None, None, 1, 0),
-    ("Camilo Santana", ["camilo santana"], None, None, 1, 0),
-    ("Fernando Haddad", ["fernando haddad"], None, None, 1, 0),
-    ("Elmano de Freitas", ["elmano de freitas"], None, None, 1, 0),
-    ("ACM Neto", ["acm neto"], None, None, 1, 0),
-    ("Jerônimo Rodrigues", ["jerônimo rodrigues", "jeronimo rodrigues"], None, None, 0, 0),
-    ("Ratinho Junior", ["ratinho junior", "ratinho", "carlos massa ratinho junior"], None, None, 0, 0),
-    ("Joaquim Barbosa", ["joaquim barbosa"], None, None, 1, 0),
-]
-
-# Cache em memória dos dados derivados da tabela candidatos (roster é estático).
+# _CANDIDATOS_SEED, _popular_candidatos, _invalidar_cache_candidatos,
+# _carregar_candidatos_cache e os getters derivados vivem em db/candidatos.py.
+# `_cache_candidatos` continua sendo um atributo deste módulo (o façade) —
+# db/candidatos.py lê/escreve nele via `import database` (live attribute
+# lookup), porque tests/test_apply_db.py e tests/test_database.py fazem
+# `database._cache_candidatos = ...` diretamente e esperam que
+# _invalidar_cache_candidatos()/_carregar_candidatos_cache() enxerguem essa
+# mesma variável (ver db/candidatos.py para detalhes).
 _cache_candidatos = None
 
+from db.candidatos import (
+    _popular_candidatos, _invalidar_cache_candidatos, _carregar_candidatos_cache,
+    get_mapa_apelidos, get_cores_candidatos, get_candidatos_por_espectro,
+    get_nomes_presidenciais, get_presidenciais_canonicos, get_candidatos_ignorar,
+)
 
-def _popular_candidatos(conn) -> None:
-    """Insere o roster canônico na tabela candidatos se ela estiver vazia (idempotente)."""
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM candidatos")
-    if cur.fetchone()[0] > 0:
-        return
-    for nome, apelidos, espectro, cor, is_pres, ativo in _CANDIDATOS_SEED:
-        cur.execute(
-            "INSERT INTO candidatos (nome_canonico, apelidos, espectro, cor_hex, is_presidencial, ativo) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (nome, json.dumps(apelidos, ensure_ascii=False), espectro, cor, is_pres, ativo)
-        )
-    conn.commit()
-    _invalidar_cache_candidatos()
-
-
-def _invalidar_cache_candidatos() -> None:
-    global _cache_candidatos
-    _cache_candidatos = None
-
-
-def _carregar_candidatos_cache() -> dict:
-    """Carrega (e memoiza) os mapas derivados da tabela candidatos.
-
-    Retorna dict com:
-      - mapa: {alias/canonico_lower -> nome_canonico | None}  (None = descartar)
-      - espectro: {nome_canonico -> 'esquerda'|'centro'|'direita'}  (só ativos)
-      - cores: {nome_canonico -> cor_hex}
-      - presidenciais: set de chaves minúsculas (apelidos+canonico) de presidenciais ativos
-      - presidenciais_canonicos: [nome_canonico, ...] presidenciais ativos
-      - ignorar: [nome_canonico, ...] com ativo=0
-    """
-    global _cache_candidatos
-    if _cache_candidatos is not None:
-        return _cache_candidatos
-
-    mapa, espectro, cores = {}, {}, {}
-    presidenciais, presidenciais_canonicos, ignorar = set(), [], []
-    try:
-        with get_db() as conn:
-            rows = conn.execute(
-                "SELECT nome_canonico, apelidos, espectro, cor_hex, is_presidencial, ativo FROM candidatos"
-            ).fetchall()
-        for r in rows:
-            nome = r["nome_canonico"]
-            ativo = r["ativo"]
-            try:
-                apelidos = json.loads(r["apelidos"]) if r["apelidos"] else []
-            except Exception:
-                apelidos = []
-            chaves = {a.lower().strip() for a in apelidos}
-            chaves.add(nome.lower().strip())
-            destino = nome if ativo else None
-            for k in chaves:
-                mapa[k] = destino
-            if ativo:
-                if r["espectro"]:
-                    espectro[nome] = r["espectro"]
-                if r["cor_hex"]:
-                    cores[nome] = r["cor_hex"]
-                if r["is_presidencial"]:
-                    presidenciais.update(chaves)
-                    presidenciais_canonicos.append(nome)
-            else:
-                ignorar.append(nome)
-        _cache_candidatos = {
-            "mapa": mapa, "espectro": espectro, "cores": cores,
-            "presidenciais": presidenciais, "presidenciais_canonicos": presidenciais_canonicos,
-            "ignorar": ignorar,
-        }
-    except Exception:
-        # DB ainda sem a tabela/dados (ou falha transitória): devolve mapas vazios
-        # SEM memoizar — a próxima chamada tenta carregar de novo. Memoizar o vazio
-        # aqui envenenaria a normalização para sempre num erro transitório (ex.:
-        # banco travado durante a troca de volume do apply-db).
-        return {
-            "mapa": {}, "espectro": {}, "cores": {},
-            "presidenciais": set(), "presidenciais_canonicos": [], "ignorar": [],
-        }
-    return _cache_candidatos
-
-
-def get_mapa_apelidos() -> dict:
-    """{alias/nome minúsculo -> nome_canonico ou None}. Fonte para normalizar_nome."""
-    return _carregar_candidatos_cache()["mapa"]
-
-
-def get_cores_candidatos() -> dict:
-    """{nome_canonico -> cor_hex} dos candidatos com cor definida."""
-    return _carregar_candidatos_cache()["cores"]
-
-
-def get_candidatos_por_espectro(espectros) -> set:
-    """Nomes canônicos cujo espectro está no conjunto pedido (ex.: {'esquerda','centro'})."""
-    esp = _carregar_candidatos_cache()["espectro"]
-    return {nome for nome, e in esp.items() if e in espectros}
-
-
-def get_nomes_presidenciais() -> set:
-    """Conjunto de chaves minúsculas (apelidos + canônicos) de presidenciais ativos."""
-    return _carregar_candidatos_cache()["presidenciais"]
-
-
-def get_presidenciais_canonicos() -> list:
-    """Lista de nomes canônicos presidenciais ativos (para injeção em prompts)."""
-    return _carregar_candidatos_cache()["presidenciais_canonicos"]
-
-
-def get_candidatos_ignorar() -> list:
-    """Lista de nomes canônicos a descartar (para injeção em prompts)."""
-    return _carregar_candidatos_cache()["ignorar"]
-
-
-def init_db(force_seed=False):
-    """Executa o schema.sql para inicializar o banco de dados.
-    Se o banco estiver vazio ou force_seed for True, executa também o seed.sql."""
-    # Garante que a pasta 'data' exista
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR, exist_ok=True)
-        
-    conn = get_conn()
-    
-    # 1. Executa o schema.sql
-    schema_path = os.path.join(BASE_DIR, 'schema.sql')
-    if os.path.exists(schema_path):
-        with open(schema_path, 'r', encoding='utf-8') as f:
-            schema_sql = f.read()
-        conn.executescript(schema_sql)
-        conn.commit()
-
-    # Popula a tabela candidatos (idempotente — só insere se vazia)
-    _popular_candidatos(conn)
-
-    # Migration idempotente: colunas status/data_status em candidatos
-    # (mesmo padrão de scripts/migrate_candidatos_status.py — ALTER TABLE
-    # puro, sem tocar schema.sql, seguro rodar em toda inicialização)
-    from scripts.migrate_candidatos_status import aplicar_migracao
-    aplicar_migracao(conn)
-
-    # Migration idempotente: pct_pode_mudar_voto em pesquisas
-    from scripts.migrate_pesquisas_volatilidade import aplicar_migracao as _aplicar_migracao_volatilidade
-    _aplicar_migracao_volatilidade(conn)
-
-    # Migration idempotente: tabela confrontos_2turno (2º turno real das pesquisas)
-    from scripts.migrate_confrontos_2turno import aplicar_migracao as _aplicar_migracao_confrontos
-    _aplicar_migracao_confrontos(conn)
-
-    # Verifica se os dados já foram populados
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM institutos")
-    count_institutos = cursor.fetchone()[0]
-    
-    # 2. Executa o seed.sql se o banco estiver vazio ou forçado
-    if count_institutos == 0 or force_seed:
-        seed_path = os.path.join(BASE_DIR, 'seed.sql')
-        if os.path.exists(seed_path):
-            with open(seed_path, 'r', encoding='utf-8') as f:
-                seed_sql = f.read()
-            # Precisamos desabilitar foreign keys temporariamente se formos limpar/refazer inserts
-            conn.executescript(seed_sql)
-            conn.commit()
-
-    # 3. Inicializa o usuário admin padrão se não houver usuários cadastrados
-    cursor.execute("SELECT COUNT(*) FROM usuarios")
-    count_usuarios = cursor.fetchone()[0]
-    if count_usuarios == 0:
-        from dotenv import load_dotenv
-        load_dotenv()
-        admin_pass = os.getenv('ADMIN_PASS')
-        if not admin_pass:
-            import secrets
-            admin_pass = secrets.token_urlsafe(16)
-            logger.warning(
-                "ADMIN_PASS não configurada — senha admin aleatória gerada e "
-                "descartada. Defina ADMIN_PASS e recrie o usuário admin para ter "
-                "uma senha conhecida."
-            )
-        admin_user = 'admin'
-        password_hash = bcrypt.hashpw(admin_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        cursor.execute(
-            "INSERT INTO usuarios (username, password_hash, nome, ativo) VALUES (?, ?, ?, 1)",
-            (admin_user, password_hash, 'Administrador')
-        )
-        conn.commit()
-            
-    conn.close()
-
-@contextmanager
-def get_db():
-    """Context manager para uso com o Flask (with get_db() as conn:)."""
-    conn = get_conn()
-    try:
-        yield conn
-    finally:
-        conn.close()
 
 def get_comparativo_candidato(candidato: str, cargo: str) -> dict:
     """Retorna a pesquisa mais recente de cada instituto para o candidato/cargo."""
@@ -306,46 +78,6 @@ def get_comparativo_candidato(candidato: str, cargo: str) -> dict:
             for r in rows
         ]
     }
-
-def limpar_cache_analises():
-    """Remove todas as análises geradas por IA para forçar regeneração."""
-    with get_db() as conn:
-        conn.execute("DELETE FROM analises_ia")
-        conn.commit()
-
-def salvar_log_scheduler(resultado: list) -> None:
-    """Salva o log de execução de coleta no banco de dados SQLite."""
-    conn = get_conn()
-    try:
-        resultado_json = json.dumps(resultado)
-        conn.execute(
-            "INSERT INTO scheduler_log (job, resultado) VALUES (?, ?)",
-            ("coleta_diaria", resultado_json)
-        )
-        conn.commit()
-    except Exception as e:
-        raise e
-    finally:
-        conn.close()
-
-def buscar_ultimo_log() -> dict | None:
-    """Busca o log de execução do scheduler mais recente."""
-    conn = get_conn()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT job, executado_em, resultado FROM scheduler_log ORDER BY id DESC LIMIT 1")
-        row = cursor.fetchone()
-        if row:
-            return {
-                "job": row["job"],
-                "executado_em": row["executado_em"],
-                "resultado": json.loads(row["resultado"]) if row["resultado"] else []
-            }
-        return None
-    except Exception:
-        return None
-    finally:
-        conn.close()
 
 def get_pesquisas_mais_recentes(cargo: str, tipo: str = 'estimulada') -> list[dict]:
     """Retorna a pesquisa mais recente do cargo (do tipo solicitado) e suas intenções.
