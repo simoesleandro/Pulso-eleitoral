@@ -65,6 +65,12 @@ app.config.update(
     SESSION_COOKIE_SECURE=_em_producao,
 )
 
+# Limite de tamanho do corpo de request (defesa contra exhaustion de memória/CPU
+# num processo único, sem multi-worker). 2 MB é generoso para o maior payload
+# legítimo hoje (form de /login ou JSON pequeno de /admin/coletar-url) — não há
+# rota de upload de arquivo via HTTP nesta app.
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2 MB
+
 # Proteção CSRF (Flask-WTF). Desativada apenas sob TESTING para manter a suíte verde
 # (o test client não tem como obter token); ativa em dev e produção.
 app.config['WTF_CSRF_ENABLED'] = os.getenv('TESTING') != 'True'

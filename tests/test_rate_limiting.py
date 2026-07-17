@@ -86,3 +86,12 @@ def test_api_status_nao_e_bloqueado_por_requisicao_unica(client):
     uso legítimo."""
     resp = client.get('/api/status')
     assert resp.status_code == 200
+
+
+def test_login_rejeita_corpo_maior_que_max_content_length(client):
+    """/login (rota pública) rejeita corpo de request acima do
+    MAX_CONTENT_LENGTH configurado (2 MB) — mitigação contra exhaustion de
+    memória/CPU num processo único (plano 024)."""
+    corpo_grande = 'x' * (3 * 1024 * 1024)  # 3 MB, acima do limite de 2 MB
+    resp = client.post('/login', data={'username': 'admin', 'password': corpo_grande})
+    assert resp.status_code == 413
