@@ -1,10 +1,13 @@
 """CRUD de usuários (login/admin) — não depende de nenhum outro cluster além
 de get_conn()."""
+import logging
 import sqlite3
 
 import bcrypt
 
 from db.core import get_conn
+
+logger = logging.getLogger(__name__)
 
 
 def criar_usuario(username: str, password: str, nome: str = None) -> bool:
@@ -82,6 +85,7 @@ def listar_usuarios() -> list[dict]:
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
     except Exception:
+        logger.exception("Erro ao listar usuários")
         return []
     finally:
         conn.close()
@@ -96,6 +100,7 @@ def remover_usuario(user_id: int) -> bool:
         conn.commit()
         return cursor.rowcount > 0
     except Exception:
+        logger.exception("Erro ao remover usuário id=%s", user_id)
         return False
     finally:
         conn.close()
@@ -115,6 +120,7 @@ def toggle_usuario(user_id: int) -> bool:
         conn.commit()
         return True
     except Exception:
+        logger.exception("Erro ao alternar status do usuário id=%s", user_id)
         return False
     finally:
         conn.close()
