@@ -4,6 +4,7 @@ import atexit
 import json
 import hmac
 import sqlite3
+import threading
 from functools import wraps
 from urllib.parse import urlparse
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
@@ -36,6 +37,13 @@ if not _secret:
         "entre reinícios). Defina SECRET_KEY no .env para desenvolvimento estável."
     )
 app.secret_key = _secret
+
+# Lock em memória para evitar chamadas Gemini concorrentes duplicadas em
+# /api/visao-geral/analise quando o cache de 6h expira e múltiplas requests
+# chegam antes da primeira terminar de gerar. Assume processo único (Waitress
+# sem múltiplos workers) — se o deploy passar a rodar múltiplos processos,
+# isso precisa virar um lock em banco/Redis.
+_analise_ia_lock = threading.Lock()
 
 # NullCache em testes: SimpleCache é global no processo, então respostas
 # cacheadas por um teste vazariam para o próximo teste que reusa a mesma rota
@@ -540,49 +548,77 @@ def api_visao_geral_analise():
             "gerado_em": gerado_em
         })
         
-    # 2. Se não estiver no cache, chama Gemini API
-    dados = get_visao_geral()
-    
-    prompt = f"Você é um analista político brasileiro. Com base nos dados abaixo de pesquisas eleitorais, escreva um parágrafo analítico conciso (máximo 3 frases) sobre o cenário eleitoral atual. Seja objetivo, factual e neutro politicamente.\n\nDados: {json.dumps(dados, ensure_ascii=False)}\n\nResponda apenas com o parágrafo, sem título nem formatação."
-
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        return jsonify({"analise": "Gemini API Key não configurada.", "gerado_em": ""}), 500
-        
-    try:
-        from google import genai
-        from collectors.gemini_extractor import gerar_com_cascata
-        client = genai.Client(api_key=api_key)
-
-        analise_texto, _ = gerar_com_cascata(
-            client, prompt,
-            modelos=["gemini-2.5-flash", "gemini-2.5-flash-8b", "gemini-2.5-pro"]
-        )
-
-        if not analise_texto:
-            return jsonify({"analise": "Erro ao gerar análise de IA.", "gerado_em": ""}), 500
-            
-        # 3. Salva no banco analises_ia
-        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # 2. Cache miss — adquire lock para evitar chamadas Gemini concorrentes
+    with _analise_ia_lock:
+        # Double-check: outra thread pode ter gerado a análise enquanto
+        # esperávamos o lock.
         try:
             with get_db() as conn:
-                conn.execute("""
-                    INSERT OR REPLACE INTO analises_ia (cargo, texto, criado_em)
-                    VALUES (?, ?, ?)
-                """, (cargo, analise_texto, now_str))
-                conn.commit()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT texto, criado_em FROM analises_ia
+                    WHERE cargo = ? AND criado_em >= datetime('now', 'localtime', '-6 hours')
+                """, (cargo,))
+                row = cursor.fetchone()
+                if row:
+                    cached_analise = row['texto']
+                    cached_data = row['criado_em']
         except Exception as e:
-            app.logger.error(f"Erro ao salvar analise no banco: {e}")
-            
-        gerado_em = datetime.datetime.strptime(now_str, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M")
-        return jsonify({
-            "analise": analise_texto,
-            "gerado_em": gerado_em
-        })
-        
-    except Exception as e:
-        app.logger.error(f"Erro na geração do Gemini: {e}")
-        return jsonify({"analise": "Serviço de análise de IA temporariamente indisponível.", "gerado_em": ""}), 500
+            app.logger.error(f"Erro ao ler cache de analise (double-check): {e}")
+
+        if cached_analise:
+            try:
+                dt = datetime.datetime.strptime(cached_data, "%Y-%m-%d %H:%M:%S")
+                gerado_em = dt.strftime("%d/%m/%Y %H:%M")
+            except Exception:
+                gerado_em = cached_data
+            return jsonify({
+                "analise": cached_analise,
+                "gerado_em": gerado_em
+            })
+
+        dados = get_visao_geral()
+
+        prompt = f"Você é um analista político brasileiro. Com base nos dados abaixo de pesquisas eleitorais, escreva um parágrafo analítico conciso (máximo 3 frases) sobre o cenário eleitoral atual. Seja objetivo, factual e neutro politicamente.\n\nDados: {json.dumps(dados, ensure_ascii=False)}\n\nResponda apenas com o parágrafo, sem título nem formatação."
+
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            return jsonify({"analise": "Gemini API Key não configurada.", "gerado_em": ""}), 500
+
+        try:
+            from google import genai
+            from collectors.gemini_extractor import gerar_com_cascata
+            client = genai.Client(api_key=api_key)
+
+            analise_texto, _ = gerar_com_cascata(
+                client, prompt,
+                modelos=["gemini-2.5-flash", "gemini-2.5-flash-8b", "gemini-2.5-pro"]
+            )
+
+            if not analise_texto:
+                return jsonify({"analise": "Erro ao gerar análise de IA.", "gerado_em": ""}), 500
+
+            # 3. Salva no banco analises_ia
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                with get_db() as conn:
+                    conn.execute("""
+                        INSERT OR REPLACE INTO analises_ia (cargo, texto, criado_em)
+                        VALUES (?, ?, ?)
+                    """, (cargo, analise_texto, now_str))
+                    conn.commit()
+            except Exception as e:
+                app.logger.error(f"Erro ao salvar analise no banco: {e}")
+
+            gerado_em = datetime.datetime.strptime(now_str, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M")
+            return jsonify({
+                "analise": analise_texto,
+                "gerado_em": gerado_em
+            })
+
+        except Exception as e:
+            app.logger.error(f"Erro na geração do Gemini: {e}")
+            return jsonify({"analise": "Serviço de análise de IA temporariamente indisponível.", "gerado_em": ""}), 500
 
 @app.route('/dashboard')
 def dashboard():
