@@ -595,6 +595,7 @@ def metodologia():
     return render_template('metodologia.html')
 
 @app.route('/api/pesquisas/presidente')
+@cache.cached(timeout=300)
 def api_pesquisas_presidente():
     """Retorna dados consolidados da pesquisa mais recente para Presidente."""
     from database import get_pesquisas_mais_recentes
@@ -624,6 +625,7 @@ def api_pesquisas_presidente():
     })
 
 @app.route('/api/pesquisas/governador-rj')
+@cache.cached(timeout=300)
 def api_pesquisas_governador_rj():
     """Retorna dados consolidados da pesquisa mais recente para Governador RJ."""
     from database import get_pesquisas_mais_recentes
