@@ -207,12 +207,35 @@
         </div>
       </div>
 
+      <!-- Evolução -->
+      <h3 class="pe-section__title" style="font-size:13px; margin-top:24px;">Evolução nas Pesquisas — Governador RJ</h3>
+      <div class="pe-card" id="historico-multi-rj-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+          <div id="candidatos-toggle-rj" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
+        </div>
+        <div class="pe-chart-container" style="height:380px;"><canvas id="chart-historico-multi-rj"></canvas></div>
+      </div>
+
       <!-- Rejeição -->
       <h3 class="pe-section__title" style="font-size:13px; margin-top:24px;">Rejeição — Governador RJ — últimos 30 dias</h3>
       <div class="pe-card" id="rejeicao-rj-card">
         <div id="rejeicao-rj-container">
           <div class="pe-mono" style="color:var(--pe-text-muted);">Carregando...</div>
         </div>
+      </div>
+
+      <!-- Alertas -->
+      <h3 class="pe-section__title" style="font-size:13px; margin-top:24px;">Alertas — Variações Bruscas — Governador RJ</h3>
+      <div id="alertas-rj-container" style="margin-bottom:24px;"></div>
+
+      <!-- House effects -->
+      <h3 class="pe-section__title" style="font-size:13px; margin-top:24px;">Tendência por instituto (house effect) — Governador RJ</h3>
+      <div class="pe-card" id="house-effects-rj-card">
+        <div id="house-effects-rj-container"></div>
+        <p class="pe-mono" style="color:var(--pe-text-muted); font-size:11px; margin-top:var(--pe-space-3);">
+          Desvio médio de cada instituto vs. os demais nos últimos 90 dias.
+          Não é erro — é diferença metodológica. <a href="/metodologia#house-effects">Ver metodologia</a>.
+        </p>
       </div>
     </section>
 
@@ -464,6 +487,7 @@
     let chartHistoricoMulti = null;
     let ultimasSeries = [];
     window.eventosTimeline = [];
+    window.eventosTimelineRJ = [];
 
     async function carregarEventos() {
       try {
@@ -475,41 +499,61 @@
       }
     }
 
+    async function carregarEventosRJ() {
+      try {
+        const res = await fetch('/api/eventos?cargo=governador_rj');
+        const data = await res.json();
+        window.eventosTimelineRJ = data.eventos || [];
+      } catch (e) {
+        window.eventosTimelineRJ = [];
+      }
+    }
+
     // Marcadores verticais de eventos no gráfico de tendência. Ancorados na
     // data plotada mais próxima <= data do evento (datas de pesquisa raramente
     // coincidem exatamente com a data do evento). >8 eventos: só a linha.
-    const eventosMarkerPlugin = {
-      id: 'eventosMarkers',
-      afterDatasetsDraw(chart) {
-        if (!window.eventosTimeline?.length) return;
-        const { ctx, chartArea, scales } = chart;
-        const brutas = chart.$_datasBrutas || [];
-        if (!brutas.length) return;
-        let desenhados = 0;
-        window.eventosTimeline.forEach(ev => {
-          // índice da data plotada mais próxima <= data do evento
-          let idx = -1;
-          for (let i = 0; i < brutas.length; i++) {
-            if (brutas[i] <= ev.data) idx = i; else break;
-          }
-          if (idx === -1) return;
-          const x = scales.x.getPixelForValue(idx);
-          ctx.save();
-          ctx.strokeStyle = 'rgba(10,34,64,0.35)';
-          ctx.setLineDash([4, 4]);
-          ctx.beginPath(); ctx.moveTo(x, chartArea.top); ctx.lineTo(x, chartArea.bottom); ctx.stroke();
-          ctx.setLineDash([]);
-          if (desenhados < 8) {
-            ctx.font = '10px "JetBrains Mono", monospace';
-            ctx.fillStyle = 'rgba(10,34,64,0.6)';
-            ctx.textAlign = 'left';
-            ctx.fillText((ev.titulo || '').slice(0, 18), x + 4, chartArea.top + 10);
-          }
-          ctx.restore();
-          desenhados++;
-        });
-      }
-    };
+    // Fábrica: cada cargo lê seu próprio global de timeline (window.eventosTimeline
+    // para presidente, window.eventosTimelineRJ para governador RJ) para não
+    // vazar marcadores de um cargo no gráfico do outro. Um 3º cargo futuro deve
+    // chamar esta fábrica de novo com o nome do seu próprio global.
+    function criarEventosMarkerPlugin(timelineGlobalName) {
+      return {
+        id: 'eventosMarkers_' + timelineGlobalName,
+        afterDatasetsDraw(chart) {
+          const timeline = window[timelineGlobalName];
+          if (!timeline?.length) return;
+          const { ctx, chartArea, scales } = chart;
+          const brutas = chart.$_datasBrutas || [];
+          if (!brutas.length) return;
+          let desenhados = 0;
+          timeline.forEach(ev => {
+            // índice da data plotada mais próxima <= data do evento
+            let idx = -1;
+            for (let i = 0; i < brutas.length; i++) {
+              if (brutas[i] <= ev.data) idx = i; else break;
+            }
+            if (idx === -1) return;
+            const x = scales.x.getPixelForValue(idx);
+            ctx.save();
+            ctx.strokeStyle = 'rgba(10,34,64,0.35)';
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(x, chartArea.top); ctx.lineTo(x, chartArea.bottom); ctx.stroke();
+            ctx.setLineDash([]);
+            if (desenhados < 8) {
+              ctx.font = '10px "JetBrains Mono", monospace';
+              ctx.fillStyle = 'rgba(10,34,64,0.6)';
+              ctx.textAlign = 'left';
+              ctx.fillText((ev.titulo || '').slice(0, 18), x + 4, chartArea.top + 10);
+            }
+            ctx.restore();
+            desenhados++;
+          });
+        }
+      };
+    }
+
+    const eventosMarkerPlugin = criarEventosMarkerPlugin('eventosTimeline');
+    const eventosMarkerPluginRJ = criarEventosMarkerPlugin('eventosTimelineRJ');
 
     async function carregarHistoricoMulti() {
       try {
@@ -604,6 +648,105 @@
     function toggleCandidato() {
       renderizarHistoricoMulti(ultimasSeries.filter(s => {
         const cb = document.querySelector(`#candidatos-toggle input[value="${s.candidato}"]`);
+        return cb && cb.checked;
+      }));
+    }
+
+    // ─── Histórico multi-candidato — Governador RJ ─────────────
+    let chartHistoricoMultiRJ = null;
+    let ultimasSeriesRJ = [];
+
+    async function carregarHistoricoMultiRJ() {
+      try {
+        const res = await fetch('/api/pesquisas/historico-multi?cargo=governador_rj&tipo=estimulada');
+        const data = await res.json();
+        ultimasSeriesRJ = data.series;
+
+        document.getElementById('candidatos-toggle-rj').innerHTML = data.series.map(s => `
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+            <input type="checkbox" value="${s.candidato}" checked style="accent-color:${s.cor};" onchange="toggleCandidatoRJ()">
+            <span style="color:${s.cor}; font-weight:500;">${s.candidato}</span>
+          </label>
+        `).join('');
+
+        renderizarHistoricoMultiRJ(data.series);
+      } catch (e) {
+        document.getElementById('historico-multi-rj-card').innerHTML =
+          '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar evolução nas pesquisas.</div>';
+      }
+    }
+
+    function renderizarHistoricoMultiRJ(series) {
+      const ctx = document.getElementById('chart-historico-multi-rj');
+      if (chartHistoricoMultiRJ) chartHistoricoMultiRJ.destroy();
+
+      const todasDatas = [...new Set(series.flatMap(s => s.dados.map(d => d.data)))].sort();
+
+      const datasets = [];
+      series.forEach(s => {
+        const porData = {};
+        s.dados.forEach(d => { porData[d.data] = d; });
+        const pct   = todasDatas.map(dt => porData[dt] ? porData[dt].percentual : null);
+        const lower = todasDatas.map(dt => { const d = porData[dt]; return d ? d.percentual - parseMargem(d.margem_erro) : null; });
+        const upper = todasDatas.map(dt => { const d = porData[dt]; return d ? d.percentual + parseMargem(d.margem_erro) : null; });
+
+        const idxLower = datasets.length;
+        datasets.push({
+          label: '_band_lower_' + s.candidato, data: lower, _band: true,
+          borderColor: 'transparent', backgroundColor: 'transparent',
+          borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false,
+          tension: 0.2, spanGaps: false,
+        });
+        datasets.push({
+          label: '_band_upper_' + s.candidato, data: upper, _band: true,
+          borderColor: 'transparent', backgroundColor: s.cor + '26',
+          borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: idxLower,
+          tension: 0.2, spanGaps: false,
+        });
+        datasets.push({
+          label: s.candidato, data: pct,
+          borderColor: s.cor, backgroundColor: s.cor + '18', borderWidth: 2,
+          pointBackgroundColor: s.cor, pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
+          pointRadius: 5, pointHoverRadius: 7, tension: 0.2, spanGaps: false,
+        });
+      });
+
+      chartHistoricoMultiRJ = new Chart(ctx, {
+        type: 'line',
+        plugins: [eventosMarkerPluginRJ],
+        data: { labels: todasDatas.map(formatarData), datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            datalabels: { display: false },
+            legend: { display: true, position: 'top', labels: { filter: item => !item.text.startsWith('_band'), color: '#0A2240', font: { family: "'Inter', sans-serif", size: 12 }, usePointStyle: true, padding: 16 } },
+            tooltip: {
+              backgroundColor: '#FFFFFF', titleColor: '#0A2240', bodyColor: '#5a7184',
+              borderColor: 'rgba(10,34,64,0.1)', borderWidth: 1, padding: 12,
+              filter: item => !item.dataset._band,
+              callbacks: {
+                label: c => {
+                  if (c.parsed.y === null) return null;
+                  const d = ultimasSeriesRJ.find(s => s.candidato === c.dataset.label)?.dados?.find(x => formatarData(x.data) === c.label);
+                  const m = d ? parseMargem(d.margem_erro) : 0;
+                  return ` ${c.dataset.label}: ${c.parsed.y.toFixed(1)}%${m > 0 ? ` (±${m}pp)` : ''}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(10,34,64,0.06)' }, ticks: { color: '#5a7184', font: { size: 10, family: "'JetBrains Mono', monospace" }, maxRotation: 45, maxTicksLimit: 12 } },
+            y: { grid: { color: 'rgba(10,34,64,0.06)' }, ticks: { color: '#5a7184', font: { size: 11, family: "'JetBrains Mono', monospace" }, callback: v => v + '%' }, suggestedMin: 0, suggestedMax: 60 }
+          }
+        }
+      });
+      chartHistoricoMultiRJ.$_datasBrutas = todasDatas;
+    }
+
+    function toggleCandidatoRJ() {
+      renderizarHistoricoMultiRJ(ultimasSeriesRJ.filter(s => {
+        const cb = document.querySelector(`#candidatos-toggle-rj input[value="${s.candidato}"]`);
         return cb && cb.checked;
       }));
     }
@@ -779,10 +922,12 @@
     }
 
     // ─── Alertas ──────────────────────────────────────────────
-    async function carregarAlertas() {
-      const res = await fetch('/api/alertas?cargo=presidente&limiar=3.0');
+    async function carregarAlertas(cargo, containerId) {
+      cargo = cargo || 'presidente';
+      containerId = containerId || 'alertas-container';
+      const res = await fetch(`/api/alertas?cargo=${cargo}&limiar=3.0`);
       const data = await res.json();
-      const container = document.getElementById('alertas-container');
+      const container = document.getElementById(containerId);
       if (!data.alertas || data.alertas.length === 0) { container.innerHTML = ''; return; }
 
       container.innerHTML = data.alertas.map(a => {
@@ -1205,11 +1350,13 @@
       }
     }
 
-    async function carregarHouseEffects() {
-      const container = document.getElementById('house-effects-container');
+    async function carregarHouseEffects(cargo, containerId) {
+      cargo = cargo || 'presidente';
+      containerId = containerId || 'house-effects-container';
+      const container = document.getElementById(containerId);
       if (!container) return;
       try {
-        const res = await fetch('/api/house-effects?cargo=presidente');
+        const res = await fetch(`/api/house-effects?cargo=${cargo}`);
         const data = await res.json();
         const institutos = data.institutos || [];
         // achata para linhas (instituto, candidato, efeito, n)
@@ -1253,8 +1400,8 @@
 
     // ─── Inicialização ────────────────────────────────────────
     async function inicializar() {
-      // Eventos antes do gráfico para os marcadores já aparecerem no 1º render.
-      await carregarEventos();
+      // Eventos antes dos gráficos para os marcadores já aparecerem no 1º render.
+      await Promise.all([carregarEventos(), carregarEventosRJ()]);
       await Promise.all([
         carregarVisaoGeral(),
         carregarKpisAvancados(),
@@ -1265,13 +1412,16 @@
         carregarMediaAgregada(),
         inicializarComparativo(),
         carregarHistoricoMulti(),
+        carregarHistoricoMultiRJ(),
         carregarAlertas(),
+        carregarAlertas('governador_rj', 'alertas-rj-container'),
         carregarSimulacao(),
         carregarCenarioVitoriaRJ(),
         carregarRegional(),
         carregarRejeicao('presidente', 'rejeicao-container'),
         carregarRejeicao('governador_rj', 'rejeicao-rj-container'),
         carregarHouseEffects(),
+        carregarHouseEffects('governador_rj', 'house-effects-rj-container'),
       ]);
     }
 
