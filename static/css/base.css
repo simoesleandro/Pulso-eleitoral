@@ -302,6 +302,22 @@ body {
 @media (max-width: 768px) {
   .pe-kpi-grid { grid-template-columns: repeat(2, 1fr); }
 }
+.pe-kpi-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 768px) {
+  .pe-kpi-grid-3 { grid-template-columns: 1fr; }
+}
+.pe-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 768px) {
+  .pe-grid-2col { grid-template-columns: 1fr; }
+}
 .pe-tendencia-row {
   display: flex;
   align-items: center;

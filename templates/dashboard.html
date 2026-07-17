@@ -59,7 +59,7 @@
       <div class="pe-kpi-grid" id="kpi-grid"></div>
 
       <!-- KPI grid analíticos 3 cards: margem, turno, concentração -->
-      <div class="pe-kpi-grid" style="grid-template-columns: repeat(3,1fr); gap:16px; margin-top:16px;" id="kpis-avancados-grid"></div>
+      <div class="pe-kpi-grid-3" style="margin-top:16px;" id="kpis-avancados-grid"></div>
 
       <!-- Tendências -->
       <div class="pe-card" style="margin-top:16px;">
@@ -116,7 +116,7 @@
               <span id="pres-tipo-info"></span>
             </div>
           </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div class="pe-grid-2col">
             <div class="pe-kpi" id="pres-margem-bloco">
               <div class="pe-kpi__label">Margem de Erro</div>
               <div id="pres-margem" class="pe-kpi__value" style="font-size:20px;">—</div>
@@ -182,7 +182,7 @@
               <span id="gov-tipo-info"></span>
             </div>
           </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div class="pe-grid-2col">
             <div class="pe-kpi" id="gov-margem-bloco">
               <div class="pe-kpi__label">Margem de Erro</div>
               <div id="gov-margem" class="pe-kpi__value" style="font-size:20px;">—</div>
@@ -210,7 +210,7 @@
       <h2 class="pe-section__title">Análise do Cenário</h2>
 
       <!-- KPIs campo minado + volatilidade + aceleração -->
-      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px;" id="kpis-analise-grid"></div>
+      <div class="pe-kpi-grid-3" style="margin-bottom:24px;" id="kpis-analise-grid"></div>
 
       <!-- Simulação 2º turno -->
       <h3 class="pe-section__title" style="font-size:13px; margin-bottom:16px;">Simulação de 2º Turno</h3>
@@ -698,6 +698,7 @@
       }
 
       container.innerHTML = `
+        <div style="overflow-x:auto;">
         <table style="width:100%; border-collapse:collapse;">
           <thead>
             <tr style="border-bottom:2px solid var(--pe-surface);">
@@ -724,6 +725,7 @@
             `).join('')}
           </tbody>
         </table>
+        </div>
       `;
     }
 
@@ -838,7 +840,7 @@
           const flavioCor = st.flavio.vencedor ? 'var(--pe-up)' : 'var(--pe-text-muted)';
           const cen = cenarios.find(c => c.id === 'lula_flavio');
           return `
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="pe-grid-2col">
               <div class="pe-card" style="border-left:3px solid var(--pe-navy);">
                 <div class="pe-kpi__label">Lula (PT) ${st.lula.vencedor ? '🏆' : ''}</div>
                 <div style="font-size:32px; font-weight:500; color:${lulaCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${st.lula.total_estimado.toFixed(1)}%</div>
@@ -876,7 +878,7 @@
         const lulaCor = a.favorito ? 'var(--pe-up)' : 'var(--pe-text-muted)';
         const advCor  = b.favorito ? 'var(--pe-up)' : 'var(--pe-text-muted)';
         return `
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div class="pe-grid-2col">
             <div class="pe-card" style="border-left:3px solid var(--pe-navy);">
               <div class="pe-kpi__label">Lula (PT) ${a.favorito ? '🏆' : ''}</div>
               <div style="font-size:32px; font-weight:500; color:${lulaCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${a.media_direto.toFixed(1)}%</div>
@@ -997,6 +999,7 @@
       const candidatos = data.candidatos.slice(0, 2);
 
       container.innerHTML = `
+        <div style="overflow-x:auto;">
         <table style="width:100%; border-collapse:collapse; font-size:13px;">
           <thead>
             <tr style="border-bottom:2px solid var(--pe-surface);">
@@ -1027,6 +1030,7 @@
             }).join('')}
           </tbody>
         </table>
+        </div>
       `;
     }
 
@@ -1135,6 +1139,7 @@
             </tr>`;
         }).join('');
         container.innerHTML = `
+          <div style="overflow-x:auto;">
           <table style="width:100%; border-collapse:collapse;">
             <thead>
               <tr style="border-bottom:1px solid var(--pe-surface);">
@@ -1146,7 +1151,8 @@
               </tr>
             </thead>
             <tbody>${rows}</tbody>
-          </table>`;
+          </table>
+          </div>`;
       } catch (e) {
         document.getElementById(containerId).innerHTML =
           '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar rejeição.</div>';
@@ -1181,6 +1187,7 @@
             </tr>`;
         }).join('');
         container.innerHTML = `
+          <div style="overflow-x:auto;">
           <table style="width:100%; border-collapse:collapse;">
             <thead>
               <tr style="border-bottom:1px solid var(--pe-surface);">
@@ -1191,7 +1198,8 @@
               </tr>
             </thead>
             <tbody>${rows}</tbody>
-          </table>`;
+          </table>
+          </div>`;
       } catch (e) {
         container.innerHTML = '<div class="pe-mono" style="color:var(--pe-text-muted);">Erro ao carregar house effects.</div>';
       }
