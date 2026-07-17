@@ -45,6 +45,7 @@
 
     <!-- SEÇÃO 1: VISÃO GERAL -->
     <section id="secao-visao-geral" class="pe-section">
+      <h2 class="pe-section__title">Visão Geral</h2>
 
       <!-- Aviso de defasagem (ativado por JS quando a última pesquisa passa do limiar) -->
       <div id="aviso-defasagem" style="display:none; padding:10px 14px; border-radius:8px;
@@ -99,14 +100,14 @@
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
         <h3 class="pe-section__title" style="font-size:13px;">Pesquisa Mais Recente</h3>
         <div id="pres-tipo-toggle" class="pe-tipo-toggle">
-          <button type="button" class="pe-tipo-btn pe-tipo-btn--active" data-tipo="estimulada" onclick="setTipoPres('estimulada')">Estimulada</button>
-          <button type="button" class="pe-tipo-btn" data-tipo="espontanea" onclick="setTipoPres('espontanea')">Espontânea</button>
+          <button type="button" class="pe-tipo-btn pe-tipo-btn--active" data-tipo="estimulada" aria-pressed="true" onclick="setTipoPres('estimulada')">Estimulada</button>
+          <button type="button" class="pe-tipo-btn" data-tipo="espontanea" aria-pressed="false" onclick="setTipoPres('espontanea')">Espontânea</button>
         </div>
       </div>
       <div class="pe-grid-2" style="margin-bottom:24px;">
         <div class="pe-card">
           <div id="pres-tipo-chart" style="margin-bottom:8px;"></div>
-          <div class="pe-chart-container"><canvas id="chart-presidente"></canvas></div>
+          <div class="pe-chart-container"><canvas id="chart-presidente" role="img" aria-label="Gráfico de barras com a intenção de voto para presidente por candidato"></canvas></div>
         </div>
         <div class="pe-card pe-info-card">
           <div class="pe-kpi">
@@ -156,7 +157,7 @@
             <span class="pe-badge pe-badge--inst">Quaest ○</span>
           </div>
         </div>
-        <div class="pe-chart-container" style="height:380px;"><canvas id="chart-historico-multi"></canvas></div>
+        <div class="pe-chart-container" style="height:380px;"><canvas id="chart-historico-multi" role="img" aria-label="Gráfico de linha com a evolução das pesquisas ao longo do tempo por candidato"></canvas></div>
         <div class="pe-mono" style="margin-top:8px; color:var(--pe-text-muted); font-size:11px;">
           Pontos sólidos = Datafolha · Pontos vazios = Quaest · Linha contínua conecta pesquisas do mesmo instituto
         </div>
@@ -177,7 +178,7 @@
       <div class="pe-grid-2">
         <div class="pe-card">
           <div id="gov-tipo-chart" style="margin-bottom:8px;"></div>
-          <div class="pe-chart-container"><canvas id="chart-governador"></canvas></div>
+          <div class="pe-chart-container"><canvas id="chart-governador" role="img" aria-label="Gráfico de barras com a intenção de voto para governador do Rio de Janeiro por candidato"></canvas></div>
         </div>
         <div class="pe-card pe-info-card">
           <div class="pe-kpi">
@@ -288,9 +289,11 @@
     function setTipoPres(tipo) {
       if (tipo === tipoPres) return;
       tipoPres = tipo;
-      document.querySelectorAll('#pres-tipo-toggle .pe-tipo-btn').forEach(b =>
-        b.classList.toggle('pe-tipo-btn--active', b.dataset.tipo === tipo)
-      );
+      document.querySelectorAll('#pres-tipo-toggle .pe-tipo-btn').forEach(b => {
+        const ativo = b.dataset.tipo === tipo;
+        b.classList.toggle('pe-tipo-btn--active', ativo);
+        b.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+      });
       carregarPresidente();
       carregarHistoricoMulti();
     }
