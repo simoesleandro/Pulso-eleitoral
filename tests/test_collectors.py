@@ -96,6 +96,42 @@ def test_save_empty_list_does_not_error(tmp_path):
         # Chamada direta ao save com array vazio
         collector.save([])
 
+def test_salvar_regional_fecha_conexao_mesmo_com_erro(tmp_path):
+    """Regressão: _salvar_regional vazava a conexão sqlite3 quando uma
+    exceção ocorria antes do conn.close() no caminho de sucesso.
+
+    Usa dois itens: o primeiro insere com sucesso (deixando uma transação
+    aberta e não commitada, já que o segundo item derruba o loop antes do
+    conn.commit()) e o segundo omite 'percentual', forçando um KeyError
+    dentro do loop, ambos com candidato presidencial conhecido ("Lula")
+    para sobreviver ao filtro _filtrar_presidenciais. Se a conexão do
+    primeiro _salvar_regional não for fechada no finally, ela mantém um
+    lock de escrita (RESERVED) que bloqueia uma segunda conexão tentando
+    escrever, evidenciando o vazamento."""
+    db_file = tmp_path / "test_regional_leak.db"
+    conn = sqlite3.connect(db_file)
+    schema_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "schema.sql")
+    with open(schema_path, "r", encoding="utf-8") as f:
+        conn.executescript(f.read())
+    conn.close()
+
+    from collectors.gazetadopovo import GazetaDoPovoColetor
+    collector = GazetaDoPovoColetor(str(db_file))
+    dados_invalidos = [
+        {"instituto_id": 1, "data_pesquisa": "2026-01-01", "candidato": "Lula", "percentual": 40.0},
+        {"instituto_id": 1, "data_pesquisa": "2026-01-01", "candidato": "Lula"},  # sem 'percentual' -> KeyError
+    ]
+    collector._salvar_regional(dados_invalidos, "SP")  # não deve levantar
+
+    # Se a conexão anterior não foi fechada (finally ausente), ela mantém uma
+    # transação aberta (lock RESERVED) e esta escrita exclusiva falha/trava.
+    conn2 = sqlite3.connect(db_file, timeout=1)
+    conn2.execute("INSERT INTO pesquisas_regionais (instituto_id, data_pesquisa, uf, candidato, percentual) "
+                   "VALUES (1, '2026-01-02', 'RJ', 'Lula', 41.0)")
+    conn2.commit()
+    conn2.close()
+
+
 def test_save_normalizado(tmp_path):
     """Verifica se o save() normaliza e insere corretamente as pesquisas e intenções."""
     db_file = tmp_path / "test_collectors_save.db"

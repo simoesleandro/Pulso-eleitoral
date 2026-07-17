@@ -401,8 +401,8 @@ class BaseCollector(ABC):
         dados = self._filtrar_presidenciais(dados)
         if not dados:
             return
+        conn = sqlite3.connect(self.db_path)
         try:
-            conn = sqlite3.connect(self.db_path)
             inseridos = 0
             for d in dados:
                 conn.execute(
@@ -417,8 +417,9 @@ class BaseCollector(ABC):
                 )
                 inseridos += 1
             conn.commit()
-            conn.close()
             self.logger.info("[%s] Regional %s: %d intenções salvas", self.name, uf, inseridos)
         except Exception as e:
             self.logger.error("[%s] Erro ao salvar regional %s: %s", self.name, uf, e)
+        finally:
+            conn.close()
 
