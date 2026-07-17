@@ -329,13 +329,15 @@
       </span>`;
     }
 
+    const _candidateColorMap = new Map();
+    let _candidateColorNextIndex = 0;
+
     function getCandidateColor(name) {
-      if (name === 'Lula') return PE_CANDIDATE_COLORS[0];
-      if (name === 'Flávio Bolsonaro') return PE_CANDIDATE_COLORS[1];
-      if (name === 'Tarcísio de Freitas') return PE_CANDIDATE_COLORS[2];
-      if (name === 'Ciro Gomes') return PE_CANDIDATE_COLORS[3];
-      if (name === 'Simone Tebet') return PE_CANDIDATE_COLORS[4];
-      return '#5a7184';
+      if (!_candidateColorMap.has(name)) {
+        _candidateColorMap.set(name, PE_CANDIDATE_COLORS[_candidateColorNextIndex % PE_CANDIDATE_COLORS.length]);
+        _candidateColorNextIndex++;
+      }
+      return _candidateColorMap.get(name);
     }
 
     // ─── Presidente ───────────────────────────────────────────
@@ -375,7 +377,7 @@
         type: 'bar',
         data: {
           labels: data.candidatos,
-          datasets: [{ data: data.percentuais, backgroundColor: ctx2 => PE_CANDIDATE_COLORS[ctx2.dataIndex % PE_CANDIDATE_COLORS.length], borderRadius: 4, barThickness: 16 }]
+          datasets: [{ data: data.percentuais, backgroundColor: ctx2 => getCandidateColor(data.candidatos[ctx2.dataIndex]), borderRadius: 4, barThickness: 16 }]
         },
         options: {
           indexAxis: 'y', responsive: true, maintainAspectRatio: false,
@@ -433,7 +435,7 @@
         type: 'bar',
         data: {
           labels: data.candidatos,
-          datasets: [{ data: data.percentuais, backgroundColor: ctx2 => PE_CANDIDATE_COLORS[ctx2.dataIndex % PE_CANDIDATE_COLORS.length], borderRadius: 4, barThickness: 16 }]
+          datasets: [{ data: data.percentuais, backgroundColor: ctx2 => getCandidateColor(data.candidatos[ctx2.dataIndex]), borderRadius: 4, barThickness: 16 }]
         },
         options: {
           indexAxis: 'y', responsive: true, maintainAspectRatio: false,
