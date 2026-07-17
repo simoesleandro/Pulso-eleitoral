@@ -47,6 +47,18 @@ def test_get_conn():
     assert fk_enabled == 1
     conn.close()
 
+def test_get_conn_ativa_wal_e_busy_timeout():
+    """Regressão: get_conn() deve configurar WAL + busy_timeout para reduzir
+    contenção entre o scheduler e requests concorrentes."""
+    conn = get_conn()
+    try:
+        journal_mode = conn.execute("PRAGMA journal_mode;").fetchone()[0]
+        busy_timeout = conn.execute("PRAGMA busy_timeout;").fetchone()[0]
+        assert journal_mode.lower() == "wal"
+        assert busy_timeout == 10000
+    finally:
+        conn.close()
+
 def test_schema_creates_tables():
     """Teste 2: Verifica se o schema.sql cria corretamente todas as 6 tabelas requeridas."""
     # Inicializa apenas o esquema (sem forçar o seed)
