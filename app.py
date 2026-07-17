@@ -650,8 +650,19 @@ def api_pesquisas_governador_rj():
         "tipo": first['tipo'],
     })
 
+def _chave_cache_alertas():
+    """Chave de cache normalizada para /api/alertas — usa os mesmos valores
+    já coagidos por _parse_num, não a query string bruta. Se este endpoint
+    ganhar um novo parâmetro, atualize esta função junto com o handler,
+    senão o novo parâmetro é ignorado pela chave de cache mas honrado pelo
+    handler, servindo respostas erradas para entradas diferentes."""
+    cargo = request.args.get('cargo', 'presidente')
+    limiar = _parse_num(request.args.get('limiar'), float, 3.0)
+    janela = _parse_num(request.args.get('janela'), int, 7)
+    return f"alertas:{cargo}:{limiar}:{janela}"
+
 @app.route('/api/alertas')
-@cache.cached(timeout=300, query_string=True)
+@cache.cached(timeout=300, key_prefix=_chave_cache_alertas)
 def api_alertas():
     """Retorna alertas de variações bruscas de percentual."""
     from database import detectar_variacoes_bruscas
@@ -660,8 +671,28 @@ def api_alertas():
     janela = _parse_num(request.args.get('janela'), int, 7)
     return jsonify({"alertas": detectar_variacoes_bruscas(cargo, limiar, janela)})
 
+def _chave_cache_historico_multi():
+    """Chave de cache normalizada para /api/pesquisas/historico-multi —
+    ordena a lista de candidatos (a ordem não muda o conjunto pedido) para
+    que 'Lula,Ciro' e 'Ciro,Lula' colapsem na mesma entrada de cache. Se
+    este endpoint ganhar um novo parâmetro, atualize esta função junto com
+    o handler, senão o novo parâmetro é ignorado pela chave de cache mas
+    honrado pelo handler, servindo respostas erradas para entradas
+    diferentes."""
+    from database import get_top_candidatos
+    cargo = request.args.get('cargo', 'presidente')
+    tipo = request.args.get('tipo', 'estimulada')
+    if tipo not in ('estimulada', 'espontanea'):
+        tipo = 'estimulada'
+    candidatos_param = request.args.get('candidatos', '')
+    if candidatos_param:
+        candidatos = sorted(c.strip() for c in candidatos_param.split(',') if c.strip())
+    else:
+        candidatos = sorted(get_top_candidatos(cargo, n=3))
+    return f"historico-multi:{cargo}:{tipo}:{','.join(candidatos)}"
+
 @app.route('/api/pesquisas/historico-multi')
-@cache.cached(timeout=300, query_string=True)
+@cache.cached(timeout=300, key_prefix=_chave_cache_historico_multi)
 def api_pesquisas_historico_multi():
     """Retorna séries históricas de múltiplos candidatos para um cargo."""
     from database import get_historico_multi, get_top_candidatos
@@ -677,8 +708,18 @@ def api_pesquisas_historico_multi():
     series = get_historico_multi(candidatos, cargo, tipo)
     return jsonify({"cargo": cargo, "series": series})
 
+def _chave_cache_media_agregada():
+    """Chave de cache normalizada para /api/media-agregada. Se este
+    endpoint ganhar um novo parâmetro, atualize esta função junto com o
+    handler, senão o novo parâmetro é ignorado pela chave de cache mas
+    honrado pelo handler, servindo respostas erradas para entradas
+    diferentes."""
+    cargo = request.args.get('cargo', 'presidente')
+    dias = _parse_num(request.args.get('dias'), int, 30)
+    return f"media-agregada:{cargo}:{dias}"
+
 @app.route('/api/media-agregada')
-@cache.cached(timeout=300, query_string=True)
+@cache.cached(timeout=300, key_prefix=_chave_cache_media_agregada)
 def api_media_agregada():
     """Retorna média agregada dos últimos 30 dias por candidato para um cargo."""
     from database import get_media_agregada
