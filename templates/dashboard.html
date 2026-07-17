@@ -32,7 +32,6 @@
   <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="#secao-visao-geral" id="nav-visao-geral">Visão Geral</a>
   <a class="pe-topbar__nav-item" href="#secao-presidente" id="nav-presidente">Presidente</a>
   <a class="pe-topbar__nav-item" href="#secao-governador" id="nav-governador">Gov. RJ</a>
-  <a class="pe-topbar__nav-item" href="#secao-analise" id="nav-analise">Análise</a>
   <a class="pe-topbar__nav-item" href="#secao-dados" id="nav-dados">Dados</a>
   <a class="pe-topbar__nav-item" href="/metodologia">Metodologia</a>
 {% endblock %}
@@ -58,9 +57,6 @@
 
       <!-- KPI grid 4 cards -->
       <div class="pe-kpi-grid" id="kpi-grid"></div>
-
-      <!-- KPI grid analíticos 3 cards: margem, turno, concentração -->
-      <div class="pe-kpi-grid-3" style="margin-top:16px;" id="kpis-avancados-grid"></div>
 
       <!-- Tendências -->
       <div class="pe-card" style="margin-top:16px;">
@@ -136,6 +132,13 @@
         </div>
       </div>
 
+      <!-- Análise Presidencial -->
+      <h3 class="pe-section__title" style="font-size:13px; margin-top:24px;">Análise Presidencial</h3>
+      <div class="pe-kpi-grid-3" style="margin-bottom:24px;" id="kpis-avancados-grid"></div>
+
+      <h3 class="pe-section__title" style="font-size:13px; margin-bottom:16px;">Simulação de 2º Turno</h3>
+      <div id="simulacao-container" style="margin-bottom:24px;"></div>
+
       <!-- Comparativo -->
       <h3 class="pe-section__title" style="font-size:13px;">Comparativo entre Institutos</h3>
       <div class="pe-card" style="margin-bottom:24px;">
@@ -170,6 +173,10 @@
           <div class="pe-mono" style="color:var(--pe-text-muted);">Carregando...</div>
         </div>
       </div>
+
+      <!-- Regional -->
+      <h3 class="pe-section__title" style="font-size:13px; margin-top:24px;">Intenção de Voto por Estado</h3>
+      <div class="pe-card"><div id="regional-container"></div></div>
     </section>
 
     <!-- SEÇÃO 3: GOV. RJ -->
@@ -207,6 +214,13 @@
         </div>
       </div>
 
+      <!-- Análise — Governador RJ -->
+      <h3 class="pe-section__title" style="font-size:13px; margin-top:24px;">Análise — Governador RJ</h3>
+      <div class="pe-kpi-grid-3" style="margin-bottom:24px;" id="kpis-analise-grid"></div>
+
+      <h3 class="pe-section__title" style="font-size:13px; margin-bottom:16px;">Cenário de Vitória — Governador RJ</h3>
+      <div id="cenario-vitoria-rj-container" style="margin-bottom:24px;"></div>
+
       <!-- Evolução -->
       <h3 class="pe-section__title" style="font-size:13px; margin-top:24px;">Evolução nas Pesquisas — Governador RJ</h3>
       <div class="pe-card" id="historico-multi-rj-card">
@@ -239,28 +253,7 @@
       </div>
     </section>
 
-    <!-- SEÇÃO 4: ANÁLISE -->
-    <section id="secao-analise" class="pe-section">
-      <h2 class="pe-section__title">Análise do Cenário</h2>
-
-      <!-- KPIs campo minado + volatilidade + aceleração -->
-      <div class="pe-kpi-grid-3" style="margin-bottom:24px;" id="kpis-analise-grid"></div>
-
-      <!-- Simulação 2º turno -->
-      <h3 class="pe-section__title" style="font-size:13px; margin-bottom:16px;">Simulação de 2º Turno</h3>
-      <div id="simulacao-container" style="margin-bottom:24px;"></div>
-
-      <!-- Cenário de Vitória — Governador RJ (chance direta de vitória em 1º turno,
-           conceitualmente diferente da simulação de 2º turno acima) -->
-      <h3 class="pe-section__title" style="font-size:13px; margin-bottom:16px;">Cenário de Vitória — Governador RJ</h3>
-      <div id="cenario-vitoria-rj-container" style="margin-bottom:24px;"></div>
-
-      <!-- Regional -->
-      <h3 class="pe-section__title" style="font-size:13px; margin-bottom:16px;">Intenção de Voto por Estado</h3>
-      <div class="pe-card"><div id="regional-container"></div></div>
-    </section>
-
-    <!-- SEÇÃO 5: DADOS -->
+    <!-- SEÇÃO 4: DADOS -->
     <section id="secao-dados" class="pe-section">
       <h2 class="pe-section__title">Integridade dos Coletores</h2>
       <div class="pe-grid-institutos" id="lista-institutos"></div>
@@ -894,7 +887,7 @@
                 <td style="padding:10px 8px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--pe-text-muted);">${formatarData(inst.data)}</td>
                 <td style="padding:10px 8px; width:200px;">
                   <div style="background:var(--pe-surface); border-radius:2px; height:16px; overflow:hidden;">
-                    <div style="width:${inst.percentual}%; height:100%; background:var(--pe-navy); border-radius:2px; transition:width .6s ease;"></div>
+                    <div style="width:100%; height:100%; background:var(--pe-navy); border-radius:2px; transform:scaleX(${inst.percentual / 100}); transform-origin:left; transition:transform .6s ease;"></div>
                   </div>
                 </td>
               </tr>
@@ -928,7 +921,10 @@
       const res = await fetch(`/api/alertas?cargo=${cargo}&limiar=3.0`);
       const data = await res.json();
       const container = document.getElementById(containerId);
-      if (!data.alertas || data.alertas.length === 0) { container.innerHTML = ''; return; }
+      if (!data.alertas || data.alertas.length === 0) {
+        container.innerHTML = '<div class="pe-mono" style="color:var(--pe-text-muted); font-size:13px;">Nenhuma variação brusca no momento.</div>';
+        return;
+      }
 
       container.innerHTML = data.alertas.map(a => {
         const cls = a.direcao === 'up' ? 'pe-alert--up' : 'pe-alert--down';
@@ -999,7 +995,7 @@
       function mcSubBloco(prob, favorito, corBarra) {
         const badgeCor   = favorito ? 'var(--pe-up)' : 'var(--pe-down)';
         const badgeBg    = favorito ? '#e6f4ec' : '#fdecea';
-        const badgeTexto = favorito ? 'FAVORITO' : 'ADVERSÁRIO';
+        const badgeTexto = favorito ? 'MAIS PROVÁVEL' : 'MENOS PROVÁVEL';
         return `
           <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--pe-surface);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -1013,7 +1009,7 @@
             <div style="font-size:20px; font-weight:500; color:${badgeCor}; font-family:'JetBrains Mono',monospace; margin-bottom:4px;">${prob.toFixed(1)}%</div>
             <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">de chance de vencer</div>
             <div style="background:var(--pe-surface); border-radius:2px; height:6px; overflow:hidden;">
-              <div style="width:${Math.min(prob, 100)}%; height:100%; background:${corBarra}; border-radius:2px; transition:width .6s ease;"></div>
+              <div style="width:100%; height:100%; background:${corBarra}; border-radius:2px; transform:scaleX(${Math.min(prob, 100) / 100}); transform-origin:left; transition:transform .6s ease;"></div>
             </div>
           </div>`;
       }
@@ -1025,8 +1021,8 @@
           const cen = cenarios.find(c => c.id === 'lula_flavio');
           return `
             <div class="pe-grid-2col">
-              <div class="pe-card" style="border-left:3px solid var(--pe-navy);">
-                <div class="pe-kpi__label">Lula (PT) ${st.lula.vencedor ? '🏆' : ''}</div>
+              <div class="pe-card">
+                <div class="pe-kpi__label"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--pe-navy); margin-right:6px;"></span>Lula (PT)</div>
                 <div style="font-size:32px; font-weight:500; color:${lulaCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${st.lula.total_estimado.toFixed(1)}%</div>
                 <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">estimativa 2º turno</div>
                 <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
@@ -1038,8 +1034,8 @@
                 </div>
                 ${cen ? mcSubBloco(cen.candidato_a.prob_vitoria, cen.candidato_a.favorito, 'var(--pe-navy)') : ''}
               </div>
-              <div class="pe-card" style="border-left:3px solid var(--pe-red);">
-                <div class="pe-kpi__label">Flávio Bolsonaro (PL) ${st.flavio.vencedor ? '🏆' : ''}</div>
+              <div class="pe-card">
+                <div class="pe-kpi__label"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--pe-red); margin-right:6px;"></span>Flávio Bolsonaro (PL)</div>
                 <div style="font-size:32px; font-weight:500; color:${flavioCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${st.flavio.total_estimado.toFixed(1)}%</div>
                 <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">estimativa 2º turno</div>
                 <div style="font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">
@@ -1063,8 +1059,8 @@
         const advCor  = b.favorito ? 'var(--pe-up)' : 'var(--pe-text-muted)';
         return `
           <div class="pe-grid-2col">
-            <div class="pe-card" style="border-left:3px solid var(--pe-navy);">
-              <div class="pe-kpi__label">Lula (PT) ${a.favorito ? '🏆' : ''}</div>
+            <div class="pe-card">
+              <div class="pe-kpi__label"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--pe-navy); margin-right:6px;"></span>Lula (PT)</div>
               <div style="font-size:32px; font-weight:500; color:${lulaCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${a.media_direto.toFixed(1)}%</div>
               <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">intenção de voto direta</div>
               <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
@@ -1072,8 +1068,8 @@
               </div>
               ${mcSubBloco(a.prob_vitoria, a.favorito, 'var(--pe-navy)')}
             </div>
-            <div class="pe-card" style="border-left:3px solid var(--pe-red);">
-              <div class="pe-kpi__label">${b.nome} ${b.favorito ? '🏆' : ''}</div>
+            <div class="pe-card">
+              <div class="pe-kpi__label"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--pe-red); margin-right:6px;"></span>${b.nome}</div>
               <div style="font-size:32px; font-weight:500; color:${advCor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${b.media_direto.toFixed(1)}%</div>
               <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">intenção de voto direta</div>
               <div style="margin-top:12px; background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
@@ -1136,8 +1132,8 @@
         const cardsSimulados = simulados.map((c, idx) => {
           const cor = PE_CANDIDATE_COLORS[idx % PE_CANDIDATE_COLORS.length];
           return `
-            <div class="pe-card" style="border-left:3px solid ${cor};">
-              <div class="pe-kpi__label">${c.nome}</div>
+            <div class="pe-card">
+              <div class="pe-kpi__label"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${cor}; margin-right:6px;"></span>${c.nome}</div>
               <div style="font-size:32px; font-weight:500; color:${cor}; font-family:'JetBrains Mono',monospace; margin:8px 0;">${c.prob_vitoria_1_turno.toFixed(1)}%</div>
               <div style="font-size:12px; color:var(--pe-text-muted); margin-bottom:8px;">chance de vitória em 1º turno · média direta ${c.media.toFixed(1)}%</div>
               <div style="background:var(--pe-surface); border-radius:2px; height:8px; overflow:hidden;">
@@ -1288,14 +1284,17 @@
         </div>
         <div class="pe-card">
           <div class="pe-kpi__label">Aceleração da Tendência</div>
-          ${d.tendencia_aceleracao.slice(0, 3).map(t => {
-            const lbl = { acelerando_alta: '📈↑', desacelerando_alta: '📈↓', acelerando_queda: '📉↑', desacelerando_queda: '📉↓', estavel: '➡️' }[t.aceleracao] || '➡️';
-            return `
-              <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
-                <span style="font-size:12px;">${t.candidato}</span>
-                <span style="font-size:12px;">${lbl} <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--pe-text-muted);">15d:${t.tendencia_15d > 0 ? '+' : ''}${t.tendencia_15d.toFixed(1)} 30d:${t.tendencia_30d > 0 ? '+' : ''}${t.tendencia_30d.toFixed(1)}</span></span>
-              </div>`;
-          }).join('')}
+          ${d.tendencia_aceleracao.length === 0
+            ? '<div style="font-size:13px; color:var(--pe-text-muted); margin-top:8px;">Dados insuficientes para calcular aceleração</div>'
+            : d.tendencia_aceleracao.slice(0, 3).map(t => {
+              const lbl = { acelerando_alta: '📈↑', desacelerando_alta: '📈↓', acelerando_queda: '📉↑', desacelerando_queda: '📉↓', estavel: '➡️' }[t.aceleracao] || '➡️';
+              return `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
+                  <span style="font-size:12px;">${t.candidato}</span>
+                  <span style="font-size:12px;">${lbl} <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--pe-text-muted);">15d:${t.tendencia_15d > 0 ? '+' : ''}${t.tendencia_15d.toFixed(1)} 30d:${t.tendencia_30d > 0 ? '+' : ''}${t.tendencia_30d.toFixed(1)}</span></span>
+                </div>`;
+            }).join('')
+          }
         </div>
       `;
     }
@@ -1434,7 +1433,6 @@
       { id: 'secao-visao-geral', nav: 'nav-visao-geral' },
       { id: 'secao-presidente',  nav: 'nav-presidente' },
       { id: 'secao-governador',  nav: 'nav-governador' },
-      { id: 'secao-analise',     nav: 'nav-analise' },
       { id: 'secao-dados',       nav: 'nav-dados' },
     ];
 
@@ -1442,7 +1440,6 @@
       'nav-visao-geral': document.getElementById('nav-visao-geral'),
       'nav-presidente':  document.getElementById('nav-presidente'),
       'nav-governador':  document.getElementById('nav-governador'),
-      'nav-analise':     document.getElementById('nav-analise'),
       'nav-dados':       document.getElementById('nav-dados'),
     };
 
