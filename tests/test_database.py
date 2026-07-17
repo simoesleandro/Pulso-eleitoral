@@ -194,3 +194,86 @@ def test_falha_transitoria_no_cache_candidatos_nao_memoiza_vazio(monkeypatch):
 
     resultado2 = database._carregar_candidatos_cache()
     assert resultado2["mapa"] != {}
+
+
+def test_facade_reexporta_todo_o_db_conhecido():
+    """Regressão: database.py é uma façade mantida à mão sobre db/*.py
+    (plano 029). Se um nome sair da lista de re-exports sem que ninguém
+    perceba, ele fica inacessível via `import database` em silêncio — só
+    quebra quando algum caller tentar usá-lo em produção. Este teste fixa
+    a lista conhecida-boa de hoje; ao adicionar uma função nova e pública
+    num submódulo de db/*, adicione o nome aqui também (e no import
+    correspondente em database.py)."""
+    import database
+
+    esperado = {
+        # db/core.py
+        "get_conn", "get_db", "init_db", "limpar_cache_analises",
+        "salvar_log_scheduler", "buscar_ultimo_log",
+        # db/candidatos.py
+        "_popular_candidatos", "_invalidar_cache_candidatos",
+        "_carregar_candidatos_cache", "get_mapa_apelidos",
+        "get_cores_candidatos", "get_candidatos_por_espectro",
+        "get_nomes_presidenciais", "get_presidenciais_canonicos",
+        "get_candidatos_ignorar",
+        # db/eventos.py
+        "listar_eventos", "criar_evento", "remover_evento",
+        # db/pesquisas.py
+        "get_comparativo_candidato", "get_pesquisas_mais_recentes",
+        "detectar_variacoes_bruscas", "get_media_agregada",
+        "get_house_effects", "get_historico_multi", "get_historico_candidato",
+        "get_top_candidatos", "get_institutos_com_totais",
+        "get_dados_regionais", "_e_candidato",
+        # db/kpis.py
+        "get_kpis_avancados", "get_visao_geral", "_media_intervalo",
+        # db/monte_carlo.py
+        "fator_volatilidade", "_redistribuir_indecisos",
+        "prob_vitoria_primeiro_turno", "_margens_por_candidato",
+        "_pct_mudar_voto_recente", "_pct_indecisos_medio",
+        "_simular_cenario", "simular_monte_carlo_cenarios",
+        "_contagem_pesquisas_por_candidato", "_aviso_amostra_limitada",
+        "simular_prob_vitoria_1_turno", "simular_monte_carlo_cargo",
+        "get_simulacao_monte_carlo", "get_confronto_2turno_real",
+        "get_simulacao_segundo_turno",
+        # db/usuarios.py
+        "criar_usuario", "verificar_usuario", "listar_usuarios",
+        "remover_usuario", "toggle_usuario",
+    }
+
+    faltando = [nome for nome in esperado if not hasattr(database, nome)]
+    assert not faltando, f"database.py não re-exporta: {faltando}"
+
+
+def test_todos_os_imports_de_database_resolvem():
+    """Varre app.py, coletar.py, collectors/*.py, cronos/**/*.py,
+    scripts/*.py e tests/*.py por `from database import X, Y` e confirma
+    que cada nome importado existe de fato em `database`. Import-time
+    já garante isso indiretamente (um ImportError pararia a suíte), mas
+    este teste torna a garantia explícita e documenta a superfície real
+    da façade.
+
+    Limitação conhecida: análise estática via `ast` não enxerga imports
+    dinâmicos (ex.: `importlib.import_module`) — não há nenhum caso desses
+    hoje contra `database`, mas se surgir um no futuro este teste não o
+    cobrirá."""
+    import ast
+    import glob
+    import database
+
+    arquivos = (
+        glob.glob("app.py") + glob.glob("coletar.py") +
+        glob.glob("collectors/*.py") + glob.glob("cronos/**/*.py", recursive=True) +
+        glob.glob("scripts/*.py") + glob.glob("tests/*.py")
+    )
+
+    problemas = []
+    for caminho in arquivos:
+        with open(caminho, "r", encoding="utf-8") as f:
+            arvore = ast.parse(f.read(), filename=caminho)
+        for node in ast.walk(arvore):
+            if isinstance(node, ast.ImportFrom) and node.module == "database":
+                for alias in node.names:
+                    if not hasattr(database, alias.name):
+                        problemas.append(f"{caminho}: from database import {alias.name}")
+
+    assert not problemas, "Imports de `database` que não resolvem:\n" + "\n".join(problemas)
