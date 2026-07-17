@@ -389,7 +389,11 @@ def admin_criar_usuario():
     if not username or not password:
         flash("Usuário e senha são obrigatórios.", "danger")
         return redirect(url_for('admin_usuarios'))
-        
+
+    if len(password) < 8:
+        flash("A senha deve ter pelo menos 8 caracteres.", "danger")
+        return redirect(url_for('admin_usuarios'))
+
     from database import criar_usuario
     sucesso = criar_usuario(username, password, nome)
     if sucesso:
