@@ -29,6 +29,7 @@ Planos 001–005 escritos contra o commit `2b49ba3`; planos 006–017 contra `b3
 | 015 | Linha do tempo de eventos (F4 do PRD): CRUD admin + marcadores no gráfico | P2 | M | 009* | DONE |
 | 016 | House effects por instituto (#5 roadmap / F7 PRD) | P3 | M | **010, 015** | DONE |
 | 017 | Aviso de defasagem no dashboard (#10c roadmap) | P3 | S | **016** | DONE |
+| 029 | Divide o god-module `database.py` em `db/` com façade de re-export | P4 | L | — | DONE |
 
 Valores de status: TODO | IN PROGRESS | DONE | BLOCKED (motivo em uma linha) | REJECTED (motivo).
 Dependências em **negrito** são obrigatórias; com `*` são só ordem recomendada
