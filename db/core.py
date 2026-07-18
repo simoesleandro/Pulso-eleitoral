@@ -161,6 +161,7 @@ def buscar_ultimo_log() -> dict | None:
             }
         return None
     except Exception:
+        logger.exception("Erro ao buscar último log do scheduler")
         return None
     finally:
         conn.close()
