@@ -451,21 +451,3 @@ def test_api_rejeicao_default_mantem_presidente(client):
     candidatos = [r['candidato'] for r in data['rejeicoes']]
     assert 'Lula' in candidatos
     assert 'Eduardo Paes' not in candidatos
-
-
-def test_pesquisa_detalhe_smoke(client):
-    """Smoke test do protótipo de permalink (spike plano 039): a rota
-    /pesquisa/<id> não deve crashar — nem para um id existente no seed nem
-    para um id inexistente (404 tratado)."""
-    setup_db_with_seed()
-
-    resp_404 = client.get('/pesquisa/999999')
-    assert resp_404.status_code == 404
-
-    from database import get_db
-    with get_db() as conn:
-        row = conn.execute("SELECT id FROM pesquisas LIMIT 1").fetchone()
-    if row is not None:
-        resp = client.get(f'/pesquisa/{row["id"]}')
-        assert resp.status_code == 200
-        assert b'ATEN' in resp.data  # aviso de protótipo presente na página

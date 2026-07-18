@@ -57,52 +57,6 @@ def get_comparativo_candidato(candidato: str, cargo: str) -> dict:
     }
 
 
-def get_pesquisa_por_id(pesquisa_id: int) -> dict | None:
-    """Retorna uma pesquisa específica (por id) com instituto, metadados e
-    todas as intenções de voto associadas.
-
-    Protótipo do spike de permalink (plano 039) — usado por `/pesquisa/<id>`.
-    Retorna None se o id não existir.
-    """
-    with get_db() as conn:
-        pesquisa = conn.execute("""
-            SELECT p.id, p.cargo, p.data_pesquisa, p.margem_erro, p.tamanho_amostra,
-                   p.fonte_url, inst.nome AS instituto
-            FROM pesquisas p
-            JOIN institutos inst ON p.instituto_id = inst.id
-            WHERE p.id = ?
-        """, (pesquisa_id,)).fetchone()
-
-        if pesquisa is None:
-            return None
-
-        intencoes = conn.execute("""
-            SELECT candidato, percentual, partido, tipo
-            FROM intencoes
-            WHERE pesquisa_id = ?
-            ORDER BY percentual DESC
-        """, (pesquisa_id,)).fetchall()
-
-    return {
-        "id": pesquisa["id"],
-        "cargo": pesquisa["cargo"],
-        "instituto": pesquisa["instituto"],
-        "data": pesquisa["data_pesquisa"],
-        "margem_erro": pesquisa["margem_erro"],
-        "tamanho_amostra": pesquisa["tamanho_amostra"],
-        "fonte_url": pesquisa["fonte_url"],
-        "intencoes": [
-            {
-                "candidato": r["candidato"],
-                "percentual": r["percentual"],
-                "partido": r["partido"],
-                "tipo": r["tipo"],
-            }
-            for r in intencoes
-        ],
-    }
-
-
 def get_pesquisas_mais_recentes(cargo: str, tipo: str = 'estimulada') -> list[dict]:
     """Retorna a pesquisa mais recente do cargo (do tipo solicitado) e suas intenções.
 

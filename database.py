@@ -53,7 +53,6 @@ from db.pesquisas import (
     get_comparativo_candidato, get_pesquisas_mais_recentes, detectar_variacoes_bruscas,
     get_media_agregada, get_house_effects, get_historico_multi, get_historico_candidato,
     get_top_candidatos, get_institutos_com_totais, get_dados_regionais, _e_candidato,
-    get_pesquisa_por_id,
 )
 
 # ─── KPIs analíticos avançados e visão geral ───────────────────────────────
