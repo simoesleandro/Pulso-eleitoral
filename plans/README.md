@@ -58,11 +58,31 @@ dashboard).
 | 036 | Ativa WAL + busy_timeout no SQLite | P3 | S | — | DONE (mergeado na main, commit original `421870e`) |
 | 037 | Teste de fumaça: façade `database.py` cobre tudo em `db/*` | P3 | S | — | DONE (mergeado na main, commit original `9dc2872` — executor travou 1x, retomado via SendMessage) |
 | 038 | Carrega governador RJ e Dados sob demanda (lazy) no dashboard | P2 | M | 031* | DONE (mergeado na main, commit original `1df1211` — verificado em browser real, 13→25 requests) |
-| 039 | [SPIKE] Permalink citável por pesquisa/candidato | P3 | M | — | DONE, mas merge revertido antes do push (`4fc586f` reverte `1c3f40f`) — protótipo expunha rota pública sem estilo/OG tags; branch `advisor/039-spike-permalink-pesquisa-candidato` preservada com commit `3d2c2c3` e a recomendação em `docs/spike-permalink-pesquisa.md` (só acessível nesse branch) pra quem quiser retomar como plano de build de verdade |
+| 039 | [SPIKE] Permalink citável por pesquisa/candidato | P3 | M | — | DONE, mas merge revertido antes do push (`4fc586f` reverte `1c3f40f`) — protótipo expunha rota pública sem estilo/OG tags; branch `advisor/039-spike-permalink-pesquisa-candidato` preservada com commit `3d2c2c3` e a recomendação em `docs/spike-permalink-pesquisa.md` (só acessível nesse branch); virou o plano 040 |
+| 040 | Permalink de produção por pesquisa (`/pesquisa/<id>`) — build completo | P2 | M | — | DONE (worktree `worktree-agent-aaf34276f6ba2fafb`, commit `788b650`, não mergeado — og:image omitido por decisão do maintainer, sem asset disponível; og:title/description/type presentes) |
 
 Valores de status: TODO | IN PROGRESS | DONE | BLOCKED (motivo em uma linha) | REJECTED (motivo).
 Dependências em **negrito** são obrigatórias; com `*` são só ordem recomendada
 (mesmos arquivos — evita conflito de merge).
+
+## Plano 040 (2026-07-17, pós-rodada) — build completo do permalink
+
+Planos 031–038 mergeados e pushados na `main` (`8081abf`); 039 mergeado e
+depois revertido antes do push (protótipo não deveria expor rota pública
+sem estilo). O dono do produto decidiu retomar 039 como plano de build
+completo — três decisões de produto que a spike deixou em aberto foram
+resolvidas antes de escrever o plano 040:
+
+- **URL scheme**: id numérico (`/pesquisa/<id>`), não slug.
+- **SEO**: páginas devem ser indexáveis (sem `noindex`) — alinhado ao
+  critério de sucesso "ser citável" do `PRODUCT.md`. Não inclui construir
+  `sitemap.xml`/`robots.txt` (infraestrutura site-wide, fora de escopo).
+- **Open Graph**: incluído nesta primeira leva (`og:title`, `og:description`,
+  `og:image` com fallback estático, `og:type`) — não adiado.
+
+Opção B (permalink por candidato) continua fora de escopo do 040,
+propositalmente sequenciada como próximo plano depois que A estiver no ar
+(mesma recomendação da spike original).
 
 ## Rodada 2026-07-17 (planos 031–039)
 
