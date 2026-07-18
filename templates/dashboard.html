@@ -1399,28 +1399,47 @@
 
     // ─── Inicialização ────────────────────────────────────────
     async function inicializar() {
-      // Eventos antes dos gráficos para os marcadores já aparecerem no 1º render.
-      await Promise.all([carregarEventos(), carregarEventosRJ()]);
+      // Eager: Visão Geral + Presidente, para o eleitor casual ver algo
+      // completo sem rolar (PRODUCT.md, princípio 3 — escaneável antes de
+      // exaustivo).
+      await Promise.all([carregarEventos()]);
       await Promise.all([
         carregarVisaoGeral(),
         carregarKpisAvancados(),
-        carregarKpisAnaliseRJ(),
         carregarPresidente(),
-        carregarGovernador(),
-        carregarInstitutos(),
         carregarMediaAgregada(),
-        inicializarComparativo(),
         carregarHistoricoMulti(),
-        carregarHistoricoMultiRJ(),
         carregarAlertas(),
-        carregarAlertas('governador_rj', 'alertas-rj-container'),
         carregarSimulacao(),
-        carregarCenarioVitoriaRJ(),
-        carregarRegional(),
         carregarRejeicao('presidente', 'rejeicao-container'),
-        carregarRejeicao('governador_rj', 'rejeicao-rj-container'),
         carregarHouseEffects(),
+      ]);
+    }
+
+    let _governadorCarregado = false;
+    async function carregarSecaoGovernadorRJ() {
+      if (_governadorCarregado) return;
+      _governadorCarregado = true;
+      await Promise.all([carregarEventosRJ()]);
+      await Promise.all([
+        carregarKpisAnaliseRJ(),
+        carregarGovernador(),
+        carregarHistoricoMultiRJ(),
+        carregarAlertas('governador_rj', 'alertas-rj-container'),
+        carregarCenarioVitoriaRJ(),
+        carregarRejeicao('governador_rj', 'rejeicao-rj-container'),
         carregarHouseEffects('governador_rj', 'house-effects-rj-container'),
+      ]);
+    }
+
+    let _dadosCarregados = false;
+    async function carregarSecaoDados() {
+      if (_dadosCarregados) return;
+      _dadosCarregados = true;
+      await Promise.all([
+        carregarInstitutos(),
+        inicializarComparativo(),
+        carregarRegional(),
       ]);
     }
 
@@ -1459,6 +1478,26 @@
     sections.forEach(s => {
       const el = document.getElementById(s.id);
       if (el) observer.observe(el);
+    });
+
+    // Observer separado (não o de scroll-spy acima) para disparar o
+    // carregamento sob demanda das seções Governador RJ e Dados.
+    const lazyLoadTriggers = {
+      'secao-governador': carregarSecaoGovernadorRJ,
+      'secao-dados': carregarSecaoDados,
+    };
+    const lazyLoadObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const trigger = lazyLoadTriggers[entry.target.id];
+          if (trigger) trigger();
+        }
+      });
+    }, { rootMargin: '200px 0px', threshold: 0 });
+
+    Object.keys(lazyLoadTriggers).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) lazyLoadObserver.observe(el);
     });
   </script>
 {% endblock %}
