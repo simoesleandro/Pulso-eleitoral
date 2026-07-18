@@ -1,16 +1,20 @@
 # Implementation Plans
 
-Gerado pela skill `improve`. Três rodadas de auditoria: 2026-06-26 (planos
+Gerado pela skill `improve`. Quatro rodadas de auditoria: 2026-06-26 (planos
 001–005, segurança/baseline — concluída), **2026-07-07** (planos 006–017,
-confiabilidade/performance/higiene/produto) e **2026-07-16** (planos
+confiabilidade/performance/higiene/produto), **2026-07-16** (planos
 018–030, bugs de dado/UX/segurança/dívida técnica/produto — ver seção
-própria abaixo). Execute na ordem abaixo, respeitando as dependências. Cada
-executor: leia o plano inteiro antes de começar, honre as "STOP conditions"
-e atualize a linha de status ao terminar.
+própria abaixo) e **2026-07-17** (planos 031–039, correção/perf/dívida
+técnica/direção pós-split do `database.py` — ver seção própria abaixo).
+Execute na ordem abaixo, respeitando as dependências. Cada executor: leia o
+plano inteiro antes de começar, honre as "STOP conditions" e atualize a
+linha de status ao terminar.
 
 Planos 001–005 escritos contra o commit `2b49ba3`; planos 006–017 contra
 `b3b92ef`; planos 018–023 contra `8d3827f`; planos 024–030 contra `f53d533`
-(commit após o merge dos planos 018-023).
+(commit após o merge dos planos 018-023); planos 031–039 contra `0992d23`
+(commit após o merge dos planos 024-030 e a reorganização de IA do
+dashboard).
 
 ## Ordem de execução & status
 
@@ -46,10 +50,66 @@ Planos 001–005 escritos contra o commit `2b49ba3`; planos 006–017 contra
 | 028 | Acessibilidade básica do dashboard (headings, aria, gráficos) | P3 | M | — | DONE |
 | 030 | Estende Governador RJ (histórico/eventos/alertas/house-effects) | P3 | M | — | DONE |
 | 029 | Divide o god-module `database.py` em `db/` com façade de re-export | P4 | L | — | DONE |
+| 031 | Cacheia `/api/pesquisas/presidente` e `/governador-rj` | P2 | S | — | DONE (mergeado na main em `14ccf22`) |
+| 032 | Fecha conexão sqlite3 vazada em `_salvar_regional` sob exceção | P2 | S | — | DONE (mergeado na main, commit original `8922431` — teste do plano foi corrigido pelo executor, ver histórico) |
+| 033 | Remove `_media_intervalo` duplicada/morta em `db/pesquisas.py` | P3 | S | — | DONE (mergeado na main, commit original `b1d00da`) |
+| 034 | Loga exceções silenciosas em `db/usuarios.py`/`db/core.py` | P3 | S | — | DONE (mergeado na main, commit original `2199236`) |
+| 035 | Evita chamadas Gemini concorrentes em `/api/visao-geral/analise` | P3 | S | — | DONE (mergeado na main, commit original `a3d5d69`) |
+| 036 | Ativa WAL + busy_timeout no SQLite | P3 | S | — | DONE (mergeado na main, commit original `421870e`) |
+| 037 | Teste de fumaça: façade `database.py` cobre tudo em `db/*` | P3 | S | — | DONE (mergeado na main, commit original `9dc2872` — executor travou 1x, retomado via SendMessage) |
+| 038 | Carrega governador RJ e Dados sob demanda (lazy) no dashboard | P2 | M | 031* | DONE (mergeado na main, commit original `1df1211` — verificado em browser real, 13→25 requests) |
+| 039 | [SPIKE] Permalink citável por pesquisa/candidato | P3 | M | — | DONE, mas merge revertido antes do push (`4fc586f` reverte `1c3f40f`) — protótipo expunha rota pública sem estilo/OG tags; branch `advisor/039-spike-permalink-pesquisa-candidato` preservada com commit `3d2c2c3` e a recomendação em `docs/spike-permalink-pesquisa.md` (só acessível nesse branch) pra quem quiser retomar como plano de build de verdade |
 
 Valores de status: TODO | IN PROGRESS | DONE | BLOCKED (motivo em uma linha) | REJECTED (motivo).
 Dependências em **negrito** são obrigatórias; com `*` são só ordem recomendada
 (mesmos arquivos — evita conflito de merge).
+
+## Rodada 2026-07-17 (planos 031–039)
+
+Auditoria completa padrão (correção/bugs, cobertura de testes, dívida
+técnica, segurança, performance, dependências, DX, docs, direção) disparada
+um dia depois do merge dos planos 024–030, focada especialmente no split do
+`database.py` em `db/*` (plano 029, o mais arriscado da leva anterior) e na
+extensão de Governador RJ (plano 030). Segurança voltou limpa — nada novo
+além do que já estava no backlog; `/admin/apply-db` reconfirmado fail-closed
+via `hmac.compare_digest`, validação de traversal e integridade do SQLite
+recebido.
+
+Achados confirmados e selecionados para plano nesta rodada: 031 (cache
+faltante em 2 endpoints), 032 (vazamento de conexão sqlite3), 033 (código
+morto — cópia duplicada de `_media_intervalo`), 034 (except silencioso sem
+log em CRUD de usuários), 035 (race condition na chamada Gemini de
+`/api/visao-geral/analise`), 036 (SQLite sem WAL/busy_timeout — "database is
+locked" reproduzido com escrita concorrente), 037 (teste de fumaça para a
+completude da façade `database.py`), 038 (home carrega 20 requests em
+paralelo, tensão com o princípio 3 do `PRODUCT.md`), 039 (spike: permalink
+citável por pesquisa/candidato, grounded no `PRODUCT.md`).
+
+Ordem recomendada: **031 → 032 → 033 → 034 primeiro** (independentes entre
+si, S de esforço, arquivos diferentes — dá pra rodar em paralelo sem
+conflito de merge); **035, 036, 037** em qualquer ordem depois (também
+independentes, mas tocam lógica mais sensível de concorrência/schema);
+**038** depois de 031 (mesmo arquivo `dashboard.html`, mais fácil de
+revisar já com o cache dos dois endpoints em vigor); **039** (spike) pode
+rodar a qualquer momento, é exploratório e não bloqueia nada.
+
+**Correção de contexto que veio à tona nesta auditoria**: o
+`collectors/paraná_pesquisas.py`, listado em rodadas anteriores como stub
+com `fetch()` retornando `[]`, foi implementado e validado ao vivo em
+2026-07-10 e já está em `ALL_COLLECTORS` — não é mais stub. O item
+correspondente no backlog de "validações pendentes" está desatualizado.
+
+### Achados considerados e rejeitados nesta rodada (para não re-auditar)
+
+- Duplicação de `_norm`/`HEADERS` entre coletores: já rastreado no backlog
+  de rodadas anteriores, não re-selecionado (não piorou, sem novo caller).
+- SSRF TOCTOU em `_url_segura`: já rastreado, nada novo encontrado nesta
+  passada.
+- Injeção de prompt de 2ª ordem (nomes extraídos de fontes scrapeadas):
+  já rastreado, severidade baixa reconfirmada, não re-selecionado.
+- Divergência de versão Python no lockfile (3.12 geração vs. 3.11
+  produção/CI): reconfirmado como risco latente de baixa confiança, não
+  virou plano.
 
 ## Rodada 2026-07-16 (planos 018–023)
 
