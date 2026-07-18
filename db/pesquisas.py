@@ -503,6 +503,34 @@ def get_historico_candidato(candidato: str) -> list[dict]:
         conn.close()
 
 
+def get_pesquisa_por_id(pesquisa_id: int) -> dict | None:
+    """Retorna o detalhe completo de uma pesquisa (metodologia + intenções), ou None se não existir."""
+    with get_db() as conn:
+        pesquisa_row = conn.execute("""
+            SELECT p.id, p.cargo, p.data_pesquisa, p.data_publicacao,
+                   p.tamanho_amostra, p.margem_erro, p.contratante,
+                   p.registro_tse, p.fonte_url,
+                   inst.nome AS instituto
+            FROM pesquisas p
+            JOIN institutos inst ON p.instituto_id = inst.id
+            WHERE p.id = ?
+        """, (pesquisa_id,)).fetchone()
+
+        if pesquisa_row is None:
+            return None
+
+        intencoes_rows = conn.execute("""
+            SELECT candidato, partido, percentual, tipo
+            FROM intencoes
+            WHERE pesquisa_id = ?
+            ORDER BY percentual DESC
+        """, (pesquisa_id,)).fetchall()
+
+    pesquisa = dict(pesquisa_row)
+    pesquisa["intencoes"] = [dict(row) for row in intencoes_rows]
+    return pesquisa
+
+
 def get_institutos_com_totais() -> list[dict]:
     """Retorna a lista de institutos cadastrados junto com a contagem total de pesquisas e a data da última."""
     conn = get_conn()

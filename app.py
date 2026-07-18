@@ -170,7 +170,8 @@ def require_login():
         'api_rejeicao',
         'api_eventos',
         'api_house_effects',
-        'apply_db'
+        'apply_db',
+        'pesquisa_detalhe',
     ]
     if request.endpoint in allowed_endpoints:
         return
@@ -629,6 +630,17 @@ def dashboard():
 def metodologia():
     """Página de metodologia — como o sistema funciona."""
     return render_template('metodologia.html')
+
+@app.route('/pesquisa/<int:pesquisa_id>')
+def pesquisa_detalhe(pesquisa_id):
+    """Permalink público de uma pesquisa individual — instituto, metodologia
+    completa e intenções de voto, para citação em matérias jornalísticas."""
+    from database import get_pesquisa_por_id, get_cores_candidatos
+    pesquisa = get_pesquisa_por_id(pesquisa_id)
+    if pesquisa is None:
+        return "Pesquisa não encontrada.", 404
+    cores_candidatos = get_cores_candidatos()
+    return render_template('pesquisa_detalhe.html', pesquisa=pesquisa, cores_candidatos=cores_candidatos)
 
 @app.route('/api/pesquisas/presidente')
 @cache.cached(timeout=300)

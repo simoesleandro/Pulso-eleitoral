@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% set cargo_label = 'Presidente' if pesquisa.cargo == 'presidente' else 'Governador RJ' %}
+
+{% block title %}{{ pesquisa.instituto }} — {{ cargo_label }} ({{ pesquisa.data_pesquisa }}) — Pulso Eleitoral{% endblock %}
+
+{% block head_meta %}
+  <meta property="og:title" content="{{ pesquisa.instituto }} — {{ cargo_label }} ({{ pesquisa.data_pesquisa }})">
+  <meta property="og:description" content="Pesquisa eleitoral {{ pesquisa.instituto }}, {{ pesquisa.data_pesquisa }}. Ver intenções de voto completas no Pulso Eleitoral.">
+  <meta property="og:type" content="article">
+  <meta name="description" content="Pesquisa eleitoral {{ pesquisa.instituto }} para {{ cargo_label }}, período de campo {{ pesquisa.data_pesquisa }}, registro TSE {{ pesquisa.registro_tse }}. Intenções de voto completas no Pulso Eleitoral.">
+{% endblock %}
+
+{% block head %}
+  <style>
+    .pd-hero {
+      background: var(--pe-navy);
+      padding: 40px 24px 32px;
+      text-align: center;
+    }
+    .pd-hero__cargo {
+      display: inline-block;
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+    }
+    .pd-hero__title {
+      color: #fff;
+      font-size: 26px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .pd-hero__sub {
+      color: rgba(255,255,255,0.6);
+      font-size: 14px;
+    }
+
+    .pd-content-wrap { max-width: 800px; margin: 0 auto; padding-top: 32px; padding-bottom: 48px; }
+
+    .pd-section { margin-bottom: 32px; }
+    .pd-section__title {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--pe-navy);
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--pe-surface);
+    }
+
+    /* Metodologia */
+    .pd-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+    }
+    .pd-meta-item {
+      background: var(--pe-surface);
+      border-radius: 6px;
+      padding: 12px 14px;
+    }
+    .pd-meta-item__label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      color: var(--pe-text-muted);
+      margin-bottom: 4px;
+    }
+    .pd-meta-item__value {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--pe-text);
+      word-break: break-word;
+    }
+    .pd-meta-item__value a { color: var(--pe-navy); }
+
+    /* Candidatos */
+    .pd-candidato {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--pe-surface-2);
+      border: 1px solid var(--pe-surface);
+      border-left: 4px solid var(--pe-cand-3);
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    .pd-candidato__nome { font-weight: 500; color: var(--pe-text); flex: 1; }
+    .pd-candidato__partido { font-size: 12px; color: var(--pe-text-muted); margin-left: 6px; }
+    .pd-candidato__tipo {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+      color: var(--pe-text-muted);
+      background: var(--pe-surface);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .pd-candidato__pct {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--pe-navy);
+      min-width: 56px;
+      text-align: right;
+    }
+
+    .pd-back {
+      display: inline-block;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--pe-text-muted);
+      text-decoration: none;
+    }
+    .pd-back:hover { color: var(--pe-navy); }
+  </style>
+{% endblock %}
+
+{% block topbar_nav %}
+  <a class="pe-topbar__nav-item" href="/dashboard">Dashboard</a>
+  <a class="pe-topbar__nav-item" href="/metodologia">Metodologia</a>
+{% endblock %}
+
+{% block before_content %}
+  <div class="pd-hero">
+    <div class="pd-hero__cargo">{{ cargo_label }}</div>
+    <div class="pd-hero__title">{{ pesquisa.instituto }}</div>
+    <p class="pd-hero__sub">Pesquisa de campo em {{ pesquisa.data_pesquisa }} — publicada em {{ pesquisa.data_publicacao }}</p>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="pd-content-wrap">
+    <a class="pd-back" href="/dashboard">&larr; Voltar ao dashboard</a>
+
+    <section class="pd-section">
+      <h2 class="pd-section__title">Metodologia</h2>
+      <div class="pd-meta-grid">
+        <div class="pd-meta-item">
+          <div class="pd-meta-item__label">Instituto</div>
+          <div class="pd-meta-item__value">{{ pesquisa.instituto }}</div>
+        </div>
+        <div class="pd-meta-item">
+          <div class="pd-meta-item__label">Cargo</div>
+          <div class="pd-meta-item__value">{{ cargo_label }}</div>
+        </div>
+        <div class="pd-meta-item">
+          <div class="pd-meta-item__label">Período de campo</div>
+          <div class="pd-meta-item__value">{{ pesquisa.data_pesquisa }}</div>
+        </div>
+        <div class="pd-meta-item">
+          <div class="pd-meta-item__label">Data de publicação</div>
+          <div class="pd-meta-item__value">{{ pesquisa.data_publicacao }}</div>
+        </div>
+        <div class="pd-meta-item">
+          <div class="pd-meta-item__label">Tamanho da amostra</div>
+          <div class="pd-meta-item__value">{{ pesquisa.tamanho_amostra }} entrevistas</div>
+        </div>
+        <div class="pd-meta-item">
+          <div class="pd-meta-item__label">Margem de erro</div>
+          <div class="pd-meta-item__value">± {{ pesquisa.margem_erro }} p.p.</div>
+        </div>
+        {% if pesquisa.contratante %}
+        <div class="pd-meta-item">
+          <div class="pd-meta-item__label">Contratante</div>
+          <div class="pd-meta-item__value">{{ pesquisa.contratante }}</div>
+        </div>
+        {% endif %}
+        <div class="pd-meta-item">
+          <div class="pd-meta-item__label">Registro TSE</div>
+          <div class="pd-meta-item__value">{{ pesquisa.registro_tse }}</div>
+        </div>
+        {% if pesquisa.fonte_url %}
+        <div class="pd-meta-item">
+          <div class="pd-meta-item__label">Fonte</div>
+          <div class="pd-meta-item__value"><a href="{{ pesquisa.fonte_url }}" target="_blank" rel="noopener noreferrer">Ver divulgação original</a></div>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="pd-section">
+      <h2 class="pd-section__title">Intenções de voto</h2>
+      {% for i in pesquisa.intencoes %}
+        {% set cor = cores_candidatos.get(i.candidato) %}
+        <div class="pd-candidato"{% if cor %} style="border-left-color: {{ cor }};"{% endif %}>
+          <span class="pd-candidato__nome">
+            {{ i.candidato }}{% if i.partido %}<span class="pd-candidato__partido">({{ i.partido }})</span>{% endif %}
+          </span>
+          <span class="pd-candidato__tipo">{{ 'Espontânea' if i.tipo == 'espontanea' else 'Estimulada' }}</span>
+          <span class="pd-candidato__pct">{{ i.percentual }}%</span>
+        </div>
+      {% endfor %}
+    </section>
+  </div>
+{% endblock %}
