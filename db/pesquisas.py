@@ -423,17 +423,6 @@ def get_dados_regionais() -> dict:
     return {"candidatos": candidatos, "estados": estados}
 
 
-def _media_intervalo(pontos: list[tuple[str, float]], inicio: str, fim: str = None):
-    """Média dos percentuais com data_pesquisa em [inicio, fim) — ou
-    [inicio, ...] se fim for None. Retorna None se não houver pontos no
-    intervalo (equivalente a um AVG(...) SQL retornando NULL)."""
-    if fim:
-        vals = [pct for dt, pct in pontos if inicio <= dt < fim]
-    else:
-        vals = [pct for dt, pct in pontos if dt >= inicio]
-    return mean(vals) if vals else None
-
-
 def get_top_candidatos(cargo: str, n: int = 3) -> list[str]:
     """Retorna os n candidatos com maior percentual médio para o cargo."""
     with get_db() as conn:
