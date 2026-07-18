@@ -12,3 +12,7 @@ logs/
 
 # Scripts e arquivos descartáveis (debug/fixes pontuais)
 scratch/
+
+# Artefatos locais de tooling
+pulso.db
+.impeccable/
