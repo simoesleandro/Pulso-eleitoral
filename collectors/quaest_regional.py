@@ -84,6 +84,8 @@ class QuaestRegionalColetor(BaseCollector):
         data_ref = data_pesquisa or hoje
         try:
             conn = sqlite3.connect(self.db_path)
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA busy_timeout=10000;")
             inseridos = 0
             for r in registros:
                 uf = r.get("uf", "").upper().strip()
