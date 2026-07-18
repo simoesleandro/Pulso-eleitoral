@@ -162,7 +162,8 @@ def require_login():
         'api_rejeicao',
         'api_eventos',
         'api_house_effects',
-        'apply_db'
+        'apply_db',
+        'pesquisa_detalhe',  # protótipo de permalink público (spike 039)
     ]
     if request.endpoint in allowed_endpoints:
         return
@@ -593,6 +594,20 @@ def dashboard():
 def metodologia():
     """Página de metodologia — como o sistema funciona."""
     return render_template('metodologia.html')
+
+@app.route('/pesquisa/<int:pesquisa_id>')
+def pesquisa_detalhe(pesquisa_id):
+    """Protótipo de permalink por pesquisa (spike, plano 039).
+
+    Não é rota de produção — página sem estilo, existe só para provar que a
+    query/rota funcionam de ponta a ponta. Ver plans/spike-permalink-pesquisa.md
+    (ou docs/ equivalente) para a recomendação completa.
+    """
+    from database import get_pesquisa_por_id
+    pesquisa = get_pesquisa_por_id(pesquisa_id)
+    if pesquisa is None:
+        return "Pesquisa não encontrada", 404
+    return render_template('pesquisa_detalhe_spike.html', pesquisa=pesquisa)
 
 @app.route('/api/pesquisas/presidente')
 def api_pesquisas_presidente():
