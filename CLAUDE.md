@@ -21,7 +21,8 @@ importe `app` em contexto de teste precisa do mesmo cuidado.
 
 `app.py` roda localmente como serviço Windows (WinSW, `PulsoEleitoral.xml`)
 com um `BackgroundScheduler` interno que dispara `run_all_collectors()` às
-10h e 20h (`app.py`, gate: desliga sob `TESTING=True` e sob `FLY_APP_NAME`) →
+segundas e quintas, 10h (`app.py`, 2x/semana para poupar a cota de gasto
+mensal do Gemini; gate: desliga sob `TESTING=True` e sob `FLY_APP_NAME`) →
 coleta com todos os `ALL_COLLECTORS` (`collectors/__init__.py`, fonte única
 de verdade da lista — `coletar.py` também importa dali) → grava em SQLite
 local → se houve pesquisa/intenção nova, chama `sync_para_fly()`

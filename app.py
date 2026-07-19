@@ -143,10 +143,11 @@ def run_all_collectors():
 
     return resultados
 
-# Registra o job diário às 10h00 e 20h00 no scheduler
+# Registra o job de coleta às segundas e quintas, 10h00 — 2x/semana para
+# poupar a cota de gasto mensal do Gemini (ver plans/README.md).
 scheduler.add_job(
     run_all_collectors,
-    CronTrigger(hour='10,20', minute=0),
+    CronTrigger(day_of_week='mon,thu', hour=10, minute=0),
     id='coleta_diaria',
     replace_existing=True
 )

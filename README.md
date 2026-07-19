@@ -229,7 +229,7 @@ Pulso-eleitoral/
 **Fluxo principal / Main flow:**
 
 ```
-Serviço Windows (WinSW) roda app.py 24/7 → scheduler interno dispara às 10h e 20h
+Serviço Windows (WinSW) roda app.py 24/7 → scheduler interno dispara seg/qui às 10h
       ↓
 Playwright abre browser → coleta HTML do instituto
       ↓
