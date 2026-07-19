@@ -108,22 +108,17 @@ def _parse_num(valor, tipo, default):
 scheduler = BackgroundScheduler()
 
 def run_all_collectors():
-    """Roda todos os coletores cadastrados sequencialmente e salva log de execução."""
-    from collectors.datafolha import DatafolhaCollector
-    from collectors.quaest import QuaestCollector
-    from collectors.gazetadopovo import GazetaDoPovoColetor
-    from collectors.atlas import AtlasCollector
-    from collectors.poder360 import Poder360Collector
-    from database import salvar_log_scheduler
+    """Roda todos os coletores cadastrados sequencialmente, salva log de execução
+    e sincroniza com o Fly.io se houve dado novo (mesmo contrato de coletar.py)."""
+    from collectors import ALL_COLLECTORS
+    from database import salvar_log_scheduler, get_db
 
-    coletores = [
-        DatafolhaCollector(db_path=DB_PATH),
-        QuaestCollector(db_path=DB_PATH),
-        GazetaDoPovoColetor(db_path=DB_PATH),
-        AtlasCollector(db_path=DB_PATH),
-        Poder360Collector(db_path=DB_PATH),
-    ]
-    
+    with get_db() as conn:
+        p_antes = conn.execute("SELECT COUNT(*) FROM pesquisas").fetchone()[0]
+        i_antes = conn.execute("SELECT COUNT(*) FROM intencoes").fetchone()[0]
+
+    coletores = [cls(db_path=DB_PATH) for cls in ALL_COLLECTORS]
+
     resultados = []
     for c in coletores:
         try:
@@ -131,15 +126,27 @@ def run_all_collectors():
             resultados.append({"coletor": c.__class__.__name__, "status": "ok"})
         except Exception as e:
             resultados.append({"coletor": c.__class__.__name__, "status": "erro", "msg": str(e)})
-            
+
     # Salva o log de execução no banco SQLite
     salvar_log_scheduler(resultados)
+
+    with get_db() as conn:
+        p_depois = conn.execute("SELECT COUNT(*) FROM pesquisas").fetchone()[0]
+        i_depois = conn.execute("SELECT COUNT(*) FROM intencoes").fetchone()[0]
+
+    pesquisas_novas = max(0, p_depois - p_antes)
+    intencoes_novas = max(0, i_depois - i_antes)
+
+    if pesquisas_novas > 0 or intencoes_novas > 0:
+        from scripts.sync_db import sync_para_fly
+        sync_para_fly()
+
     return resultados
 
-# Registra o job diário às 08h00 no scheduler
+# Registra o job diário às 10h00 e 20h00 no scheduler
 scheduler.add_job(
     run_all_collectors,
-    CronTrigger(hour=8, minute=0),
+    CronTrigger(hour='10,20', minute=0),
     id='coleta_diaria',
     replace_existing=True
 )

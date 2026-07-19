@@ -1,3 +1,3 @@
 @echo off
-cd /d C:\Meus_projetos\Pulso_Eleitoral
-C:\Users\stife\AppData\Local\Programs\Python\Python312\python.exe app.py
+cd /d C:\Projetos\Pulso-eleitoral
+C:\Projetos\Pulso-eleitoral\.venv\Scripts\python.exe app.py

@@ -2,6 +2,7 @@
 
 from .datafolha import DatafolhaCollector
 from .quaest import QuaestCollector
+from .gazetadopovo import GazetaDoPovoColetor
 from .atlas import AtlasCollector
 from .poder360 import Poder360Collector
 from .verita import VeritaCollector
@@ -15,6 +16,7 @@ from .paraná_pesquisas import ParanaPesquisasCollector
 ALL_COLLECTORS = [
     DatafolhaCollector,
     QuaestCollector,
+    GazetaDoPovoColetor,
     AtlasCollector,
     Poder360Collector,
     VeritaCollector,

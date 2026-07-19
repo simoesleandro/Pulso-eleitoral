@@ -2,11 +2,11 @@
   <id>PulsoEleitoral</id>
   <name>Pulso Eleitoral</name>
   <description>Radar de pesquisas eleitorais 2026 - porta 5080</description>
-  <executable>C:\Users\stife\AppData\Local\Programs\Python\Python312\python.exe</executable>
-  <arguments>C:\Meus_projetos\Pulso_Eleitoral\app.py</arguments>
-  <workingdirectory>C:\Meus_projetos\Pulso_Eleitoral</workingdirectory>
+  <executable>C:\Projetos\Pulso-eleitoral\.venv\Scripts\python.exe</executable>
+  <arguments>C:\Projetos\Pulso-eleitoral\app.py</arguments>
+  <workingdirectory>C:\Projetos\Pulso-eleitoral</workingdirectory>
   <logmode>rotate</logmode>
-  <logpath>C:\Meus_projetos\Pulso_Eleitoral\logs</logpath>
+  <logpath>C:\Projetos\Pulso-eleitoral\logs</logpath>
   <startmode>Automatic</startmode>
   <onfailure action="restart" delay="10 sec"/>
   <onfailure action="restart" delay="30 sec"/>

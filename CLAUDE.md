@@ -19,12 +19,19 @@ importe `app` em contexto de teste precisa do mesmo cuidado.
 
 ## Arquitetura em 5 linhas
 
-Task Scheduler local (10h) → `coletar.py` roda os coletores (Playwright +
-Gemini) → grava em SQLite local → se houve dado novo, `scripts/sync_db.py`
-sobe o arquivo e chama `POST /admin/apply-db` → Fly.io troca `/data/pulso.db`
-e reinicia o processo → dashboard público serve os dados. **O Fly nunca
-coleta** — o scheduler do `app.py` só roda localmente (gate em `app.py:117`:
-desliga sob `TESTING=True` e sob `FLY_APP_NAME`).
+`app.py` roda localmente como serviço Windows (WinSW, `PulsoEleitoral.xml`)
+com um `BackgroundScheduler` interno que dispara `run_all_collectors()` às
+10h e 20h (`app.py`, gate: desliga sob `TESTING=True` e sob `FLY_APP_NAME`) →
+coleta com todos os `ALL_COLLECTORS` (`collectors/__init__.py`, fonte única
+de verdade da lista — `coletar.py` também importa dali) → grava em SQLite
+local → se houve pesquisa/intenção nova, chama `sync_para_fly()`
+(`scripts/sync_db.py`) automaticamente, que sobe o arquivo e chama
+`POST /admin/apply-db` → Fly.io troca `/data/pulso.db` e reinicia o processo
+→ dashboard público serve os dados. **O Fly nunca coleta**. `coletar.py`
+continua existindo para coleta manual/ad-hoc e replica o mesmo contrato
+(conta pesquisas/intenções antes/depois, sincroniza só se houve dado novo),
+mas também envia notificações Telegram e roda alerta de variação brusca —
+coisas que o scheduler interno do `app.py` não faz.
 
 ## Regras que quebram deploy ou banco de produção
 

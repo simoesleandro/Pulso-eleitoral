@@ -34,15 +34,7 @@ def main():
     import database
     DB_PATH = database.DB_PATH
     
-    from collectors.datafolha import DatafolhaCollector
-    from collectors.quaest import QuaestCollector
-    from collectors.gazetadopovo import GazetaDoPovoColetor
-    from collectors.atlas import AtlasCollector
-    from collectors.poder360 import Poder360Collector
-    from collectors.verita import VeritaCollector
-    from collectors.cnn_brasil import CnnBrasilColetor
-    from collectors.quaest_regional import QuaestRegionalColetor
-    from collectors.paraná_pesquisas import ParanaPesquisasCollector
+    from collectors import ALL_COLLECTORS
     from database import salvar_log_scheduler
     from notifier import send_telegram, montar_mensagem_coleta
 
@@ -52,17 +44,7 @@ def main():
         i_antes = conn.execute("SELECT COUNT(*) FROM intencoes").fetchone()[0]
         max_id_antes = conn.execute("SELECT COALESCE(MAX(id), 0) FROM pesquisas").fetchone()[0]
 
-    coletores = [
-        DatafolhaCollector(db_path=DB_PATH),
-        QuaestCollector(db_path=DB_PATH),
-        GazetaDoPovoColetor(db_path=DB_PATH),
-        AtlasCollector(db_path=DB_PATH),
-        Poder360Collector(db_path=DB_PATH),
-        VeritaCollector(db_path=DB_PATH),
-        CnnBrasilColetor(db_path=DB_PATH),
-        QuaestRegionalColetor(db_path=DB_PATH),
-        ParanaPesquisasCollector(db_path=DB_PATH),
-    ]
+    coletores = [cls(db_path=DB_PATH) for cls in ALL_COLLECTORS]
     
     resultados = []
     for c in coletores:
