@@ -180,3 +180,30 @@ def test_sincronizar_preserva_o_casamento_ja_feito():
     ).fetchone()
     assert linha["pesquisa_id"] == 7, "o upsert não pode zerar o casamento"
     conn.close()
+
+
+def test_sincronizar_tse_nao_chama_gemini(monkeypatch, tmp_path):
+    """O sync do TSE é gratuito por contrato — nunca pode tocar no Gemini."""
+    from pathlib import Path
+
+    import database
+    import scripts.sync_tse as sync_tse
+
+    monkeypatch.setattr(database, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(database, "DB_PATH", str(tmp_path / "pulso_test.db"))
+    database.init_db(force_seed=False)
+
+    fixture = (Path(__file__).parent / "fixtures" / "tse_amostra.csv").read_bytes()
+    monkeypatch.setattr(sync_tse, "baixar_zip", lambda url=None: b"zip-falso")
+    monkeypatch.setattr(sync_tse, "extrair_csv", lambda zip_bytes, nome: fixture)
+
+    def explodir(*args, **kwargs):
+        raise AssertionError("sync do TSE não pode chamar o Gemini")
+
+    monkeypatch.setattr("collectors.gemini_extractor.gerar_com_cascata", explodir)
+
+    resultado = sync_tse.sincronizar_tse(dry_run=True)
+
+    assert resultado["presidente"]["inseridos"] > 0
+    assert resultado["governador_rj"]["inseridos"] > 0
+    assert "casamento" in resultado

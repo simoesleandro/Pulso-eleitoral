@@ -111,9 +111,17 @@ def casar(conn: sqlite3.Connection, cargo: str, dry_run: bool = True) -> dict:
                 "UPDATE pesquisas_tse SET pesquisa_id = ? WHERE protocolo = ?",
                 (par["pesquisa_id"], par["protocolo"]),
             )
+            # A amostra do TSE é a REGISTRADA (planejada); o release publica a
+            # REALIZADA, que pode diferir (visto: 2000 registrado vs 2003
+            # realizado). Só preenche quando falta — nunca sobrescreve um
+            # valor real por um planejado.
             conn.execute("""
                 UPDATE pesquisas
-                SET tamanho_amostra = ?, data_pesquisa = ?, registro_tse = ?
+                SET tamanho_amostra = CASE
+                        WHEN tamanho_amostra IS NULL OR tamanho_amostra = 0
+                        THEN ? ELSE tamanho_amostra END,
+                    data_pesquisa = ?,
+                    registro_tse = ?
                 WHERE id = ?
             """, (par["amostra_tse"], par["data_tse"], par["protocolo"],
                   par["pesquisa_id"]))

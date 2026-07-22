@@ -143,3 +143,17 @@ def test_instituto_sem_cnpj_nao_casa():
 
     assert resultado["casados"] == []
     conn.close()
+
+
+def test_backfill_nao_sobrescreve_amostra_realizada():
+    """O TSE guarda a amostra registrada (planejada); o release publica a
+    realizada. Visto em produção: 2000 registrado vs 2003 realizado."""
+    conn = _conn()
+    _tse(conn, "BR000012026", "2026-07-01", "2026-07-03", "2026-07-05", amostra=2000)
+    pid = _pesquisa(conn, "2026-07-05", amostra=2003)
+
+    casar(conn, cargo="presidente", dry_run=False)
+
+    amostra = conn.execute(
+        "SELECT tamanho_amostra FROM pesquisas WHERE id = ?", (pid,)).fetchone()[0]
+    assert amostra == 2003, "amostra realizada não pode ser sobrescrita pela registrada"

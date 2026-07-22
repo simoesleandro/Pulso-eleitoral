@@ -112,6 +112,12 @@ def init_db(force_seed=False):
     from scripts.migrate_pesquisas_tse import popular_cnpjs as _popular_cnpjs
     _popular_cnpjs(conn)
 
+    # Migration idempotente: funde pesquisas duplicadas pela chave sintética
+    # de URL (ver scripts/migrate_dedup_pesquisas.py). Roda depois do seed
+    # porque precisa das pesquisas já carregadas.
+    from scripts.migrate_dedup_pesquisas import aplicar_migracao as _aplicar_dedup
+    _aplicar_dedup(conn)
+
     # 2b. Executa o seed_demo_pesquisas.sql (pesquisas FICTÍCIAS de demonstração)
     # só sob TESTING ou force_seed explícito, e só se pesquisas ainda estiver
     # vazia (idempotente — evita UNIQUE constraint se init_db() rodar de novo
