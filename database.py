@@ -46,6 +46,8 @@ from db.candidatos import (
 )
 
 # ─── Eventos da campanha (F4 do PRD: marcadores no gráfico) ────────────────
+from db.cobertura import (agendadas, contar_fila, em_campo_hoje,
+                          fila_de_trabalho, institutos_para_descobrir)
 from db.eventos import listar_eventos, criar_evento, remover_evento
 
 # ─── Pesquisas: comparativos, poll-of-polls, house effects, séries ─────────
