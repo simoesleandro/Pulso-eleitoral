@@ -23,14 +23,23 @@ um instituto não é um poll-of-polls.
 
 Além da cobertura, quatro defeitos corrompem os números que já existem:
 
-1. **Datafolha entra com peso zero.** As 5 pesquisas do Datafolha têm
-   `tamanho_amostra = 0`. A agregação pondera por `amostra × 0.9^dias`, logo o
-   instituto contribui nada.
+1. **Datafolha entra subponderado.** As 5 pesquisas do Datafolha têm
+   `tamanho_amostra = 0`. A agregação já tem guarda em `db/pesquisas.py:255`
+   (`amostra if amostra > 0 else 1000`), então o instituto **não** é anulado —
+   entra com peso 1000 em vez dos ~2004 reais, cerca de metade do devido.
+   Bug real, de severidade modesta: com a janela padrão de 30 dias a pesquisa
+   de março sequer é incluída. O backfill do TSE corrige a distorção sem
+   precisar mexer na guarda.
 2. **A mesma pesquisa entra duas vezes.** `registro_tse` é sintético —
    `GEN-{inst}-{cargo}-{data_coleta}-{sha1(url)}` (`collectors/base.py:195`).
    A chave usa a URL da matéria, então duas matérias sobre a mesma pesquisa
-   viram duas pesquisas (ids 27 e 28: Real Time, 2026-07-20, n=2000). A chave
-   também embute a data da coleta, então recoletar duplica de novo.
+   viram duas pesquisas. Confirmado nos ids 27 e 28 (Real Time, 2026-07-20,
+   n=2000, me=2.0) — e a id 27 é uma extração **truncada**, com 2 candidatos
+   contra 6 da id 28. A média escolhe uma pesquisa por instituto e o desempate
+   por id maior salva a completa por acaso, mas a `variacao_30d`
+   (`db/pesquisas.py:293`) usa todas as pesquisas da janela, então o valor
+   duplicado entra duas vezes no sinal de variação. A chave também embute a
+   data da coleta, então recoletar duplica de novo.
 3. **`data_pesquisa == data_publicacao` nas 14 linhas.** O período de campo
    nunca é extraído. Como a recência é `0.9^dias`, toda pesquisa é tratada
    como mais fresca do que é — erro sistemático, sempre na mesma direção.
@@ -134,9 +143,10 @@ ao percentil 90 das amostras dos institutos aprovados no mesmo cargo.
 
 ## Correções destravadas
 
-1. **Amostra real.** Backfill do `QT_ENTREVISTADO`. Além disso, amostra
-   ausente não pode virar peso zero silencioso: exclui a pesquisa com log ou
-   usa a mediana do instituto.
+1. **Amostra real.** Backfill do `QT_ENTREVISTADO`, substituindo o fallback
+   fixo de 1000 pelo valor registrado. A guarda de `db/pesquisas.py:255`
+   permanece como está — ela já impede peso zero; o que muda é que ela deixa
+   de ser acionada quando o TSE conhece a amostra.
 2. **Deduplicação.** `registro_tse` passa a ser o protocolo quando há
    casamento. Exige migração que funda as duplicatas existentes antes de
    criar o índice único.
@@ -144,8 +154,9 @@ ao percentil 90 das amostras dos institutos aprovados no mesmo cargo.
 4. **Status `"vazio"`** no retorno de `run()`, distinto de `"ok"`. A fila do
    TSE vira o detector real de coletor quebrado.
 
-As correções 1 e o teto de peso mudam a fórmula de agregação. Conforme o
-`CLAUDE.md`, `tests/test_agregacao.py` e `/metodologia` mudam no mesmo commit.
+Das correções acima, só o **teto de peso** altera a fórmula de agregação — as
+demais mudam dados, não cálculo. Conforme o `CLAUDE.md`,
+`tests/test_agregacao.py` e `/metodologia` mudam no mesmo commit que o teto.
 
 ## Ondas
 
