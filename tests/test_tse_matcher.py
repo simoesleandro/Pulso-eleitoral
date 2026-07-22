@@ -145,6 +145,49 @@ def test_instituto_sem_cnpj_nao_casa():
     conn.close()
 
 
+def test_aplicar_ligacao_isolada():
+    """A ligação é reusável fora do casamento automático (ligação manual)."""
+    from tse.matcher import aplicar_ligacao
+
+    conn = _conn()
+    _tse(conn, "BR000012026", "2026-07-01", "2026-07-03", "2026-07-05", amostra=2004)
+    pid = _pesquisa(conn, "2026-07-05", amostra=0)
+
+    aplicar_ligacao(conn, protocolo="BR000012026", pesquisa_id=pid,
+                    amostra_tse=2004, data_fim="2026-07-03")
+    conn.commit()
+
+    tse = conn.execute("SELECT pesquisa_id FROM pesquisas_tse WHERE protocolo = ?",
+                       ("BR000012026",)).fetchone()
+    pesquisa = conn.execute(
+        "SELECT tamanho_amostra, data_pesquisa, registro_tse FROM pesquisas WHERE id = ?",
+        (pid,)).fetchone()
+
+    assert tse["pesquisa_id"] == pid
+    assert pesquisa["tamanho_amostra"] == 2004
+    assert pesquisa["data_pesquisa"] == "2026-07-03"
+    assert pesquisa["registro_tse"] == "BR000012026"
+    conn.close()
+
+
+def test_aplicar_ligacao_preserva_amostra_realizada():
+    """Mesma regra do casamento automático, agora na função extraída."""
+    from tse.matcher import aplicar_ligacao
+
+    conn = _conn()
+    _tse(conn, "BR000012026", "2026-07-01", "2026-07-03", "2026-07-05", amostra=2000)
+    pid = _pesquisa(conn, "2026-07-05", amostra=2003)
+
+    aplicar_ligacao(conn, protocolo="BR000012026", pesquisa_id=pid,
+                    amostra_tse=2000, data_fim="2026-07-03")
+    conn.commit()
+
+    amostra = conn.execute(
+        "SELECT tamanho_amostra FROM pesquisas WHERE id = ?", (pid,)).fetchone()[0]
+    assert amostra == 2003
+    conn.close()
+
+
 def test_backfill_nao_sobrescreve_amostra_realizada():
     """O TSE guarda a amostra registrada (planejada); o release publica a
     realizada. Visto em produção: 2000 registrado vs 2003 realizado."""
