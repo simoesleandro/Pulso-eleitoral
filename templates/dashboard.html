@@ -255,6 +255,15 @@
 
     <!-- SEÇÃO 4: DADOS -->
     <section id="secao-dados" class="pe-section">
+      <div class="pe-card" id="em-campo-card" hidden style="margin-bottom: var(--pe-space-6);">
+        <div class="pe-card__title">Em campo agora</div>
+        <div id="em-campo-container"></div>
+        <p class="pe-mono" style="color:var(--pe-text-muted); font-size:11px; margin-top:var(--pe-space-3);">
+          Pesquisas com coleta em andamento hoje, segundo o registro oficial do TSE.
+          O resultado ainda não foi divulgado.
+        </p>
+      </div>
+
       <h2 class="pe-section__title">Integridade dos Coletores</h2>
       <div class="pe-grid-institutos" id="lista-institutos"></div>
 
@@ -785,6 +794,34 @@
         `;
         container.appendChild(card);
       });
+    }
+
+    // ─── Em campo agora ───────────────────────────────────────
+    // Só pesquisas com campo em andamento hoje. Registro de data futura é
+    // tracking agendado e fica de fora: um único instituto encheria a lista.
+    async function carregarEmCampo() {
+      let itens = [];
+      try {
+        const res = await fetch('/api/em-campo');
+        if (res.ok) itens = await res.json();
+      } catch (err) { console.warn('Erro em-campo:', err); }
+
+      if (!itens.length) return;  // dia sem campo não mostra caixa vazia
+
+      const container = document.getElementById('em-campo-container');
+      container.innerHTML = '';
+      const rotuloCargo = { presidente: 'Presidente', governador_rj: 'Governador RJ' };
+
+      itens.forEach(item => {
+        const linha = document.createElement('div');
+        linha.className = 'pe-mono';
+        linha.style.padding = '4px 0';
+        linha.textContent = `${item.nome_empresa} · ${rotuloCargo[item.cargo] || item.cargo}`
+          + ` · ${formatarData(item.data_inicio)} a ${formatarData(item.data_fim)}`
+          + ` · n=${item.qt_entrevistado}`;
+        container.appendChild(linha);
+      });
+      document.getElementById('em-campo-card').hidden = false;
     }
 
     // ─── Visão Geral ──────────────────────────────────────────
@@ -1438,6 +1475,7 @@
       _dadosCarregados = true;
       await Promise.all([
         carregarInstitutos(),
+        carregarEmCampo(),
         inicializarComparativo(),
         carregarRegional(),
       ]);

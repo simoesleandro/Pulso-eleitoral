@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Cobertura — Pulso Eleitoral{% endblock %}
+
+{% block topbar_nav %}
+  <a class="pe-topbar__nav-item" href="/">Dashboard</a>
+  <a class="pe-topbar__nav-item" href="/admin">Painel Admin</a>
+  <a class="pe-topbar__nav-item" href="/admin/usuarios">Usuários</a>
+  <a class="pe-topbar__nav-item" href="/admin/coletar-url">Coletar URL</a>
+  <a class="pe-topbar__nav-item pe-topbar__nav-item--active" href="/admin/cobertura">Cobertura</a>
+  <a class="pe-topbar__nav-item" href="/logout">Sair</a>
+{% endblock %}
+
+{% block content %}
+<h1>Cobertura</h1>
+
+{% with mensagens = get_flashed_messages(with_categories=true) %}
+  {% if mensagens %}
+    <div class="flash-area">
+      {% for categoria, texto in mensagens %}
+        <p class="flash flash-{{ categoria }}">{{ texto }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<nav class="cobertura-cargos">
+  <a href="{{ url_for('admin_cobertura', cargo='presidente') }}"
+     {% if cargo == 'presidente' %}aria-current="page"{% endif %}>Presidente</a>
+  <a href="{{ url_for('admin_cobertura', cargo='governador_rj') }}"
+     {% if cargo == 'governador_rj' %}aria-current="page"{% endif %}>Governador RJ</a>
+</nav>
+
+<section>
+  <h2>Fila de trabalho — {{ total_fila }} registro(s)</h2>
+  <p>Registrado no TSE por instituto aprovado, com campo encerrado, sem pesquisa no Pulso.</p>
+  <table>
+    <thead>
+      <tr><th>Fim do campo</th><th>Instituto</th><th>Amostra</th><th>Protocolo</th><th>Ligar a</th></tr>
+    </thead>
+    <tbody>
+    {% for item in fila %}
+      <tr>
+        <td>{{ item.data_fim }}</td>
+        <td>{{ item.instituto }}</td>
+        <td>{{ item.qt_entrevistado }}</td>
+        <td>{{ item.protocolo }}</td>
+        <td>
+          <form method="post" action="{{ url_for('admin_cobertura_ligar') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="protocolo" value="{{ item.protocolo }}">
+            <input type="number" name="pesquisa_id" placeholder="id" required>
+            <button type="submit">Ligar</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5">Nada na fila.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <p class="paginacao">
+    {% if pagina > 1 %}
+      <a href="{{ url_for('admin_cobertura', cargo=cargo, pagina=pagina - 1) }}">← anterior</a>
+    {% endif %}
+    {% if tem_proxima %}
+      <a href="{{ url_for('admin_cobertura', cargo=cargo, pagina=pagina + 1) }}">próxima →</a>
+    {% endif %}
+  </p>
+</section>
+
+<section>
+  <h2>Institutos por avaliar — {{ descoberta | length }}</h2>
+  <p>Aparecem no registro do TSE e nunca foram avaliados. Rejeitar tira da lista para sempre.</p>
+  <table>
+    <thead>
+      <tr><th>Razão social</th><th>Registros</th><th>Amostra média</th><th>Último campo</th><th>Decisão</th></tr>
+    </thead>
+    <tbody>
+    {% for inst in descoberta %}
+      <tr>
+        <td>{{ inst.nome_empresa }}</td>
+        <td>{{ inst.registros }}</td>
+        <td>{{ inst.amostra_media }}</td>
+        <td>{{ inst.ultimo_campo }}</td>
+        <td>
+          <form method="post" action="{{ url_for('admin_cobertura_instituto') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="cnpj" value="{{ inst.cnpj_empresa }}">
+            <input type="text" name="nome" placeholder="nome de exibição" required>
+            <button type="submit" name="acao" value="aprovar">Aprovar</button>
+            <button type="submit" name="acao" value="rejeitar">Rejeitar</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5">Nenhum instituto pendente.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Em campo hoje — {{ em_campo | length }}</h2>
+  <ul>
+  {% for item in em_campo %}
+    <li>{{ item.nome_empresa }} · {{ item.cargo }} · {{ item.data_inicio }} a {{ item.data_fim }} · n={{ item.qt_entrevistado }}</li>
+  {% else %}
+    <li>Nenhuma pesquisa em campo hoje.</li>
+  {% endfor %}
+  </ul>
+</section>
+
+<section>
+  <h2>Agendadas — {{ agendadas | length }}</h2>
+  <p>Registro antecipado: o campo ainda não começou.</p>
+  <ul>
+  {% for item in agendadas %}
+    <li>{{ item.nome_empresa }} · {{ item.cargo }} · campo de {{ item.data_inicio }} a {{ item.data_fim }} · n={{ item.qt_entrevistado }}</li>
+  {% else %}
+    <li>Nenhuma pesquisa agendada.</li>
+  {% endfor %}
+  </ul>
+</section>
+{% endblock %}
