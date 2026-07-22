@@ -5,6 +5,7 @@ Uso: python scripts/sync_db.py
 Requer: flyctl instalado e autenticado
 """
 import json
+import shutil
 import subprocess
 import os
 import logging
@@ -19,6 +20,12 @@ APP_NAME   = "pulso-eleitoral"
 MACHINE_ID = "6837932c65d538"
 DB_LOCAL   = os.path.join(os.path.dirname(__file__), '..', 'data', 'pulso.db')
 
+# O serviço Windows PulsoEleitoral roda como LocalSystem, que não enxerga o
+# PATH de usuário onde o instalador do flyctl grava o binário — por isso o
+# fallback para o caminho absoluto (shutil.which cobre a execução manual,
+# onde 'flyctl' já está no PATH do usuário).
+FLYCTL_BIN = shutil.which('flyctl') or r'C:\Users\Leand\.fly\bin\flyctl.exe'
+
 
 def wait_machine_ready(timeout: int = 120, interval: int = 5) -> bool:
     """Aguarda a máquina MACHINE_ID atingir state == 'started'.
@@ -31,7 +38,7 @@ def wait_machine_ready(timeout: int = 120, interval: int = 5) -> bool:
         tentativa += 1
         try:
             result = subprocess.run(
-                ['flyctl', 'machines', 'list', '--app', APP_NAME, '--json'],
+                [FLYCTL_BIN, 'machines', 'list', '--app', APP_NAME, '--json'],
                 capture_output=True, text=True, timeout=15
             )
             if result.returncode == 0 and result.stdout.strip():
@@ -63,7 +70,7 @@ def upload_e_apply(db_local: str) -> bool:
     remote_path = f"/data/{filename}"
 
     result = subprocess.run(
-        ['flyctl', 'sftp', 'put', db_local, remote_path, '--app', APP_NAME],
+        [FLYCTL_BIN, 'sftp', 'put', db_local, remote_path, '--app', APP_NAME],
         capture_output=True, text=True, timeout=60
     )
     if result.returncode != 0:
@@ -91,7 +98,7 @@ def sync_para_fly(force: bool = False) -> bool:
     """
     try:
         result = subprocess.run(
-            ['flyctl', 'version'],
+            [FLYCTL_BIN, 'version'],
             capture_output=True, text=True, timeout=10
         )
         if result.returncode != 0:
@@ -106,7 +113,7 @@ def sync_para_fly(force: bool = False) -> bool:
     try:
         # 1. Inicia máquina
         subprocess.run(
-            ['flyctl', 'machines', 'start', MACHINE_ID, '--app', APP_NAME],
+            [FLYCTL_BIN, 'machines', 'start', MACHINE_ID, '--app', APP_NAME],
             capture_output=True, text=True, timeout=30
         )
 
@@ -119,7 +126,7 @@ def sync_para_fly(force: bool = False) -> bool:
 
         # 5. Reinicia máquina
         subprocess.run(
-            ['flyctl', 'machines', 'restart', '--app', APP_NAME],
+            [FLYCTL_BIN, 'machines', 'restart', '--app', APP_NAME],
             capture_output=True, text=True, timeout=30
         )
 
