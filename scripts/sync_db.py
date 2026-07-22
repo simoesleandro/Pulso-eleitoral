@@ -6,15 +6,23 @@ Requer: flyctl instalado e autenticado
 """
 import json
 import shutil
+import socket
 import subprocess
 import os
 import logging
 import time
 from dotenv import load_dotenv
+import urllib3.util.connection as urllib3_cn
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 logger = logging.getLogger(__name__)
+
+# Este notebook tem a rota IPv6 pra api.fly.io/*.fly.dev quebrada no handshake
+# TLS (curl sem -4 falha, com -4 funciona) — ao contrário do flyctl/curl, o
+# urllib3 (usado por requests em upload_e_apply) não faz fallback confiável
+# pra IPv4, então o POST /admin/apply-db falhava com SSLEOFError toda vez.
+urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
 
 APP_NAME   = "pulso-eleitoral"
 MACHINE_ID = "6837932c65d538"
