@@ -49,7 +49,9 @@ def get_db():
 
 def init_db(force_seed=False):
     """Executa o schema.sql para inicializar o banco de dados.
-    Se o banco estiver vazio ou force_seed for True, executa também o seed.sql."""
+    Institutos (seed.sql) carregam sempre que a tabela estiver vazia. Pesquisas
+    de demonstração (seed_demo_pesquisas.sql) só carregam sob TESTING=True ou
+    force_seed=True explícito — nunca automaticamente em produção."""
     # Garante que a pasta 'data' exista
     if not os.path.exists(database.DATA_DIR):
         os.makedirs(database.DATA_DIR, exist_ok=True)
@@ -89,14 +91,31 @@ def init_db(force_seed=False):
     cursor.execute("SELECT COUNT(*) FROM institutos")
     count_institutos = cursor.fetchone()[0]
 
-    # 2. Executa o seed.sql se o banco estiver vazio ou forçado
-    if count_institutos == 0 or force_seed:
+    # 2. Executa o seed.sql (institutos — dado real) se o banco estiver vazio.
+    # Seguro em qualquer ambiente: collectors/*.py dependem desses instituto_id
+    # via foreign key, então essa carga precisa acontecer mesmo em produção.
+    if count_institutos == 0:
         seed_path = os.path.join(database.BASE_DIR, 'seed.sql')
         if os.path.exists(seed_path):
             with open(seed_path, 'r', encoding='utf-8') as f:
                 seed_sql = f.read()
-            # Precisamos desabilitar foreign keys temporariamente se formos limpar/refazer inserts
             conn.executescript(seed_sql)
+            conn.commit()
+
+    # 2b. Executa o seed_demo_pesquisas.sql (pesquisas FICTÍCIAS de demonstração)
+    # só sob TESTING ou force_seed explícito, e só se pesquisas ainda estiver
+    # vazia (idempotente — evita UNIQUE constraint se init_db() rodar de novo
+    # num banco de teste que sobrou de uma execução anterior). Nunca roda por
+    # o banco estar vazio sozinho, senão contamina produção com dado fabricado
+    # (ver incidente de 2026-07-21 na memória do projeto).
+    cursor.execute("SELECT COUNT(*) FROM pesquisas")
+    count_pesquisas = cursor.fetchone()[0]
+    if count_pesquisas == 0 and (force_seed or os.getenv('TESTING') == 'True'):
+        seed_demo_path = os.path.join(database.BASE_DIR, 'seed_demo_pesquisas.sql')
+        if os.path.exists(seed_demo_path):
+            with open(seed_demo_path, 'r', encoding='utf-8') as f:
+                seed_demo_sql = f.read()
+            conn.executescript(seed_demo_sql)
             conn.commit()
 
     # 3. Inicializa o usuário admin padrão se não houver usuários cadastrados
