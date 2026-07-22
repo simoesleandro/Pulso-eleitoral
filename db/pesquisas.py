@@ -287,8 +287,8 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
     for pid in pids_selecionados:
         poll = polls[pid]
         peso_amostra = poll['amostra'] if poll['amostra'] and poll['amostra'] > 0 else 1000
-        # Teto: nenhuma pesquisa pesa mais que o percentil 90 das amostras da
-        # janela — evita que um tracking de amostra atípica dite o agregado.
+        # Teto: nenhuma pesquisa pesa mais que o dobro da mediana das amostras
+        # da janela — evita que um tracking de amostra atípica dite o agregado.
         peso_amostra = min(peso_amostra, teto)
         try:
             dias_desde = max(0, (hoje - date.fromisoformat(poll['data'])).days)
