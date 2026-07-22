@@ -345,6 +345,7 @@
       <div class="met-prose">
         <p>A média agregada que aparece no dashboard não é uma média simples de todos os números disponíveis. O cálculo usa uma <strong>janela móvel de 30 dias</strong>: apenas pesquisas com data de campo nos últimos 30 dias entram na conta.</p>
         <p>Dentro dessa janela, cada instituto contribui com sua pesquisa mais recente. O resultado é uma <strong>média ponderada</strong> dos percentuais de cada candidato entre os institutos incluídos, dando mais peso a pesquisas com amostra maior e a pesquisas mais recentes dentro da janela.</p>
+        <p>Só entram na média pesquisas de <strong>institutos aprovados</strong>. O registro oficial do TSE lista quase cem empresas de pesquisa em 2026, muitas de atuação local e amostra pequena; incluir todas degradaria a média em vez de melhorá-la. Pesquisas de institutos não aprovados continuam publicadas e consultáveis no site, marcadas como fora da média.</p>
       </div>
       <div class="met-formula">
         Média(candidato) = <span>Σ</span> (percentual_i × peso_i) / <span>Σ</span> peso_i<br>
@@ -353,7 +354,7 @@
         <span>onde i percorre os institutos com pesquisa nos últimos 30 dias, cada um contribuindo com apenas 1 pesquisa (a mais recente)</span>
       </div>
       <div class="met-prose">
-        <p>Amostras maiores pesam mais (menor margem de erro estatístico) e pesquisas mais antigas dentro da janela perdem peso gradualmente — uma pesquisa de hoje pesa mais que uma de 20 dias atrás. Isso não é um julgamento sobre a qualidade metodológica de cada instituto: nenhum instituto recebe peso extra por reputação ou histórico de acertos.</p>
+        <p>Amostras maiores pesam mais (menor margem de erro estatístico) e pesquisas mais antigas dentro da janela perdem peso gradualmente — uma pesquisa de hoje pesa mais que uma de 20 dias atrás. Entre os institutos aprovados, nenhum recebe peso extra por reputação ou histórico de acertos: a curadoria decide quem entra na média, não quanto cada um vale dentro dela.</p>
         <p>O peso de amostra tem um <strong>teto</strong>, fixado em duas vezes a mediana das amostras consideradas naquele momento. Sem ele, uma única pesquisa de amostra muito grande — uma série de acompanhamento semanal com dezenas de milhares de entrevistas, por exemplo — poderia sozinha determinar o resultado, mesmo que todos os demais institutos apontassem outra coisa. Na prática o teto só tem efeito quando alguma pesquisa é mais que o dobro da mediana: quando as amostras são parecidas entre si, nenhum peso é reduzido. O ganho estatístico de precisão acima de cerca de 2.000 entrevistas é pequeno, então o custo de limitar é baixo.</p>
       </div>
       <div class="met-callout">

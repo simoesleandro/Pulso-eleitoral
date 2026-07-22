@@ -30,8 +30,8 @@ def _seed(dbpath):
     from scripts.migrate_pesquisas_volatilidade import aplicar_migracao as _mig
     _mig(conn)
 
-    conn.execute("INSERT INTO institutos (id, nome, sigla, site) VALUES (1, 'Inst A', 'A', 'http://a')")
-    conn.execute("INSERT INTO institutos (id, nome, sigla, site) VALUES (2, 'Inst B', 'B', 'http://b')")
+    conn.execute("INSERT INTO institutos (id, nome, sigla, site, agregar) VALUES (1, 'Inst A', 'A', 'http://a', 1)")
+    conn.execute("INSERT INTO institutos (id, nome, sigla, site, agregar) VALUES (2, 'Inst B', 'B', 'http://b', 1)")
 
     hoje = date.today()
     d_rec = hoje.isoformat()
@@ -83,7 +83,7 @@ def test_par_unico_inalterado(tmp_path, monkeypatch):
         conn.executescript(f.read())
     from scripts.migrate_pesquisas_volatilidade import aplicar_migracao as _mig
     _mig(conn)
-    conn.execute("INSERT INTO institutos (id, nome, sigla, site) VALUES (1, 'Inst A', 'A', 'http://a')")
+    conn.execute("INSERT INTO institutos (id, nome, sigla, site, agregar) VALUES (1, 'Inst A', 'A', 'http://a', 1)")
     hoje = date.today()
     p_ant = _pesquisa(conn, 1, (hoje - timedelta(days=40)).isoformat(), "u-ant")
     p_rec = _pesquisa(conn, 1, hoje.isoformat(), "u-rec")

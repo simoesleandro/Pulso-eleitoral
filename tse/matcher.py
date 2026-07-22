@@ -24,6 +24,35 @@ def _mais(data_iso: str, dias: int) -> str:
     return (date.fromisoformat(data_iso) + timedelta(days=dias)).isoformat()
 
 
+def aplicar_ligacao(conn: sqlite3.Connection, protocolo: str, pesquisa_id: int,
+                    amostra_tse: int, data_fim: str) -> None:
+    """Liga um registro do TSE a uma pesquisa e faz o backfill dos metadados.
+
+    Usada tanto pelo casamento automático quanto pela ligação manual da tela
+    de cobertura — a regra de backfill é do domínio, não do casador.
+
+    **Não commita**: quem chama decide a transação (o casador aplica vários
+    pares de uma vez; a rota manual aplica um só).
+    """
+    conn.execute(
+        "UPDATE pesquisas_tse SET pesquisa_id = ? WHERE protocolo = ?",
+        (pesquisa_id, protocolo),
+    )
+    # A amostra do TSE é a REGISTRADA (planejada); o release publica a
+    # REALIZADA, que pode diferir (visto: 2000 registrado vs 2003 realizado).
+    # Só preenche quando falta — nunca sobrescreve um valor real por um
+    # planejado.
+    conn.execute("""
+        UPDATE pesquisas
+        SET tamanho_amostra = CASE
+                WHEN tamanho_amostra IS NULL OR tamanho_amostra = 0
+                THEN ? ELSE tamanho_amostra END,
+            data_pesquisa = ?,
+            registro_tse = ?
+        WHERE id = ?
+    """, (amostra_tse, data_fim, protocolo, pesquisa_id))
+
+
 def casar(conn: sqlite3.Connection, cargo: str, dry_run: bool = True) -> dict:
     """Casa registros do TSE com pesquisas coletadas.
 
@@ -107,24 +136,10 @@ def casar(conn: sqlite3.Connection, cargo: str, dry_run: bool = True) -> dict:
 
     if not dry_run:
         for par in casados:
-            conn.execute(
-                "UPDATE pesquisas_tse SET pesquisa_id = ? WHERE protocolo = ?",
-                (par["pesquisa_id"], par["protocolo"]),
-            )
-            # A amostra do TSE é a REGISTRADA (planejada); o release publica a
-            # REALIZADA, que pode diferir (visto: 2000 registrado vs 2003
-            # realizado). Só preenche quando falta — nunca sobrescreve um
-            # valor real por um planejado.
-            conn.execute("""
-                UPDATE pesquisas
-                SET tamanho_amostra = CASE
-                        WHEN tamanho_amostra IS NULL OR tamanho_amostra = 0
-                        THEN ? ELSE tamanho_amostra END,
-                    data_pesquisa = ?,
-                    registro_tse = ?
-                WHERE id = ?
-            """, (par["amostra_tse"], par["data_tse"], par["protocolo"],
-                  par["pesquisa_id"]))
+            aplicar_ligacao(conn, protocolo=par["protocolo"],
+                            pesquisa_id=par["pesquisa_id"],
+                            amostra_tse=par["amostra_tse"],
+                            data_fim=par["data_tse"])
         conn.commit()
         logger.info("Casamento aplicado: %d pares, %d ambíguos, %d sem par.",
                     len(casados), len(ambiguos), sem_par)

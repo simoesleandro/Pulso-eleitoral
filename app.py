@@ -210,6 +210,7 @@ def require_login():
         'api_rejeicao',
         'api_eventos',
         'api_house_effects',
+        'api_em_campo',
         'apply_db',
         'pesquisa_detalhe',
     ]
@@ -1061,6 +1062,89 @@ def admin_coletar_url():
     resultado = _coletar_url_especifica(url, coletor_key)
     status = 200 if 'erro' not in resultado else 422
     return jsonify(resultado), status
+
+
+@app.route('/admin/cobertura')
+@login_required
+def admin_cobertura():
+    """Fila do que o TSE registrou e o Pulso ainda não tem."""
+    from database import (agendadas, contar_fila, em_campo_hoje,
+                          fila_de_trabalho, institutos_para_descobrir)
+
+    pagina = max(1, request.args.get('pagina', 1, type=int))
+    cargo = request.args.get('cargo', 'presidente')
+    if cargo not in ('presidente', 'governador_rj'):
+        cargo = 'presidente'
+    por_pagina = 50
+    offset = (pagina - 1) * por_pagina
+
+    total = contar_fila(cargo)
+    return render_template(
+        'admin_cobertura.html',
+        cargo=cargo,
+        pagina=pagina,
+        total_fila=total,
+        tem_proxima=(offset + por_pagina) < total,
+        fila=fila_de_trabalho(cargo, limite=por_pagina, offset=offset),
+        descoberta=institutos_para_descobrir(),
+        em_campo=em_campo_hoje(),
+        agendadas=agendadas(),
+    )
+
+
+@app.route('/admin/cobertura/ligar', methods=['POST'])
+@login_required
+def admin_cobertura_ligar():
+    """Liga um registro do TSE a uma pesquisa existente."""
+    from flask import flash
+
+    from db.curadoria import ligar
+
+    protocolo = (request.form.get('protocolo') or '').strip()
+    pesquisa_id = request.form.get('pesquisa_id', type=int)
+    if not protocolo or pesquisa_id is None:
+        flash('Informe protocolo e id da pesquisa.', 'erro')
+        return redirect(url_for('admin_cobertura'))
+
+    resultado = ligar(protocolo, pesquisa_id)
+    flash(resultado['erro'] if not resultado['ok']
+          else f'Protocolo {protocolo} ligado à pesquisa {pesquisa_id}.',
+          'erro' if not resultado['ok'] else 'ok')
+    return redirect(url_for('admin_cobertura'))
+
+
+@app.route('/admin/cobertura/instituto', methods=['POST'])
+@login_required
+def admin_cobertura_instituto():
+    """Aprova ou rejeita um instituto descoberto no registro do TSE."""
+    from flask import flash
+
+    from db.curadoria import avaliar
+
+    cnpj = (request.form.get('cnpj') or '').strip()
+    nome = (request.form.get('nome') or '').strip()
+    aprovar = request.form.get('acao') == 'aprovar'
+
+    resultado = avaliar(cnpj, nome, aprovar)
+    flash(resultado['erro'] if not resultado['ok']
+          else f"{nome} {'aprovado' if aprovar else 'rejeitado'}.",
+          'erro' if not resultado['ok'] else 'ok')
+    return redirect(url_for('admin_cobertura'))
+
+
+@app.route('/api/em-campo')
+@cache.cached(timeout=300)
+def api_em_campo():
+    """Pesquisas registradas no TSE que estão em campo hoje.
+
+    Só `data_inicio <= hoje <= data_fim`. Registro com data futura é
+    tracking agendado — anunciá-lo daria destaque público a instituto que
+    talvez nunca seja aprovado, e um mesmo instituto encheria a lista.
+    Não traz percentual: o dataset do TSE registra a pesquisa, não o
+    resultado.
+    """
+    from database import em_campo_hoje
+    return jsonify(em_campo_hoje())
 
 
 @app.route('/admin/apply-db', methods=['POST'])

@@ -112,6 +112,12 @@ def init_db(force_seed=False):
     from scripts.migrate_pesquisas_tse import popular_cnpjs as _popular_cnpjs
     _popular_cnpjs(conn)
 
+    # Curadoria: promove ao agregado os institutos do seed. Depois do seed
+    # pelo mesmo motivo de _popular_cnpjs — antes dele não há linha para
+    # atualizar. Não ressuscita instituto rejeitado à mão (lista explícita).
+    from scripts.migrate_curadoria import promover_institutos_do_seed as _promover
+    _promover(conn)
+
     # Migration idempotente: funde pesquisas duplicadas pela chave sintética
     # de URL (ver scripts/migrate_dedup_pesquisas.py). Roda depois do seed
     # porque precisa das pesquisas já carregadas.
