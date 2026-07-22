@@ -102,7 +102,32 @@ coisas que o scheduler interno do `app.py` não faz.
   `init_db` **depois** do `seed.sql` (antes dele os institutos não existem e
   o UPDATE não acha linha). O sync **não chama o Gemini** — por isso roda
   diariamente (9h30), enquanto a coleta roda 2x/semana por causa da cota.
-- **Cache**: 13 endpoints de leitura usam `@cache.cached(timeout=300)`
+- **Curadoria** (`institutos.agregar`): só instituto com `agregar = 1` entra
+  na média e nas afirmações derivadas — média agregada, variação brusca,
+  house effects, série do gráfico, corrida atual, líder presidente, líder
+  gov RJ e tendências (8 consultas em `db/pesquisas.py` e `db/kpis.py`).
+  Detalhe da pesquisa, comparativo, histórico por candidato e
+  `get_institutos_com_totais` **não** filtram — pesquisa de instituto não
+  aprovado fica visível, marcada. Três estados: sem linha em `institutos` =
+  nunca avaliado (aparece na descoberta de `/admin/cobertura`);
+  `agregar = 1` = aprovado; `agregar = 0` = rejeitado. Rejeitar **precisa**
+  criar a linha, senão o instituto volta à descoberta a cada sync diário.
+  `scripts/migrate_curadoria.py` promove os institutos do seed por lista
+  explícita — um `UPDATE` sem cláusula desfaria rejeições manuais.
+  `institutos.ativo` é coluna morta (nunca lida); não usar.
+- **Ligação manual** (`db/curadoria.py`): `/admin/cobertura` liga registro do
+  TSE a pesquisa existente quando o casador automático recusou por
+  ambiguidade ou a janela de ±3 dias não alcançou. Valida antes de escrever
+  (protocolo/pesquisa já ligados, cargo divergente, inexistentes) e
+  compartilha `tse.matcher.aplicar_ligacao` com o casador — a regra de não
+  sobrescrever amostra realizada vale nos dois caminhos.
+- **Entrada por `db/*`**: importar `db.qualquer_coisa` direto dispara
+  ImportError circular (`db/core.py` importa `database` no topo). A façade
+  `database` é o único ponto de entrada — vale para scripts e testes.
+- **Rotas públicas** entram na allowlist de `require_login`
+  (`app.py`, `@app.before_request`). O middleware é default-deny: endpoint
+  novo sem estar na lista redireciona para o login, mesmo sendo `/api/*`.
+- **Cache**: 14 endpoints de leitura usam `@cache.cached(timeout=300)`
   (`query_string=True` onde há parâmetros). `apply-db` já invalida tudo via
   `cache.clear()`. Sob `TESTING=True` o cache vira `NullCache` (SimpleCache é
   global no processo e vazaria entre testes).
