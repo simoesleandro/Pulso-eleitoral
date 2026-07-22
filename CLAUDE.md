@@ -11,6 +11,8 @@ python -m pytest -q                    # suíte de testes (config em pyproject.t
 python app.py                          # roda o app localmente (Waitress/Flask)
 python coletar.py                      # coleta manual (todos os institutos)
 python scripts/sync_db.py              # sincroniza banco local → Fly.io
+python scripts/sync_tse.py             # registro oficial do TSE (dry-run)
+python scripts/sync_tse.py --aplicar   # ...e grava os casamentos
 ```
 
 `TESTING=True` precisa estar setado **antes** de importar `app`/`database` —
@@ -61,6 +63,11 @@ coisas que o scheduler interno do `app.py` não faz.
 - **Agregação** (`get_media_agregada`, poll-of-polls) usa só pesquisas
   `estimulada` (ou `tipo IS NULL`, legado) e pondera por amostra × recência
   (`0.9 ** dias`), uma pesquisa por instituto — documentado em `/metodologia`.
+  O peso de amostra tem teto em **2× a mediana** da janela (`_teto_amostra`),
+  para que um tracking de amostra atípica não dite a média sozinho. Percentil
+  90 foi tentado e descartado: com 5–10 institutos o nearest-rank do p90
+  devolve o próprio máximo e o teto nunca morde (teste de regressão em
+  `tests/test_agregacao.py`).
   O contrato numérico dessa lógica está fixado em `tests/test_agregacao.py`;
   qualquer mudança na fórmula exige atualizar os dois (testes e
   `/metodologia`) e é o gate de equivalência para refatorar
@@ -79,7 +86,22 @@ coisas que o scheduler interno do `app.py` não faz.
   compartilhada (`_PROMPT_BASE_EXTRACAO`) + deltas nomeados.
 - **Coleta**: `collectors/base.py.save()` commita cada release
   individualmente — uma falha num release não derruba as demais do mesmo
-  lote. `run()` retorna `{"status": "ok"|"parcial"|"erro", "salvas", "falhas"}`.
+  lote. `run()` retorna
+  `{"status": "ok"|"vazio"|"parcial"|"erro", "salvas", "falhas"}`. `"vazio"`
+  (rodou sem exceção, salvou zero) é distinto de `"ok"` de propósito: antes
+  os dois eram `"ok"` e coletor quebrado ficava invisível no log.
+- **Registro do TSE** (`tse/`): `dataset.py` baixa/parseia o CSV de dados
+  abertos (latin-1, `;`, sentinela `#NULO#`), `sync.py` faz upsert em
+  `pesquisas_tse` por protocolo **preservando `pesquisa_id`** (re-sync diário
+  não pode desfazer casamento), `matcher.py` liga registro ↔ pesquisa por
+  `institutos.cnpj` + janela de datas. `pesquisa_id IS NULL` é a fila de
+  cobertura. Regras não-óbvias: o casador **nunca resolve ambiguidade por
+  chute** (falso positivo envenena a série em silêncio); o backfill de
+  `tamanho_amostra` só preenche quando falta, porque o TSE guarda a amostra
+  *registrada* e o release publica a *realizada*; e `popular_cnpjs` roda em
+  `init_db` **depois** do `seed.sql` (antes dele os institutos não existem e
+  o UPDATE não acha linha). O sync **não chama o Gemini** — por isso roda
+  diariamente (9h30), enquanto a coleta roda 2x/semana por causa da cota.
 - **Cache**: 13 endpoints de leitura usam `@cache.cached(timeout=300)`
   (`query_string=True` onde há parâmetros). `apply-db` já invalida tudo via
   `cache.clear()`. Sob `TESTING=True` o cache vira `NullCache` (SimpleCache é
