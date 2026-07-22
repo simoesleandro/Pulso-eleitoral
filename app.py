@@ -145,11 +145,16 @@ def run_all_collectors():
 
 # Registra o job de coleta às segundas e quintas, 10h00 — 2x/semana para
 # poupar a cota de gasto mensal do Gemini (ver plans/README.md).
+# misfire_grace_time=21600 (6h): se o notebook estava suspenso no horário exato
+# (ex: a tarefa de wake falhou em manter a máquina acordada), o job ainda roda
+# atrasado em vez de ser descartado pelo APScheduler — visto em produção em
+# 2026-07-20, quando o job foi perdido por ter sido detectado só 11h39min depois.
 scheduler.add_job(
     run_all_collectors,
     CronTrigger(day_of_week='mon,thu', hour=10, minute=0),
     id='coleta_diaria',
-    replace_existing=True
+    replace_existing=True,
+    misfire_grace_time=21600
 )
 
 if not app.testing and os.getenv('TESTING') != 'True' and not os.getenv('FLY_APP_NAME') and not scheduler.running:
