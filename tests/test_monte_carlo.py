@@ -65,7 +65,9 @@ def _inserir_pesquisa_teste(conn, cargo, data_pesquisa, candidatos_percentuais):
     """Insere instituto + pesquisa + intenções de teste (1 poll, N candidatos)."""
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO institutos (nome, sigla, site) VALUES (?, ?, ?)",
+        # agregar=1: instituto de teste precisa entrar na média, senão a
+        # curadoria filtra a pesquisa e a simulação não recebe dado nenhum.
+        "INSERT INTO institutos (nome, sigla, site, agregar) VALUES (?, ?, ?, 1)",
         ("Instituto Teste", "IT", "http://teste.com")
     )
     instituto_id = cursor.lastrowid

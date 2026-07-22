@@ -55,7 +55,8 @@ def _criar_pesquisa(conn, cargo, data_pesquisa, candidatos_percentuais):
     """
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO institutos (nome, sigla, site) VALUES (?, ?, ?)",
+        # agregar=1: instituto de teste precisa entrar na média (curadoria).
+        "INSERT INTO institutos (nome, sigla, site, agregar) VALUES (?, ?, ?, 1)",
         ("Instituto Teste", "IT", "http://teste.com")
     )
     instituto_id = cursor.lastrowid

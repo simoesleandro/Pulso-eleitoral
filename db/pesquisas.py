@@ -85,10 +85,11 @@ def get_pesquisas_mais_recentes(cargo: str, tipo: str = 'estimulada') -> list[di
             JOIN institutos inst ON p.instituto_id = inst.id
             JOIN intencoes int ON int.pesquisa_id = p.id
             LEFT JOIN candidatos c ON c.nome_canonico = int.candidato
-            WHERE p.cargo = ? AND {filtro_int} AND p.id = (
+            WHERE p.cargo = ? AND {filtro_int} AND inst.agregar = 1 AND p.id = (
                 SELECT p2.id FROM pesquisas p2
                 JOIN intencoes i2 ON i2.pesquisa_id = p2.id
-                WHERE p2.cargo = ? AND {filtro_sub}
+                JOIN institutos inst2 ON p2.instituto_id = inst2.id
+                WHERE p2.cargo = ? AND {filtro_sub} AND inst2.agregar = 1
                 ORDER BY p2.data_pesquisa DESC, p2.id DESC
                 LIMIT 1
             )
@@ -147,6 +148,7 @@ def detectar_variacoes_bruscas(cargo: str = 'presidente',
             AND p3.data_pesquisa <= ?
         )
         AND p_anterior.instituto_id = p_recente.instituto_id
+        AND inst_recente.agregar = 1 AND inst_anterior.agregar = 1
         AND ABS(i_recente.percentual - i_anterior.percentual) >= ?
         AND LOWER(i_recente.candidato) NOT LIKE '%outros%'
         AND LOWER(i_recente.candidato) NOT LIKE '%nulos%'
@@ -247,6 +249,7 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
             JOIN institutos inst ON p.instituto_id = inst.id
             LEFT JOIN candidatos c ON c.nome_canonico = i.candidato
             WHERE p.cargo = ? AND p.data_pesquisa >= ?
+            AND inst.agregar = 1
             AND (i.tipo = 'estimulada' OR i.tipo IS NULL)
             AND (c.status IS NULL OR c.status = 'ativo')
             AND LOWER(i.candidato) NOT LIKE '%outros%'
@@ -375,6 +378,7 @@ def get_house_effects(cargo: str = 'presidente', dias: int = 90) -> dict:
             JOIN institutos inst ON p.instituto_id = inst.id
             LEFT JOIN candidatos c ON c.nome_canonico = i.candidato
             WHERE p.cargo = ? AND p.data_pesquisa >= ?
+            AND inst.agregar = 1
             AND (i.tipo = 'estimulada' OR i.tipo IS NULL)
             AND (c.status IS NULL OR c.status = 'ativo')
             AND LOWER(i.candidato) NOT LIKE '%outros%'
@@ -497,6 +501,7 @@ def get_historico_multi(candidatos: list[str], cargo: str, tipo: str = 'estimula
             JOIN pesquisas p ON i.pesquisa_id = p.id
             JOIN institutos inst ON p.instituto_id = inst.id
             WHERE i.candidato IN ({placeholders}) AND p.cargo = ?
+            AND inst.agregar = 1
             AND {filtro_tipo}
             ORDER BY i.candidato, p.data_pesquisa ASC
         """, (*candidatos, cargo)).fetchall()
@@ -574,10 +579,11 @@ def get_institutos_com_totais() -> list[dict]:
     try:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT inst.nome, COUNT(p.id) AS total, MAX(p.data_pesquisa) AS ultima_coleta
+            SELECT inst.nome, inst.agregar, COUNT(p.id) AS total,
+                   MAX(p.data_pesquisa) AS ultima_coleta
             FROM institutos inst
             LEFT JOIN pesquisas p ON p.instituto_id = inst.id
-            GROUP BY inst.id, inst.nome
+            GROUP BY inst.id, inst.nome, inst.agregar
             ORDER BY total DESC, inst.nome ASC
         """)
         rows = cursor.fetchall()

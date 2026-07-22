@@ -6,8 +6,10 @@ CREATE TABLE IF NOT EXISTS institutos (
     nome TEXT NOT NULL,
     sigla TEXT,
     site TEXT,
-    ativo INTEGER DEFAULT 1, -- 1 = ativo, 0 = inativo
-    criado_em TEXT DEFAULT (datetime('now', 'localtime'))
+    ativo INTEGER DEFAULT 1, -- COLUNA MORTA: nunca lida pelo código. Use `agregar`.
+    criado_em TEXT DEFAULT (datetime('now', 'localtime')),
+    cnpj TEXT,          -- casamento com o registro do TSE (pesquisas_tse.cnpj_empresa)
+    agregar INTEGER DEFAULT 0  -- curadoria: 1 = entra na média; 0 = visível, fora dela
 );
 
 -- 2. Pesquisas eleitorais

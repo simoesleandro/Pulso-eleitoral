@@ -209,10 +209,11 @@ def get_visao_geral() -> dict:
             FROM pesquisas p
             JOIN institutos inst ON p.instituto_id = inst.id
             JOIN intencoes int ON int.pesquisa_id = p.id
-            WHERE p.cargo = 'presidente' AND p.id = (
-                SELECT id FROM pesquisas
-                WHERE cargo = 'presidente'
-                ORDER BY data_pesquisa DESC, id DESC
+            WHERE p.cargo = 'presidente' AND inst.agregar = 1 AND p.id = (
+                SELECT p2.id FROM pesquisas p2
+                JOIN institutos inst2 ON p2.instituto_id = inst2.id
+                WHERE p2.cargo = 'presidente' AND inst2.agregar = 1
+                ORDER BY p2.data_pesquisa DESC, p2.id DESC
                 LIMIT 1
             )
             ORDER BY int.percentual DESC
@@ -239,10 +240,11 @@ def get_visao_geral() -> dict:
             FROM pesquisas p
             JOIN institutos inst ON p.instituto_id = inst.id
             JOIN intencoes int ON int.pesquisa_id = p.id
-            WHERE p.cargo = 'governador_rj' AND p.id = (
-                SELECT id FROM pesquisas
-                WHERE cargo = 'governador_rj'
-                ORDER BY data_pesquisa DESC, id DESC
+            WHERE p.cargo = 'governador_rj' AND inst.agregar = 1 AND p.id = (
+                SELECT p2.id FROM pesquisas p2
+                JOIN institutos inst2 ON p2.instituto_id = inst2.id
+                WHERE p2.cargo = 'governador_rj' AND inst2.agregar = 1
+                ORDER BY p2.data_pesquisa DESC, p2.id DESC
                 LIMIT 1
             )
             ORDER BY int.percentual DESC
@@ -269,9 +271,10 @@ def get_visao_geral() -> dict:
             FROM pesquisas p
             JOIN intencoes int ON int.pesquisa_id = p.id
             WHERE p.cargo = 'presidente' AND p.id = (
-                SELECT id FROM pesquisas
-                WHERE cargo = 'presidente'
-                ORDER BY data_pesquisa DESC, id DESC
+                SELECT p2.id FROM pesquisas p2
+                JOIN institutos inst2 ON p2.instituto_id = inst2.id
+                WHERE p2.cargo = 'presidente' AND inst2.agregar = 1
+                ORDER BY p2.data_pesquisa DESC, p2.id DESC
                 LIMIT 1
             )
             ORDER BY int.percentual DESC
