@@ -426,3 +426,52 @@ def test_save_lote_vazio_retorna_dict_zerado():
 
     resultado = collector.save([])
     assert resultado == {"pesquisas": 0, "intencoes": 0, "rejeicoes": 0, "falhas": []}
+
+
+# --- Status "vazio": coleta sem resultado não é sucesso ---
+
+def test_run_reporta_vazio_quando_nada_e_salvo(monkeypatch):
+    """Coletor que não encontra nada não pode reportar 'ok'."""
+    import database
+    from collectors.datafolha import DatafolhaCollector
+
+    coletor = DatafolhaCollector(db_path=database.DB_PATH)
+    monkeypatch.setattr(coletor, "fetch", lambda: [])
+
+    resultado = coletor.run()
+
+    assert resultado["status"] == "vazio"
+    assert resultado["salvas"] == 0
+
+
+def test_run_reporta_ok_quando_salva(monkeypatch):
+    import database
+    from collectors.datafolha import DatafolhaCollector
+
+    coletor = DatafolhaCollector(db_path=database.DB_PATH)
+    monkeypatch.setattr(coletor, "fetch", lambda: [])
+    monkeypatch.setattr(
+        coletor, "save",
+        lambda pesquisas: {"pesquisas": 2, "intencoes": 8, "rejeicoes": 0, "falhas": []},
+    )
+
+    resultado = coletor.run()
+
+    assert resultado["status"] == "ok"
+    assert resultado["salvas"] == 2
+
+
+def test_run_reporta_parcial_quando_ha_falha(monkeypatch):
+    """Falha em release individual continua sendo 'parcial', não 'vazio'."""
+    import database
+    from collectors.datafolha import DatafolhaCollector
+
+    coletor = DatafolhaCollector(db_path=database.DB_PATH)
+    monkeypatch.setattr(coletor, "fetch", lambda: [])
+    monkeypatch.setattr(
+        coletor, "save",
+        lambda pesquisas: {"pesquisas": 0, "intencoes": 0, "rejeicoes": 0,
+                           "falhas": [("http://x", "boom")]},
+    )
+
+    assert coletor.run()["status"] == "parcial"

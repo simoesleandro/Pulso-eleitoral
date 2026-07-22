@@ -58,20 +58,29 @@ class BaseCollector(ABC):
 
     def run(self) -> dict:
         """Executa o ciclo completo de coleta: busca, logs e persistência.
-        Retorna {"status": "ok"|"parcial"|"erro", "salvas": int, "falhas": list}."""
+        Retorna {"status": "ok"|"vazio"|"parcial"|"erro", "salvas": int, "falhas": list}.
+        "vazio" = rodou sem exceção mas não salvou nada (fonte mudou ou quebrou)."""
         logger.info("[%s] Iniciando execução do coletor...", self.name)
         try:
             pesquisas = self.fetch()
             logger.info("[%s] Coleta concluída com sucesso. %d registros obtidos.", self.name, len(pesquisas))
             resultado = self.save(pesquisas)
             falhas = resultado.get("falhas", [])
-            status = "parcial" if falhas else "ok"
+            salvas = resultado.get("pesquisas", 0)
+            if falhas:
+                status = "parcial"
+            elif salvas == 0:
+                # Não é sucesso: o coletor rodou sem erro e não trouxe nada.
+                # Antes isso virava "ok" e a quebra ficava invisível no log.
+                status = "vazio"
+            else:
+                status = "ok"
             logger.info(
-                "[%s] Persistência concluída: %d pesquisas, %d intenções, %d rejeições (%d falha(s)).",
-                self.name, resultado.get("pesquisas", 0), resultado.get("intencoes", 0),
-                resultado.get("rejeicoes", 0), len(falhas)
+                "[%s] Persistência concluída: %d pesquisas, %d intenções, %d rejeições (%d falha(s)). Status: %s",
+                self.name, salvas, resultado.get("intencoes", 0),
+                resultado.get("rejeicoes", 0), len(falhas), status
             )
-            return {"status": status, "salvas": resultado.get("pesquisas", 0), "falhas": falhas}
+            return {"status": status, "salvas": salvas, "falhas": falhas}
         except Exception as e:
             logger.error("[%s] Erro durante a execução do coletor: %s", self.name, str(e))
             return {"status": "erro", "salvas": 0, "falhas": []}
