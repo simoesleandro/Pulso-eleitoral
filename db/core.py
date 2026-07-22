@@ -86,6 +86,10 @@ def init_db(force_seed=False):
     from scripts.migrate_confrontos_2turno import aplicar_migracao as _aplicar_migracao_confrontos
     _aplicar_migracao_confrontos(conn)
 
+    # Migration idempotente: tabela pesquisas_tse + curadoria em institutos
+    from scripts.migrate_pesquisas_tse import aplicar_migracao as _aplicar_migracao_tse
+    _aplicar_migracao_tse(conn)
+
     # Verifica se os dados já foram populados
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM institutos")
@@ -101,6 +105,18 @@ def init_db(force_seed=False):
                 seed_sql = f.read()
             conn.executescript(seed_sql)
             conn.commit()
+
+    # Preenche institutos.cnpj DEPOIS do seed — em banco novo os institutos só
+    # existem a partir daqui, e a migração acima roda antes (o UPDATE não
+    # acharia linha nenhuma). Idempotente: não sobrescreve CNPJ já definido.
+    from scripts.migrate_pesquisas_tse import popular_cnpjs as _popular_cnpjs
+    _popular_cnpjs(conn)
+
+    # Migration idempotente: funde pesquisas duplicadas pela chave sintética
+    # de URL (ver scripts/migrate_dedup_pesquisas.py). Roda depois do seed
+    # porque precisa das pesquisas já carregadas.
+    from scripts.migrate_dedup_pesquisas import aplicar_migracao as _aplicar_dedup
+    _aplicar_dedup(conn)
 
     # 2b. Executa o seed_demo_pesquisas.sql (pesquisas FICTÍCIAS de demonstração)
     # só sob TESTING ou force_seed explícito, e só se pesquisas ainda estiver

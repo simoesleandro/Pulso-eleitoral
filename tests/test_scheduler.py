@@ -46,7 +46,9 @@ def test_run_all_collectors():
     for item in resultados:
         assert 'coletor' in item
         assert 'status' in item
-        assert item['status'] in ['ok', 'erro']
+        # 'vazio' = rodou sem exceção e não salvou nada; 'parcial' = alguns
+        # releases falharam. Antes ambos vinham como 'ok' e a quebra sumia.
+        assert item['status'] in ['ok', 'vazio', 'parcial', 'erro']
 
 def test_salvar_e_buscar_ultimo_log():
     """Testa salvar_log_scheduler() e buscar_ultimo_log() no banco de dados temporário."""

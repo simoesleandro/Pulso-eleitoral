@@ -157,6 +157,33 @@ scheduler.add_job(
     misfire_grace_time=21600
 )
 
+
+def _job_sync_tse():
+    """Sincroniza o registro oficial do TSE e casa com o que já foi coletado.
+
+    Não consome cota do Gemini (é só download de CSV), por isso roda
+    diariamente, enquanto a coleta roda 2x/semana.
+    """
+    from scripts.sync_tse import sincronizar_tse
+    try:
+        # dry_run=False: o casador recusa ambiguidade por construção, então só
+        # grava par inequívoco (ver tse/matcher.py).
+        resultado = sincronizar_tse(dry_run=False)
+        app.logger.info("Sync TSE concluído: %s", resultado)
+    except Exception:
+        app.logger.exception("Falha no sync do TSE")
+
+
+# 9h30: depois da geração do arquivo pelo TSE (observada às 5h46) e antes da
+# coleta das 10h, para que a coleta já encontre os registros do dia.
+scheduler.add_job(
+    _job_sync_tse,
+    CronTrigger(hour=9, minute=30),
+    id='sync_tse',
+    replace_existing=True,
+    misfire_grace_time=3600
+)
+
 if not app.testing and os.getenv('TESTING') != 'True' and not os.getenv('FLY_APP_NAME') and not scheduler.running:
     scheduler.start()
 
