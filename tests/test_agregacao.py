@@ -427,3 +427,59 @@ def test_house_effect_fora_da_janela_ignorado():
 
     res = get_house_effects('presidente', dias=90)
     assert res['institutos'] == []
+
+
+# --- Teto de peso por amostra (percentil 90) ---
+
+from db.pesquisas import _teto_amostra
+
+
+def test_teto_amostra_e_o_dobro_da_mediana():
+    assert _teto_amostra([1000]) == 2000
+    assert _teto_amostra([1000, 2000]) == 3000  # mediana 1500
+    assert _teto_amostra([1000, 1500, 2000]) == 3000  # mediana 1500
+
+
+def test_teto_amostra_ignora_o_outlier_ao_definir_a_mediana():
+    """A mediana é robusta: um valor absurdo não infla o teto."""
+    assert _teto_amostra([1200, 1500, 1800, 2000, 40000]) == 3600  # mediana 1800
+
+
+def test_teto_p90_nao_serviria_com_poucos_institutos():
+    """Regressão de desenho: com n<=10 o nearest-rank do p90 devolveria o
+    próprio máximo, e o teto nunca morderia. A mediana morde."""
+    amostras = [1000, 1200, 1200, 1600, 2030, 2500, 14000]
+    assert _teto_amostra(amostras) < max(amostras)
+
+
+def test_teto_amostra_lista_vazia():
+    assert _teto_amostra([]) == 1000
+
+
+def test_outlier_de_amostra_nao_domina_a_media():
+    """Um instituto com amostra 10x maior não pode ditar a média sozinho."""
+    _init_limpo()
+    conn = get_conn()
+    try:
+        # 4 institutos comedidos concordam em ~40; o outlier diz 30.
+        _seed_pesquisa(conn, "Quaest", dias_atras=1, amostra=1200,
+                       candidatos={"Lula": 40.0, "Flávio Bolsonaro": 30.0})
+        _seed_pesquisa(conn, "Datafolha", dias_atras=1, amostra=2000,
+                       candidatos={"Lula": 40.0, "Flávio Bolsonaro": 30.0})
+        _seed_pesquisa(conn, "Atlas", dias_atras=1, amostra=1500,
+                       candidatos={"Lula": 40.0, "Flávio Bolsonaro": 30.0})
+        _seed_pesquisa(conn, "PoderData", dias_atras=1, amostra=1800,
+                       candidatos={"Lula": 40.0, "Flávio Bolsonaro": 30.0})
+        _seed_pesquisa(conn, "Verita", dias_atras=1, amostra=40000,
+                       candidatos={"Lula": 30.0, "Flávio Bolsonaro": 40.0})
+
+        resultado = get_media_agregada("presidente", dias=30)
+        lula = next(c for c in resultado["candidatos"] if c["candidato"] == "Lula")
+
+        # Sem teto, o outlier de 40k puxaria a média para ~31.
+        # Com teto em 2x a mediana, ela fica muito mais perto do consenso de 40.
+        assert lula["media"] > 36.0, (
+            f"outlier dominou a média: {lula['media']}"
+        )
+    finally:
+        conn.close()

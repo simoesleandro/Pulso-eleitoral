@@ -190,13 +190,46 @@ def detectar_variacoes_bruscas(cargo: str = 'presidente',
     return alertas
 
 
+_FATOR_TETO_AMOSTRA = 2.0
+
+
+def _teto_amostra(amostras: list[int]) -> int:
+    """Teto de peso: o dobro da mediana das amostras da janela.
+
+    Existe para que um instituto com amostra muito acima das demais não dite a
+    média sozinho. Um percentil alto (p90) **não** serve aqui: com o número de
+    institutos que existe na prática (5 a 10), o nearest-rank do p90 seleciona
+    justamente o maior valor, e o teto nunca morderia — inclusive no caso que
+    motivou a regra (uma série de tracking de n=14.000 entre institutos de
+    n≈1.200 no Rio de Janeiro).
+
+    A mediana é robusta a outlier por construção, então o teto acompanha o
+    tamanho típico das pesquisas do momento em vez de ser um número fixo. O
+    fator 2 dá folga para variação legítima de amostra: só morde quando uma
+    pesquisa é mais que o dobro da mediana. Estatisticamente isso custa pouco —
+    o ganho de margem de erro acima de ~2.000 entrevistas é marginal.
+    """
+    validas = sorted(a for a in amostras if a and a > 0)
+    if not validas:
+        return 1000
+
+    meio = len(validas) // 2
+    if len(validas) % 2:
+        mediana = float(validas[meio])
+    else:
+        mediana = (validas[meio - 1] + validas[meio]) / 2
+
+    return int(mediana * _FATOR_TETO_AMOSTRA)
+
+
 def get_media_agregada(cargo: str, dias: int = 30) -> dict:
     """Retorna média agregada (poll-of-polls ponderado) por candidato.
 
     Em vez de média simples de todas as pesquisas — que deixaria um instituto
     prolífico dominar — o cálculo:
       1. Usa SOMENTE a pesquisa mais recente de cada instituto (1 voto/instituto);
-      2. Pondera por tamanho de amostra (peso = amostra, ou 1000 se ausente);
+      2. Pondera por tamanho de amostra (peso = amostra, ou 1000 se ausente),
+         limitado ao percentil 90 das amostras da janela;
       3. Pondera por recência via decaimento exponencial (0.9 ^ dias);
       4. score = peso_amostra * peso_recencia;
       5. média ponderada = SUM(percentual * score) / SUM(score).
@@ -249,10 +282,14 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
 
     # 2-4. Score de cada pesquisa selecionada = peso_amostra * peso_recencia
     hoje = date.today()
+    teto = _teto_amostra([polls[pid]['amostra'] for pid in pids_selecionados])
     scores: dict[int, float] = {}
     for pid in pids_selecionados:
         poll = polls[pid]
         peso_amostra = poll['amostra'] if poll['amostra'] and poll['amostra'] > 0 else 1000
+        # Teto: nenhuma pesquisa pesa mais que o percentil 90 das amostras da
+        # janela — evita que um tracking de amostra atípica dite o agregado.
+        peso_amostra = min(peso_amostra, teto)
         try:
             dias_desde = max(0, (hoje - date.fromisoformat(poll['data'])).days)
         except (ValueError, TypeError):

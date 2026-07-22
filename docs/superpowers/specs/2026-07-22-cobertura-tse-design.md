@@ -138,8 +138,15 @@ locais e pequenos (amostra mínima observada: n=300).
 
 A Vetor Arrow registrou tracking semanal de RJ com n=14.000 — dez vezes o
 Quaest (n=1.200). Pela ponderação por amostra, uma única aprovação errada
-dominaria a média sozinha. A amostra efetiva usada na ponderação é limitada
-ao percentil 90 das amostras dos institutos aprovados no mesmo cargo.
+dominaria a média sozinha. A amostra efetiva usada na ponderação é limitada a
+**duas vezes a mediana** das amostras da janela.
+
+Percentil 90 foi a primeira regra escrita aqui e está **descartada**: com o
+número de institutos que existe na prática (5 a 10), o nearest-rank do p90
+seleciona justamente o maior valor, e o teto nunca morderia — inclusive no
+caso da Vetor Arrow que motivou a regra. Descoberto ao implementar, com teste
+de regressão em `tests/test_agregacao.py`. A mediana é robusta a outlier por
+construção; o fator 2 dá folga para variação legítima.
 
 ## Correções destravadas
 

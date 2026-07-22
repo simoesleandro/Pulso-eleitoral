@@ -1350,7 +1350,7 @@ git commit -m "fix(db): funde pesquisas duplicadas pela chave sintética de URL"
 
 **Interfaces:**
 - Consumes: nada.
-- Produces: `_teto_amostra(amostras: list[int]) -> int` em `db/pesquisas.py` — percentil 90 por *nearest-rank*, isto é, o elemento de índice `ceil(0.9 * n) - 1` na lista ordenada. Determinístico e testável.
+- Produces: `_teto_amostra(amostras: list[int]) -> int` em `db/pesquisas.py` — **duas vezes a mediana** das amostras válidas. (Percentil 90 foi tentado e descartado: com 5 a 10 institutos o nearest-rank do p90 devolve o próprio máximo e o teto nunca morde.)
 
 **Por que:** a Vetor Arrow registrou tracking de RJ com n=14.000 contra n=1.200 do Quaest. Sem teto, um único instituto domina a média. Com poucos institutos o percentil 90 ≈ máximo, então o teto não tem efeito — ele só morde quando há um outlier real.
 
