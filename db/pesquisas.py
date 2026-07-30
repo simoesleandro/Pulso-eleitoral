@@ -329,6 +329,14 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
             continue
         media_ponderada = num / den
 
+        # Cálculo da Margem de Erro Agregada (Intervalo de Confiança de 95%)
+        if len(percentuais_sel) > 1:
+            var_w = sum(s * ((pct - media_ponderada) ** 2) for pct, s in zip(percentuais_sel, scores.values())) / den if len(scores) == len(percentuais_sel) else sum((pct - media_ponderada) ** 2 for pct in percentuais_sel) / len(percentuais_sel)
+            se = (var_w ** 0.5) / (len(percentuais_sel) ** 0.5)
+            margem_erro = max(1.5, round(1.96 * se, 1))
+        else:
+            margem_erro = 2.5
+
         # Variação no período: todas as pesquisas da janela (sinal temporal)
         recentes = [e['percentual'] for e in entradas if e['data_pesquisa'] >= data_meio]
         anteriores = [e['percentual'] for e in entradas if e['data_pesquisa'] < data_meio]
@@ -340,6 +348,7 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
         candidatos_resultado.append({
             "candidato": candidato,
             "media": round(media_ponderada, 1),
+            "margem_erro": margem_erro,
             "min": round(min(percentuais_sel), 1),
             "max": round(max(percentuais_sel), 1),
             "variacao_30d": variacao,
@@ -349,10 +358,23 @@ def get_media_agregada(cargo: str, dias: int = 30) -> dict:
 
     candidatos_resultado.sort(key=lambda x: x['media'], reverse=True)
 
+    # Detecção de Empate Técnico Estatístico entre o 1º e 2º colocados
+    empate_tecnico = False
+    empate_tecnico_detalhe = None
+    if len(candidatos_resultado) >= 2:
+        c1, c2 = candidatos_resultado[0], candidatos_resultado[1]
+        diff = round(c1['media'] - c2['media'], 1)
+        limiar = max(c1['margem_erro'], c2['margem_erro'], 2.0)
+        if diff <= limiar:
+            empate_tecnico = True
+            empate_tecnico_detalhe = f"Empate técnico estatístico entre {c1['candidato']} ({c1['media']}%) e {c2['candidato']} ({c2['media']}%) — diferença de {diff} p.p. dentro da margem de erro agregada (±{limiar} p.p.)."
+
     return {
         "cargo": cargo,
         "periodo": f"últimos {dias} dias",
         "total_pesquisas": total_pesquisas,
+        "empate_tecnico": empate_tecnico,
+        "empate_tecnico_detalhe": empate_tecnico_detalhe,
         "institutos_incluidos": sorted(institutos_set),
         "candidatos": candidatos_resultado,
         "atualizado_em": date.today().strftime("%d/%m/%Y"),

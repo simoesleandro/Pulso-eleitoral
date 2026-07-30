@@ -44,7 +44,20 @@
 
     <!-- SEÇÃO 1: VISÃO GERAL -->
     <section id="secao-visao-geral" class="pe-section">
-      <h2 class="pe-section__title">Visão Geral</h2>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+        <h2 class="pe-section__title" style="margin-bottom:0;">Visão Geral</h2>
+        <div style="display:flex; gap:8px;">
+          <a href="/api/v1/export/pesquisas.csv" class="pe-btn pe-btn--outline" style="font-size:12px; padding:4px 10px; text-decoration:none;" download>📥 Exportar CSV</a>
+          <a href="/api/v1/export/agregado.json" class="pe-btn pe-btn--outline" style="font-size:12px; padding:4px 10px; text-decoration:none;" target="_blank">🔌 API JSON</a>
+        </div>
+      </div>
+
+      <!-- Banner de Empate Técnico (preenchido via JS se detectado na média) -->
+      <div id="banner-empate-tecnico" style="display:none; padding:10px 14px; border-radius:8px;
+           background:rgba(234,88,12,0.12); border:1px solid rgba(234,88,12,0.4);
+           color:var(--pe-text); font-size:13px; margin-bottom:12px;">
+        ⚠️ <strong>Empate Técnico Estatístico:</strong> <span id="empate-tecnico-texto"></span>
+      </div>
 
       <!-- Aviso de defasagem (ativado por JS quando a última pesquisa passa do limiar) -->
       <div id="aviso-defasagem" style="display:none; padding:10px 14px; border-radius:8px;
@@ -986,6 +999,14 @@
       const res = await fetch('/api/media-agregada?cargo=presidente');
       const data = await res.json();
 
+      const bannerEmpate = document.getElementById('banner-empate-tecnico');
+      if (data.empate_tecnico && data.empate_tecnico_detalhe) {
+        document.getElementById('empate-tecnico-texto').textContent = data.empate_tecnico_detalhe;
+        if (bannerEmpate) bannerEmpate.style.display = 'block';
+      } else if (bannerEmpate) {
+        bannerEmpate.style.display = 'none';
+      }
+
       document.getElementById('media-institutos').textContent =
         data.institutos_incluidos.length ? data.institutos_incluidos.join(' + ') : '—';
       document.getElementById('media-pesquisas').textContent = `${data.total_pesquisas} pesquisas`;
@@ -1002,14 +1023,15 @@
         const variacaoStr = c.variacao_30d !== null && c.variacao_30d !== undefined
           ? (c.variacao_30d > 0 ? `+${c.variacao_30d.toFixed(1)}pp` : `${c.variacao_30d.toFixed(1)}pp`) : '—';
         const variacaoCls = c.variacao_30d > 0 ? 'color:var(--pe-up)' : c.variacao_30d < 0 ? 'color:var(--pe-down)' : 'color:var(--pe-text-muted)';
+        const margemStr = c.margem_erro ? `±${c.margem_erro.toFixed(1)}%` : '';
         return `
           <div class="pe-poll__row" style="padding:10px 0;">
             <span class="pe-poll__name" style="width:160px; font-weight:500;">${c.candidato}</span>
             <div class="pe-poll__bar-wrap"><div class="pe-poll__bar" style="width:${c.media}%; background:${cor};"></div></div>
             <span class="pe-poll__pct" style="width:50px; font-size:15px; font-weight:500;">${c.media.toFixed(1)}%</span>
             <span style="width:70px; font-size:12px; font-family:'JetBrains Mono',monospace; ${variacaoCls};">${variacaoStr}</span>
-            <span style="width:80px; font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;">${c.min.toFixed(1)}–${c.max.toFixed(1)}%</span>
-            <span class="pe-badge pe-badge--inst" style="font-size:10px;">${c.pesquisas_count} pesq.</span>
+            <span style="width:80px; font-size:11px; color:var(--pe-text-muted); font-family:'JetBrains Mono',monospace;" title="Faixa das pesquisas min–max">${c.min.toFixed(1)}–${c.max.toFixed(1)}%</span>
+            <span class="pe-badge pe-badge--inst" style="font-size:10px;" title="Margem de incerteza da média">${margemStr || `${c.pesquisas_count} pesq.`}</span>
           </div>`;
       }).join('');
     }

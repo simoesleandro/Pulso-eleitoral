@@ -1,0 +1,28 @@
+name: Coleta Agendada de Pesquisas
+
+on:
+  schedule:
+    # Segundas e quintas às 13:00 UTC (10:00 BRT)
+    - cron: '0 13 * * 1,4'
+  workflow_dispatch:
+
+jobs:
+  coletar:
+    name: Disparar Coletor na Nuvem
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamada HTTP para o Endpoint de Coleta
+        run: |
+          echo "Disparando coleta de pesquisas em https://pulso-eleitoral.fly.dev/admin/coletar ..."
+          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            -H "X-Admin-Pass: ${{ secrets.ADMIN_PASS }}" \
+            https://pulso-eleitoral.fly.dev/admin/coletar)
+          
+          echo "$response"
+          status=$(echo "$response" | grep "HTTP_STATUS" | cut -d':' -f2)
+          
+          if [ "$status" -ne 200 ]; then
+            echo "Erro: chamado de coleta retornou status HTTP $status"
+            exit 1
+          fi
+          echo "Coleta disparada e executada com sucesso!"

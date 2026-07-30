@@ -97,3 +97,37 @@ def test_route_admin_logs(client):
     data = response.json
     assert 'logs' in data
     assert isinstance(data['logs'], list)
+
+def test_route_admin_coletar_async_and_status(client):
+    """Testa o disparo e a verificação de status da coleta assíncrona."""
+    with patch('app.run_all_collectors') as mock_run:
+        mock_run.return_value = [{"coletor": "DatafolhaCollector", "status": "ok"}]
+        
+        # Status inicial
+        res_status = client.get('/admin/coletar-status')
+        assert res_status.status_code == 200
+        
+        # Disparo assíncrono
+        res_async = client.post('/admin/coletar-async')
+        assert res_async.status_code in [200, 409]
+        data = res_async.json
+        assert 'status' in data
+
+def test_admin_coletar_with_x_admin_pass():
+    """Testa que o header X-Admin-Pass permite autenticação para chamadas automatizadas sem cookie de sessão."""
+    flask_app.config['TESTING'] = True
+    os.environ['ADMIN_PASS'] = 'secret-pass-123'
+    
+    with flask_app.test_client() as unauth_client:
+        with patch('app.run_all_collectors') as mock_run:
+            mock_run.return_value = [{"coletor": "DatafolhaCollector", "status": "ok"}]
+            
+            # Sem header -> redireciona (302) para login
+            resp1 = unauth_client.post('/admin/coletar')
+            assert resp1.status_code == 302
+            
+            # Com header correto -> autoriza (200)
+            resp2 = unauth_client.post('/admin/coletar', headers={'X-Admin-Pass': 'secret-pass-123'})
+            assert resp2.status_code == 200
+            assert resp2.json['status'] == 'ok'
+

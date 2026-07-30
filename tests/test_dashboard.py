@@ -451,3 +451,24 @@ def test_api_rejeicao_default_mantem_presidente(client):
     candidatos = [r['candidato'] for r in data['rejeicoes']]
     assert 'Lula' in candidatos
     assert 'Eduardo Paes' not in candidatos
+
+
+def test_api_export_pesquisas_csv(client):
+    """Testa que /api/v1/export/pesquisas.csv retorna um arquivo CSV válido."""
+    setup_db_with_seed()
+    resp = client.get('/api/v1/export/pesquisas.csv')
+    assert resp.status_code == 200
+    assert resp.content_type.startswith('text/csv')
+    assert b"pesquisa_id" in resp.data
+    assert b"candidato" in resp.data
+
+
+def test_api_export_agregado_json(client):
+    """Testa que /api/v1/export/agregado.json retorna a estrutura JSON da média agregada."""
+    setup_db_with_seed()
+    resp = client.get('/api/v1/export/agregado.json?cargo=presidente')
+    assert resp.status_code == 200
+    data = resp.json
+    assert data['cargo'] == 'presidente'
+    assert 'candidatos' in data
+

@@ -483,3 +483,30 @@ def test_outlier_de_amostra_nao_domina_a_media():
         )
     finally:
         conn.close()
+
+
+def test_margem_erro_agregada_e_empate_tecnico():
+    """Testa que get_media_agregada calcula margem_erro e detecta empate_tecnico quando a diferença é pequena."""
+    _init_limpo()
+    conn = get_conn()
+    try:
+        # Cenario de empate tecnico proximo (40% x 39.5%)
+        _seed_pesquisa(conn, "Quaest", dias_atras=1, amostra=1200,
+                       candidatos={"Lula": 40.0, "Flávio Bolsonaro": 39.5})
+        _seed_pesquisa(conn, "Datafolha", dias_atras=2, amostra=2000,
+                       candidatos={"Lula": 39.8, "Flávio Bolsonaro": 40.2})
+        _seed_pesquisa(conn, "Atlas", dias_atras=3, amostra=1500,
+                       candidatos={"Lula": 40.2, "Flávio Bolsonaro": 39.8})
+
+        resultado = get_media_agregada("presidente", dias=30)
+        assert "empate_tecnico" in resultado
+        assert resultado["empate_tecnico"] is True
+        assert resultado["empate_tecnico_detalhe"] is not None
+        assert "Empate técnico" in resultado["empate_tecnico_detalhe"]
+        
+        c1 = resultado["candidatos"][0]
+        assert "margem_erro" in c1
+        assert c1["margem_erro"] >= 1.5
+    finally:
+        conn.close()
+

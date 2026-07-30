@@ -91,7 +91,10 @@ init_db()
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
+        admin_pass = os.getenv('ADMIN_PASS')
+        provided_pass = request.headers.get('X-Admin-Pass')
+        has_admin_pass = admin_pass and provided_pass and hmac.compare_digest(provided_pass, admin_pass)
+        if not session.get('logged_in') and not has_admin_pass:
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -107,24 +110,46 @@ def _parse_num(valor, tipo, default):
 # Instancia o scheduler globalmente fora da inicialização do app
 scheduler = BackgroundScheduler()
 
+_coleta_lock = threading.Lock()
+_coleta_status = {
+    "em_execucao": False,
+    "inicio": None,
+    "fim": None,
+    "resultados": None,
+    "erro": None
+}
+
 def run_all_collectors():
-    """Roda todos os coletores cadastrados sequencialmente, salva log de execução
-    e sincroniza com o Fly.io se houve dado novo (mesmo contrato de coletar.py)."""
+    """Roda todos os coletores cadastrados sequencialmente, salva log de execução,
+    notifica via Telegram se configurado e sincroniza com o Fly.io apenas se estiver
+    rodando localmente (fora da nuvem)."""
     from collectors import ALL_COLLECTORS
-    from database import salvar_log_scheduler, get_db
+    from database import salvar_log_scheduler, get_db, detectar_variacoes_bruscas
+    from notifier import (
+        send_telegram, montar_mensagem_coleta,
+        montar_mensagem_nova_pesquisa, montar_mensagem_alerta
+    )
 
     with get_db() as conn:
         p_antes = conn.execute("SELECT COUNT(*) FROM pesquisas").fetchone()[0]
         i_antes = conn.execute("SELECT COUNT(*) FROM intencoes").fetchone()[0]
+        max_id_antes = conn.execute("SELECT COALESCE(MAX(id), 0) FROM pesquisas").fetchone()[0]
 
     coletores = [cls(db_path=DB_PATH) for cls in ALL_COLLECTORS]
 
     resultados = []
     for c in coletores:
         try:
-            c.run()
-            resultados.append({"coletor": c.__class__.__name__, "status": "ok"})
+            res = c.run()
+            entrada = {
+                "coletor": c.__class__.__name__,
+                "status": res.get("status", "ok") if isinstance(res, dict) else "ok",
+            }
+            if isinstance(res, dict) and res.get("falhas"):
+                entrada["falhas"] = len(res["falhas"])
+            resultados.append(entrada)
         except Exception as e:
+            app.logger.error(f"Erro no coletor {c.__class__.__name__}: {e}")
             resultados.append({"coletor": c.__class__.__name__, "status": "erro", "msg": str(e)})
 
     # Salva o log de execução no banco SQLite
@@ -137,11 +162,79 @@ def run_all_collectors():
     pesquisas_novas = max(0, p_depois - p_antes)
     intencoes_novas = max(0, i_depois - i_antes)
 
-    if pesquisas_novas > 0 or intencoes_novas > 0:
-        from scripts.sync_db import sync_para_fly
-        sync_para_fly()
+    # Notificação via Telegram
+    try:
+        mensagem = montar_mensagem_coleta(resultados, pesquisas_novas, intencoes_novas)
+        send_telegram(mensagem)
+
+        if pesquisas_novas > 0:
+            with get_db() as conn:
+                novas = conn.execute("""
+                    SELECT p.id, inst.nome AS instituto, p.cargo, p.data_pesquisa
+                    FROM pesquisas p
+                    JOIN institutos inst ON p.instituto_id = inst.id
+                    WHERE p.id > ?
+                    ORDER BY p.id
+                """, (max_id_antes,)).fetchall()
+                for row in novas:
+                    pid, instituto, cargo, data_pesquisa = row
+                    candidatos = conn.execute("""
+                        SELECT candidato, percentual FROM intencoes
+                        WHERE pesquisa_id = ?
+                        ORDER BY percentual DESC
+                    """, (pid,)).fetchall()
+                    pesquisa_info = {
+                        "instituto": instituto,
+                        "cargo": cargo,
+                        "data_pesquisa": data_pesquisa,
+                        "candidatos": [{"candidato": c, "percentual": p} for c, p in candidatos],
+                    }
+                    send_telegram(montar_mensagem_nova_pesquisa(pesquisa_info))
+
+            alertas = detectar_variacoes_bruscas(cargo='presidente', limiar_pp=3.0)
+            if alertas:
+                send_telegram(montar_mensagem_alerta(alertas))
+    except Exception as e:
+        app.logger.warning("Falha ao enviar notificações Telegram: %s", e)
+
+    # Limpa cache do Flask para atualizar dashboards imediatamente
+    try:
+        cache.clear()
+    except Exception:
+        pass
+
+    # Sincroniza com Fly.io APENAS se estiver rodando no PC local (fora do Fly.io)
+    if (pesquisas_novas > 0 or intencoes_novas > 0) and not os.getenv('FLY_APP_NAME'):
+        try:
+            from scripts.sync_db import sync_para_fly
+            sync_para_fly()
+        except Exception as e:
+            app.logger.error("Falha no sync para Fly: %s", e)
 
     return resultados
+
+def _executar_coleta_background():
+    global _coleta_status
+    with _coleta_lock:
+        _coleta_status["em_execucao"] = True
+        _coleta_status["inicio"] = datetime.datetime.now().isoformat()
+        _coleta_status["fim"] = None
+        _coleta_status["resultados"] = None
+        _coleta_status["erro"] = None
+
+    try:
+        resultados = run_all_collectors()
+        with _coleta_lock:
+            _coleta_status["resultados"] = resultados
+            _coleta_status["fim"] = datetime.datetime.now().isoformat()
+    except Exception as e:
+        app.logger.exception("Erro ao executar coleta em background")
+        with _coleta_lock:
+            _coleta_status["erro"] = str(e)
+            _coleta_status["fim"] = datetime.datetime.now().isoformat()
+    finally:
+        with _coleta_lock:
+            _coleta_status["em_execucao"] = False
 
 # Registra o job de coleta às segundas e quintas, 10h00 — 2x/semana para
 # poupar a cota de gasto mensal do Gemini (ver plans/README.md).
@@ -211,12 +304,20 @@ def require_login():
         'api_eventos',
         'api_house_effects',
         'api_em_campo',
+        'api_export_pesquisas_csv',
+        'api_export_agregado_json',
         'apply_db',
         'pesquisa_detalhe',
     ]
     if request.endpoint in allowed_endpoints:
         return
-    
+
+    # Permite autenticação via header X-Admin-Pass para chamadas automatizadas de admin (ex: GitHub Actions cron)
+    admin_pass = os.getenv('ADMIN_PASS')
+    provided_pass = request.headers.get('X-Admin-Pass')
+    if admin_pass and provided_pass and hmac.compare_digest(provided_pass, admin_pass):
+        return
+
     if request.endpoint is None:
         if not session.get('logged_in'):
             return redirect(url_for('login'))
@@ -339,9 +440,10 @@ def admin():
     )
 
 @app.route('/admin/coletar', methods=['GET', 'POST'])
+@csrf.exempt
 @login_required
 def admin_coletar():
-    """Dispara a coleta de pesquisas manualmente (protegida por login)."""
+    """Dispara a coleta de pesquisas manualmente (protegida por login ou X-Admin-Pass)."""
     resultados = run_all_collectors()
     return jsonify({
         "status": "ok",
@@ -349,6 +451,36 @@ def admin_coletar():
         "coletores": len(resultados),
         "resultados": resultados
     })
+
+@app.route('/admin/coletar-async', methods=['POST'])
+@csrf.exempt
+@login_required
+def admin_coletar_async():
+    """Dispara a coleta de pesquisas em background thread (protegida por login ou X-Admin-Pass)."""
+    global _coleta_status
+    with _coleta_lock:
+        if _coleta_status["em_execucao"]:
+            return jsonify({
+                "status": "em_execucao",
+                "mensagem": "Uma coleta já está em andamento.",
+                "inicio": _coleta_status["inicio"]
+            }), 409
+        
+    thread = threading.Thread(target=_executar_coleta_background, daemon=True)
+    thread.start()
+    
+    return jsonify({
+        "status": "iniciado",
+        "mensagem": "Coleta iniciada em segundo plano.",
+        "timestamp": datetime.datetime.now().isoformat()
+    })
+
+@app.route('/admin/coletar-status')
+@login_required
+def admin_coletar_status():
+    """Retorna o estado da última/atual execução de coleta em background."""
+    with _coleta_lock:
+        return jsonify(_coleta_status)
 
 @app.route('/admin/status-coletores')
 @login_required
@@ -1258,6 +1390,55 @@ def api_status():
         "online": True,
         "ultima_coleta": ultima_coleta
     })
+
+@app.route('/api/v1/export/pesquisas.csv')
+@cache.cached(timeout=300)
+def api_export_pesquisas_csv():
+    """Exporta todas as pesquisas registradas e intenções em formato CSV para imprensa e pesquisadores."""
+    import csv
+    from io import StringIO
+    from flask import Response
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "pesquisa_id", "instituto", "registro_tse", "cargo",
+        "data_pesquisa", "data_publicacao", "tamanho_amostra",
+        "margem_erro", "candidato", "percentual", "tipo"
+    ])
+
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT p.id, inst.nome AS instituto, p.registro_tse, p.cargo,
+                   p.data_pesquisa, p.data_publicacao, p.tamanho_amostra,
+                   p.margem_erro, i.candidato, i.percentual, i.tipo
+            FROM pesquisas p
+            JOIN institutos inst ON p.instituto_id = inst.id
+            JOIN intencoes i ON i.pesquisa_id = p.id
+            ORDER BY p.data_pesquisa DESC, p.id DESC
+        """).fetchall()
+
+        for r in rows:
+            writer.writerow([
+                r["id"], r["instituto"], r["registro_tse"], r["cargo"],
+                r["data_pesquisa"], r["data_publicacao"], r["tamanho_amostra"],
+                r["margem_erro"], r["candidato"], r["percentual"], r["tipo"]
+            ])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=pulso_eleitoral_pesquisas.csv"}
+    )
+
+@app.route('/api/v1/export/agregado.json')
+@cache.cached(timeout=300, query_string=True)
+def api_export_agregado_json():
+    """Retorna a média agregada atual (poll-of-polls) em JSON estruturado aberto. ?cargo= opcional (default presidente)."""
+    cargo = request.args.get('cargo', 'presidente')
+    from db.pesquisas import get_media_agregada
+    data = get_media_agregada(cargo)
+    return jsonify(data)
 
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 5080))

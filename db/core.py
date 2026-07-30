@@ -140,26 +140,40 @@ def init_db(force_seed=False):
             conn.executescript(seed_demo_sql)
             conn.commit()
 
-    # 3. Inicializa o usuário admin padrão se não houver usuários cadastrados
-    cursor.execute("SELECT COUNT(*) FROM usuarios")
-    count_usuarios = cursor.fetchone()[0]
-    if count_usuarios == 0:
-        from dotenv import load_dotenv
-        load_dotenv()
-        admin_pass = os.getenv('ADMIN_PASS')
-        if not admin_pass:
-            import secrets
-            admin_pass = secrets.token_urlsafe(16)
-            logger.warning(
-                "ADMIN_PASS não configurada — senha admin aleatória gerada e "
-                "descartada. Defina ADMIN_PASS e recrie o usuário admin para ter "
-                "uma senha conhecida."
+    # 3. Inicializa ou sincroniza a senha do usuário admin se ADMIN_PASS estiver configurada no ambiente
+    from dotenv import load_dotenv
+    load_dotenv()
+    admin_pass = os.getenv('ADMIN_PASS')
+
+    cursor.execute("SELECT id, password_hash FROM usuarios WHERE username = 'admin'")
+    row = cursor.fetchone()
+
+    if admin_pass:
+        if row:
+            if not bcrypt.checkpw(admin_pass.encode('utf-8'), row['password_hash'].encode('utf-8')):
+                new_hash = bcrypt.hashpw(admin_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                cursor.execute("UPDATE usuarios SET password_hash = ? WHERE id = ?", (new_hash, row['id']))
+                conn.commit()
+                logger.info("Senha do usuário admin atualizada conforme ADMIN_PASS do ambiente")
+        else:
+            new_hash = bcrypt.hashpw(admin_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            cursor.execute(
+                "INSERT INTO usuarios (username, password_hash, nome, ativo) VALUES ('admin', ?, 'Administrador', 1)",
+                (new_hash,)
             )
-        admin_user = 'admin'
-        password_hash = bcrypt.hashpw(admin_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            conn.commit()
+    elif not row:
+        import secrets
+        admin_pass = secrets.token_urlsafe(16)
+        logger.warning(
+            "ADMIN_PASS não configurada — senha admin aleatória gerada e "
+            "descartada. Defina ADMIN_PASS e recrie o usuário admin para ter "
+            "uma senha conhecida."
+        )
+        new_hash = bcrypt.hashpw(admin_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         cursor.execute(
-            "INSERT INTO usuarios (username, password_hash, nome, ativo) VALUES (?, ?, ?, 1)",
-            (admin_user, password_hash, 'Administrador')
+            "INSERT INTO usuarios (username, password_hash, nome, ativo) VALUES ('admin', ?, 'Administrador', 1)",
+            (new_hash,)
         )
         conn.commit()
 

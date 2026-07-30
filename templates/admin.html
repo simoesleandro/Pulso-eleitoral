@@ -181,6 +181,43 @@
 
 {% block scripts %}
   <script>
+    let pollInterval = null;
+
+    function checarStatusColeta() {
+      const btn = document.getElementById('btn-coletar');
+      const loading = document.getElementById('coletar-loading');
+      const container = document.getElementById('resultado-container');
+      const resultado = document.getElementById('resultado');
+
+      fetch('/admin/coletar-status')
+        .then(res => res.json())
+        .then(status => {
+          if (status.em_execucao) {
+            btn.disabled = true;
+            loading.style.display = 'inline';
+            const horaInicio = status.inicio ? new Date(status.inicio).toLocaleTimeString() : '';
+            loading.textContent = 'Executando coletores na nuvem...' + (horaInicio ? ' (desde ' + horaInicio + ')' : '');
+            container.style.display = 'block';
+            resultado.textContent = 'Coleta em andamento no servidor...\nAguarde a conclusão.';
+          } else {
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+            }
+            btn.disabled = false;
+            loading.style.display = 'none';
+
+            if (status.resultados || status.erro) {
+              container.style.display = 'block';
+              resultado.textContent = JSON.stringify(status.resultados || { erro: status.erro }, null, 2);
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Erro ao checar status:', err);
+        });
+    }
+
     document.getElementById('btn-coletar').addEventListener('click', function() {
       const btn = this;
       const loading = document.getElementById('coletar-loading');
@@ -189,34 +226,35 @@
 
       btn.disabled = true;
       loading.style.display = 'inline';
+      loading.textContent = 'Iniciando coleta na nuvem...';
       container.style.display = 'none';
 
-      fetch('/admin/coletar', {
+      fetch('/admin/coletar-async', {
         method: 'POST',
         headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content }
       })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('HTTP ' + response.status);
+        .then(response => response.json().then(data => ({ status: response.status, body: data })))
+        .then(res => {
+          if (res.status === 200 || res.status === 409) {
+            resultado.textContent = res.body.mensagem || 'Coleta iniciada.';
+            container.style.display = 'block';
+            if (!pollInterval) {
+              pollInterval = setInterval(checarStatusColeta, 3000);
+            }
+            checarStatusColeta();
+          } else {
+            throw new Error(res.body.mensagem || 'HTTP ' + res.status);
           }
-          return response.json();
-        })
-        .then(data => {
-          resultado.textContent = JSON.stringify(data, null, 2);
-          container.style.display = 'block';
-          // Recarrega a página após 3 segundos para atualizar as estatísticas e a tabela de logs
-          setTimeout(() => {
-            window.location.reload();
-          }, 3000);
         })
         .catch(err => {
-          resultado.textContent = 'Erro ao executar coleta: ' + err.message;
+          resultado.textContent = 'Erro ao disparar coleta: ' + err.message;
           container.style.display = 'block';
           btn.disabled = false;
-        })
-        .finally(() => {
           loading.style.display = 'none';
         });
     });
+
+    // Checa se já há coleta rodando ao carregar a página
+    checarStatusColeta();
   </script>
 {% endblock %}
