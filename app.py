@@ -116,10 +116,15 @@ _coleta_status = {
     "inicio": None,
     "fim": None,
     "resultados": None,
-    "erro": None
+    "erro": None,
+    "total": 0,
+    "atual_idx": 0,
+    "atual_nome": None,
+    "pct": 0,
+    "concluidos": []
 }
 
-def run_all_collectors():
+def run_all_collectors(progress_callback=None):
     """Roda todos os coletores cadastrados sequencialmente, salva log de execução,
     notifica via Telegram se configurado e sincroniza com o Fly.io apenas se estiver
     rodando localmente (fora da nuvem)."""
@@ -136,21 +141,29 @@ def run_all_collectors():
         max_id_antes = conn.execute("SELECT COALESCE(MAX(id), 0) FROM pesquisas").fetchone()[0]
 
     coletores = [cls(db_path=DB_PATH) for cls in ALL_COLLECTORS]
-
+    total = len(coletores)
     resultados = []
-    for c in coletores:
+
+    for idx, c in enumerate(coletores, 1):
+        nome_coletor = c.__class__.__name__
+        if progress_callback:
+            progress_callback(idx, total, nome_coletor, None)
         try:
             res = c.run()
             entrada = {
-                "coletor": c.__class__.__name__,
+                "coletor": nome_coletor,
                 "status": res.get("status", "ok") if isinstance(res, dict) else "ok",
             }
             if isinstance(res, dict) and res.get("falhas"):
                 entrada["falhas"] = len(res["falhas"])
             resultados.append(entrada)
         except Exception as e:
-            app.logger.error(f"Erro no coletor {c.__class__.__name__}: {e}")
-            resultados.append({"coletor": c.__class__.__name__, "status": "erro", "msg": str(e)})
+            app.logger.error(f"Erro no coletor {nome_coletor}: {e}")
+            entrada = {"coletor": nome_coletor, "status": "erro", "msg": str(e)}
+            resultados.append(entrada)
+
+        if progress_callback:
+            progress_callback(idx, total, nome_coletor, entrada)
 
     # Salva o log de execução no banco SQLite
     salvar_log_scheduler(resultados)
@@ -221,11 +234,29 @@ def _executar_coleta_background():
         _coleta_status["fim"] = None
         _coleta_status["resultados"] = None
         _coleta_status["erro"] = None
+        _coleta_status["total"] = 9
+        _coleta_status["atual_idx"] = 0
+        _coleta_status["atual_nome"] = None
+        _coleta_status["pct"] = 0
+        _coleta_status["concluidos"] = []
+
+    def on_progress(idx, total, name, item_result):
+        with _coleta_lock:
+            _coleta_status["atual_idx"] = idx
+            _coleta_status["total"] = total
+            _coleta_status["atual_nome"] = name
+            if item_result:
+                if not any(c.get("coletor") == name for c in _coleta_status["concluidos"]):
+                    _coleta_status["concluidos"].append(item_result)
+                _coleta_status["pct"] = int((len(_coleta_status["concluidos"]) / total) * 100)
+            else:
+                _coleta_status["pct"] = int(((idx - 1) / total) * 100)
 
     try:
-        resultados = run_all_collectors()
+        resultados = run_all_collectors(progress_callback=on_progress)
         with _coleta_lock:
             _coleta_status["resultados"] = resultados
+            _coleta_status["pct"] = 100
             _coleta_status["fim"] = datetime.datetime.now().isoformat()
     except Exception as e:
         app.logger.exception("Erro ao executar coleta em background")

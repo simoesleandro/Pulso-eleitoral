@@ -63,6 +63,19 @@
         <button id="btn-coletar" class="pe-btn pe-btn--primary">Coletar Agora</button>
         <span id="coletar-loading" style="display: none;" class="pe-mono">Executando coletores...</span>
       </div>
+
+      <!-- Barra de Progresso em Tempo Real (0 a 100%) -->
+      <div id="progresso-coleta-container" style="display: none; margin-top: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span class="pe-mono" id="progresso-coleta-texto" style="font-size: 13px; font-weight: 500;">Iniciando coleta...</span>
+          <span class="pe-mono" id="progresso-coleta-pct" style="font-size: 13px; font-weight: bold; color: var(--pe-navy);">0%</span>
+        </div>
+        <div style="width: 100%; height: 12px; background: var(--pe-surface); border-radius: 6px; overflow: hidden; border: 1px solid rgba(10,34,64,0.1);">
+          <div id="progresso-coleta-barra" style="width: 0%; height: 100%; background: var(--pe-navy); transition: width 0.4s ease;"></div>
+        </div>
+        <div id="progresso-coleta-feed" class="pe-mono" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px;"></div>
+      </div>
+
       <div id="resultado-container" style="display: none; margin-top: var(--pe-space-4);">
         <pre id="resultado" class="pe-mono" style="background: var(--pe-surface); padding: var(--pe-space-3); border-radius: var(--pe-radius-md); overflow-x: auto; font-size: 11px; border: 0.5px solid var(--pe-border);"></pre>
       </div>
@@ -189,16 +202,41 @@
       const container = document.getElementById('resultado-container');
       const resultado = document.getElementById('resultado');
 
+      const pContainer = document.getElementById('progresso-coleta-container');
+      const pBarra = document.getElementById('progresso-coleta-barra');
+      const pPct = document.getElementById('progresso-coleta-pct');
+      const pTexto = document.getElementById('progresso-coleta-texto');
+      const pFeed = document.getElementById('progresso-coleta-feed');
+
       fetch('/admin/coletar-status')
         .then(res => res.json())
         .then(status => {
           if (status.em_execucao) {
             btn.disabled = true;
             loading.style.display = 'inline';
-            const horaInicio = status.inicio ? new Date(status.inicio).toLocaleTimeString() : '';
-            loading.textContent = 'Executando coletores na nuvem...' + (horaInicio ? ' (desde ' + horaInicio + ')' : '');
-            container.style.display = 'block';
-            resultado.textContent = 'Coleta em andamento no servidor...\nAguarde a conclusão.';
+            loading.textContent = 'Executando coletores na nuvem...';
+
+            pContainer.style.display = 'block';
+            const pct = status.pct || 0;
+            pBarra.style.width = pct + '%';
+            pPct.textContent = pct + '%';
+
+            const coletorAtual = status.atual_nome || 'Aguardando...';
+            const idx = status.atual_idx || 0;
+            const total = status.total || 9;
+            pTexto.textContent = `⏳ Executando (${idx}/${total}): ${coletorAtual}...`;
+
+            if (status.concluidos && status.concluidos.length > 0) {
+              pFeed.innerHTML = status.concluidos.map(c => `
+                <span class="pe-badge ${c.status === 'ok' ? 'pe-badge--new' : 'pe-badge--down'}">
+                  ✓ ${c.coletor}: ${c.status}
+                </span>
+              `).join('');
+            } else {
+              pFeed.innerHTML = '<span class="pe-mono" style="color:var(--pe-text-muted);">Iniciando primeiro coletor...</span>';
+            }
+
+            container.style.display = 'none';
           } else {
             if (pollInterval) {
               clearInterval(pollInterval);
@@ -208,8 +246,23 @@
             loading.style.display = 'none';
 
             if (status.resultados || status.erro) {
+              pContainer.style.display = 'block';
+              pBarra.style.width = '100%';
+              pPct.textContent = '100%';
+              pTexto.textContent = '✅ Coleta concluída com sucesso!';
+
+              if (status.resultados) {
+                pFeed.innerHTML = status.resultados.map(c => `
+                  <span class="pe-badge ${c.status === 'ok' ? 'pe-badge--new' : 'pe-badge--down'}">
+                    ✓ ${c.coletor}: ${c.status}
+                  </span>
+                `).join('');
+              }
+
               container.style.display = 'block';
               resultado.textContent = JSON.stringify(status.resultados || { erro: status.erro }, null, 2);
+            } else {
+              pContainer.style.display = 'none';
             }
           }
         })
