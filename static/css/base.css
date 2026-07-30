@@ -10,6 +10,12 @@ body {
   font-size: 14px;
 }
 
+/* Acessibilidade: foco visível para navegação por teclado */
+:focus-visible {
+  outline: 2px solid var(--pe-navy-light);
+  outline-offset: 2px;
+}
+
 /* Topbar */
 .pe-topbar {
   background: var(--pe-navy);
