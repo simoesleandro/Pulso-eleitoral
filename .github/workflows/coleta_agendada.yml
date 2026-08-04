@@ -11,18 +11,42 @@ jobs:
     name: Disparar Coletor na Nuvem
     runs-on: ubuntu-latest
     steps:
-      - name: Chamada HTTP para o Endpoint de Coleta
+      - name: Acordar Servidor e Disparar Coleta
         run: |
-          echo "Disparando coleta de pesquisas em https://pulso-eleitoral.fly.dev/admin/coletar ..."
+          echo "1. Acordando servidor Fly.io se estiver em standby..."
+          for i in {1..6}; do
+            status_code=$(curl -s -o /dev/null -w "%{http_code}" https://pulso-eleitoral.fly.dev/api/status || echo "000")
+            echo "Tentativa $i: status HTTP $status_code"
+            if [ "$status_code" -eq 200 ]; then
+              echo "Servidor acordado e online!"
+              break
+            fi
+            sleep 5
+          done
+
+          echo "2. Disparando coleta assíncrona de pesquisas..."
           response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
             -H "X-Admin-Pass: ${{ secrets.ADMIN_PASS }}" \
-            https://pulso-eleitoral.fly.dev/admin/coletar)
+            https://pulso-eleitoral.fly.dev/admin/coletar-async)
           
           echo "$response"
           status=$(echo "$response" | grep "HTTP_STATUS" | cut -d':' -f2)
           
-          if [ "$status" -ne 200 ]; then
+          if [ "$status" -ne 200 ] && [ "$status" -ne 409 ]; then
             echo "Erro: chamado de coleta retornou status HTTP $status"
             exit 1
           fi
-          echo "Coleta disparada e executada com sucesso!"
+          
+          echo "3. Coleta iniciada! Aguardando conclusão dos 9 coletores..."
+          for i in {1..30}; do
+            sleep 10
+            c_status=$(curl -s -H "X-Admin-Pass: ${{ secrets.ADMIN_PASS }}" https://pulso-eleitoral.fly.dev/admin/coletar-status)
+            em_execucao=$(echo "$c_status" | grep -o '"em_execucao":true' || true)
+            if [ -z "$em_execucao" ]; then
+              echo "Coleta finalizada no Fly.io!"
+              echo "$c_status"
+              exit 0
+            fi
+            echo "Ainda executando ($i/30)..."
+          done
+
