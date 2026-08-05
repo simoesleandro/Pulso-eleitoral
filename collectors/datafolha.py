@@ -84,14 +84,15 @@ class DatafolhaCollector(PlaywrightCollector, BaseCollector):
                 if any(p in href_lower for p in ['avaliacao-de-governo', 'aprovacao', 'rejeicao']):
                     continue
 
-                # 2. texto OU href deve conter alguma palavra de FILTRO_NACIONAL
+                # 2. texto OU href deve conter alguma palavra de FILTRO_NACIONAL ou ser sobre Governador RJ
                 combinado = _normalizar(texto + ' ' + href)
-                if not any(p in combinado for p in nacional_norm):
+                is_rj_gov = 'rio' in combinado and ('governador' in combinado or 'governo' in combinado or 'rj' in combinado)
+                if not any(p in combinado for p in nacional_norm) and not is_rj_gov:
                     continue
 
-                # 3. texto NÃO deve conter palavras de FILTRO_ESTADUAL
+                # 3. Se não for RJ, texto NÃO deve conter palavras de FILTRO_ESTADUAL
                 texto_lower = texto.lower()
-                if any(p in texto_lower for p in estadual_lower):
+                if not is_rj_gov and any(p in texto_lower for p in estadual_lower):
                     continue
 
                 # Resolve URL absoluta
@@ -115,13 +116,47 @@ class DatafolhaCollector(PlaywrightCollector, BaseCollector):
             # Remove releases com dados inconsistentes
             unique = [l for l in unique if not any(b in l for b in RELEASES_BLOQUEADOS)]
 
-            return unique[:15]
+            return unique[:20]
 
         except Exception as e:
             logger.warning("[Datafolha] Erro ao extrair links: %s", e)
             return []
 
+    def _build_items_gov(self, resultado: dict, url: str) -> list[dict]:
+        candidatos = resultado.get("candidatos") or []
+        if not candidatos:
+            return []
+        from datetime import date
+        hoje = date.today().isoformat()
+        data_real = resultado.get("data")
+        tipo = resultado.get("tipo", "estimulada")
+        return [
+            {
+                "instituto_id": self.instituto_id,
+                "cargo": "governador_rj",
+                "candidato": c["nome"],
+                "percentual": c["percentual"],
+                "tipo": tipo,
+                "data_pesquisa": data_real or hoje,
+                "data_coleta": hoje,
+                "data_divulgacao": data_real,
+                "tamanho_amostra": resultado.get("tamanho_amostra"),
+                "margem_erro": resultado.get("margem_erro"),
+                "fonte_url": url,
+                "metodologia": "Espontânea" if tipo == "espontanea" else "Estimulada",
+            }
+            for c in candidatos
+            if c.get("nome") and c.get("percentual") is not None
+        ]
+
     def _parse_release(self, html: str, url: str) -> list[dict]:
+        url_lower = url.lower()
+        if 'rio' in url_lower and ('governador' in url_lower or 'governo' in url_lower or 'rj' in url_lower):
+            from .gemini_extractor import extrair_governador_rj
+            res_gov = extrair_governador_rj(html, fonte_url=url)
+            if res_gov.get("candidatos"):
+                return self._build_items_gov(res_gov, url)
+
         return self._parse_com_gemini(html, url, instituto_id=self.instituto_id)
 
     def fetch(self) -> list[dict]:

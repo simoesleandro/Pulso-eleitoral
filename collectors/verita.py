@@ -151,23 +151,56 @@ class VeritaCollector(PlaywrightCollector, BaseCollector):
             self.logger.error("[Verita] Falha ao baixar/extrair PDF %s: %s", pdf_url, e)
             return ""
 
+    def _build_items_gov(self, resultado: dict, url: str) -> list[dict]:
+        candidatos = resultado.get("candidatos") or []
+        if not candidatos:
+            return []
+        hoje = date.today().isoformat()
+        data_real = resultado.get("data")
+        tipo = resultado.get("tipo", "estimulada")
+        return [
+            {
+                "instituto_id": self.instituto_id,
+                "cargo": "governador_rj",
+                "candidato": c["nome"],
+                "percentual": c["percentual"],
+                "tipo": tipo,
+                "data_pesquisa": data_real or hoje,
+                "data_coleta": hoje,
+                "data_divulgacao": data_real,
+                "tamanho_amostra": resultado.get("tamanho_amostra"),
+                "margem_erro": resultado.get("margem_erro"),
+                "fonte_url": url,
+                "metodologia": "Espontânea" if tipo == "espontanea" else "Estimulada",
+            }
+            for c in candidatos
+            if c.get("nome") and c.get("percentual") is not None
+        ]
+
     def _parse_release(self, html: str, url: str) -> list[dict]:
         pdf_url = self._extract_pdf_url(html)
         if not pdf_url:
             self.logger.warning("[Verita] PDF não encontrado em %s", url)
             return []
 
-        if not _is_pdf_nacional(pdf_url):
-            return []
+        filename = pdf_url.split('/')[-1]
+        is_rj = any(m in filename.lower() for m in ['rio_de_janeiro', 'rj', 'rio-de-janeiro'])
 
-        self.logger.info("[Verita] PDF nacional: %s", pdf_url.split('/')[-1])
+        if not _is_pdf_nacional(pdf_url) and not is_rj:
+            return []
 
         texto = self._download_pdf_text(pdf_url)
         if not texto:
             self.logger.warning("[Verita] Texto vazio do PDF em %s", pdf_url)
             return []
 
-        self.logger.info("[Verita] PDF extraído: %d chars", len(texto))
+        if is_rj:
+            self.logger.info("[Verita] PDF Governador RJ: %s", filename)
+            from .gemini_extractor import extrair_governador_rj
+            res_gov = extrair_governador_rj(texto, fonte_url=url)
+            return self._build_items_gov(res_gov, url)
+
+        self.logger.info("[Verita] PDF nacional: %s", filename)
         return self._parse_com_gemini(texto, url, instituto_id=self.instituto_id)
 
     def fetch(self) -> list[dict]:

@@ -31,7 +31,11 @@ HEADERS = {
 }
 
 # Marcadores de que o release/PDF é do Rio de Janeiro.
-_RJ_MARKERS = ("rio-de-janeiro", "rio_de_janeiro", "-rj-", "_rj_", "rj-04", "/rj/")
+_RJ_MARKERS = (
+    "rio-de-janeiro", "rio_de_janeiro", "-rj-", "_rj_", "/rj/",
+    "rio", "fluminense", "governo-do-rio", "estado-do-rio",
+    "rj-01", "rj-02", "rj-03", "rj-04", "rj-05", "rj-06", "rj-07", "rj-08", "rj-09"
+)
 
 
 def _e_release_rj(href: str) -> bool:
