@@ -149,13 +149,20 @@ def run_all_collectors(progress_callback=None):
         if progress_callback:
             progress_callback(idx, total, nome_coletor, None)
         try:
-            res = c.run()
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(c.run)
+                res = future.result(timeout=45)
             entrada = {
                 "coletor": nome_coletor,
                 "status": res.get("status", "ok") if isinstance(res, dict) else "ok",
             }
             if isinstance(res, dict) and res.get("falhas"):
                 entrada["falhas"] = len(res["falhas"])
+            resultados.append(entrada)
+        except concurrent.futures.TimeoutError:
+            app.logger.warning(f"Coletor {nome_coletor} excedeu timeout de 45s e foi cancelado.")
+            entrada = {"coletor": nome_coletor, "status": "timeout", "msg": "Excedeu 45s"}
             resultados.append(entrada)
         except Exception as e:
             app.logger.error(f"Erro no coletor {nome_coletor}: {e}")
