@@ -74,9 +74,9 @@ app.config.update(
 )
 
 # Limite de tamanho do corpo de request (defesa contra exhaustion de memória/CPU
-# num processo único, sem multi-worker). 2 MB é generoso para o maior payload
-# legítimo hoje (form de /login ou JSON pequeno de /admin/coletar-url) — não há
-# rota de upload de arquivo via HTTP nesta app.
+# num processo único, sem multi-worker). 2 MB cobre o maior payload legítimo:
+# o CSV de microdados de /integridade/microdados (db/microdados.LIMITE_BYTES
+# espelha este valor) ou o JSON pequeno de /admin/coletar-url.
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2 MB
 
 # Proteção CSRF (Flask-WTF). Desativada apenas sob TESTING para manter a suíte verde
@@ -852,6 +852,52 @@ def pesquisa_detalhe(pesquisa_id):
         return "Pesquisa não encontrada.", 404
     cores_candidatos = get_cores_candidatos()
     return render_template('pesquisa_detalhe.html', pesquisa=pesquisa, cores_candidatos=cores_candidatos)
+
+@app.route('/integridade')
+def integridade():
+    """Painel de integridade estatística — indícios de anomalia em pesquisas
+    (dígito final, subdispersão, z-score vs consenso, divergência TSE).
+    Fora da allowlist de require_login DE PROPÓSITO: acesso só logado, porque
+    a categorização é de indício estatístico, não prova de irregularidade."""
+    return render_template('integridade.html')
+
+@app.route('/api/integridade')
+@cache.cached(timeout=300, query_string=True)
+def api_integridade():
+    """JSON completo do painel de integridade (restrito, ver rota acima)."""
+    from database import get_integridade_geral
+    cargo = request.args.get('cargo', 'presidente')
+    if cargo not in ('presidente', 'governador_rj'):
+        cargo = 'presidente'
+    return jsonify(get_integridade_geral(cargo))
+
+@app.route('/integridade/microdados', methods=['POST'])
+def integridade_microdados():
+    """Laudo de microdados enviados por upload (CSV). Sem cache (upload não é
+    idempotente). CSRF validado pelo CSRFProtect global — sem @csrf.exempt.
+    Fora da allowlist: só logado (mesma rota /integridade acima)."""
+    from db.microdados import ErroMicrodados, analisar_csv
+
+    arquivo = request.files.get('arquivo')
+    if arquivo is None or not arquivo.filename:
+        return jsonify({"erro": "nenhum arquivo enviado"}), 400
+
+    proporcoes = None
+    proporcoes_raw = request.form.get('proporcoes', '').strip()
+    if proporcoes_raw:
+        try:
+            proporcoes = json.loads(proporcoes_raw)
+            if not isinstance(proporcoes, dict):
+                raise ValueError
+        except ValueError:
+            return jsonify({"erro": "proporções de referência: JSON inválido (esperado objeto)"}), 400
+
+    try:
+        laudo = analisar_csv(arquivo.read(), proporcoes)
+    except ErroMicrodados as e:
+        return jsonify({"erro": str(e)}), 400
+
+    return jsonify(laudo)
 
 @app.route('/api/pesquisas/presidente')
 @cache.cached(timeout=300)

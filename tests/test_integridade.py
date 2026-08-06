@@ -7,6 +7,7 @@ from datetime import date, timedelta
 import pytest
 
 from database import DB_PATH, init_db, get_conn, get_integridade_geral
+from app import app as flask_app
 
 
 @pytest.fixture(autouse=True)
@@ -178,3 +179,52 @@ def test_contrato_do_json():
                   "divergencias_tse", "disclaimer", "atualizado_em"):
         assert chave in resultado
     assert "fraude" not in str(resultado["disclaimer"]).split("prova de")[0].lower()
+
+
+# ---------- rotas: restritas a login (não entram na allowlist) ----------
+
+@pytest.fixture
+def client():
+    flask_app.config['TESTING'] = True
+    flask_app.config['SECRET_KEY'] = 'test-secret-key'
+    with flask_app.test_client() as client:
+        yield client
+
+
+def _login(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['username'] = 'admin'
+        sess['nome'] = 'Administrador'
+
+
+def test_integridade_exige_login(client):
+    resp = client.get('/integridade', follow_redirects=False)
+    assert resp.status_code == 302
+    assert '/login' in resp.headers['Location']
+
+    resp_api = client.get('/api/integridade', follow_redirects=False)
+    assert resp_api.status_code == 302
+    assert '/login' in resp_api.headers['Location']
+
+
+def test_integridade_logado_200(client):
+    _init_limpo()
+    _login(client)
+
+    resp = client.get('/integridade')
+    assert resp.status_code == 200
+
+    resp_api = client.get('/api/integridade')
+    assert resp_api.status_code == 200
+    corpo = resp_api.get_json()
+    assert corpo['cargo'] == 'presidente'
+    assert 'institutos' in corpo
+
+
+def test_integridade_cargo_invalido_cai_no_default(client):
+    _init_limpo()
+    _login(client)
+    resp = client.get('/api/integridade?cargo=nao-existe')
+    assert resp.status_code == 200
+    assert resp.get_json()['cargo'] == 'presidente'
