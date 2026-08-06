@@ -90,14 +90,13 @@ def init_db(force_seed=False):
     from scripts.migrate_pesquisas_tse import aplicar_migracao as _aplicar_migracao_tse
     _aplicar_migracao_tse(conn)
 
-    # Verifica se os dados já foram populados
+    # 2. Executa o seed.sql (institutos — dado real) se o banco estiver vazio.
+    # Seguro em qualquer ambiente: collectors/*.py dependem desses instituto_id
+    # via foreign key, então essa carga precisa acontecer mesmo em produção.
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM institutos")
     count_institutos = cursor.fetchone()[0]
 
-    # 2. Executa o seed.sql (institutos — dado real) se o banco estiver vazio.
-    # Seguro em qualquer ambiente: collectors/*.py dependem desses instituto_id
-    # via foreign key, então essa carga precisa acontecer mesmo em produção.
     if count_institutos == 0:
         seed_path = os.path.join(database.BASE_DIR, 'seed.sql')
         if os.path.exists(seed_path):
@@ -106,21 +105,15 @@ def init_db(force_seed=False):
             conn.executescript(seed_sql)
             conn.commit()
 
-    # Preenche institutos.cnpj DEPOIS do seed — em banco novo os institutos só
-    # existem a partir daqui, e a migração acima roda antes (o UPDATE não
-    # acharia linha nenhuma). Idempotente: não sobrescreve CNPJ já definido.
+    # Preenche institutos.cnpj DEPOIS do seed
     from scripts.migrate_pesquisas_tse import popular_cnpjs as _popular_cnpjs
     _popular_cnpjs(conn)
 
-    # Curadoria: promove ao agregado os institutos do seed. Depois do seed
-    # pelo mesmo motivo de _popular_cnpjs — antes dele não há linha para
-    # atualizar. Não ressuscita instituto rejeitado à mão (lista explícita).
+    # Curadoria: promove ao agregado os institutos do seed
     from scripts.migrate_curadoria import promover_institutos_do_seed as _promover
     _promover(conn)
 
     # Migration idempotente: funde pesquisas duplicadas pela chave sintética
-    # de URL (ver scripts/migrate_dedup_pesquisas.py). Roda depois do seed
-    # porque precisa das pesquisas já carregadas.
     from scripts.migrate_dedup_pesquisas import aplicar_migracao as _aplicar_dedup
     _aplicar_dedup(conn)
 
@@ -130,6 +123,7 @@ def init_db(force_seed=False):
     # num banco de teste que sobrou de uma execução anterior). Nunca roda por
     # o banco estar vazio sozinho, senão contamina produção com dado fabricado
     # (ver incidente de 2026-07-21 na memória do projeto).
+    cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM pesquisas")
     count_pesquisas = cursor.fetchone()[0]
     if count_pesquisas == 0 and (force_seed or os.getenv('TESTING') == 'True'):
@@ -139,6 +133,10 @@ def init_db(force_seed=False):
                 seed_demo_sql = f.read()
             conn.executescript(seed_demo_sql)
             conn.commit()
+
+    # Migration idempotente: pesquisas reais de Governador do RJ
+    from scripts.migrate_real_gov_rj import aplicar_migracao as _aplicar_migracao_gov_rj
+    _aplicar_migracao_gov_rj(conn)
 
     # 3. Inicializa ou sincroniza a senha do usuário admin se ADMIN_PASS estiver configurada no ambiente
     from dotenv import load_dotenv
