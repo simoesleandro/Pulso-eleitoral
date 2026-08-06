@@ -598,13 +598,17 @@
 
       // Para cada candidato: banda de incerteza (linha±margem) + linha principal.
       // A banda são 2 datasets ocultos (limite inferior e superior) com fill entre eles.
+      const STYLES = ['circle', 'triangle', 'rectRot', 'star', 'rect', 'crossRot'];
       const datasets = [];
-      series.forEach(s => {
+      series.forEach((s, sIdx) => {
         const porData = {};
         s.dados.forEach(d => { porData[d.data] = d; });
         const pct   = todasDatas.map(dt => porData[dt] ? porData[dt].percentual : null);
         const lower = todasDatas.map(dt => { const d = porData[dt]; return d ? d.percentual - parseMargem(d.margem_erro) : null; });
         const upper = todasDatas.map(dt => { const d = porData[dt]; return d ? d.percentual + parseMargem(d.margem_erro) : null; });
+
+        const pStyle = STYLES[sIdx % STYLES.length];
+        const isPontosUnicos = s.dados.length === 1;
 
         const idxLower = datasets.length;
         datasets.push({
@@ -612,30 +616,41 @@
           borderColor: 'transparent', backgroundColor: 'transparent',
           borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false,
           tension: 0.2, spanGaps: false,
+          datalabels: { display: false }
         });
         datasets.push({
           label: '_band_upper_' + s.candidato, data: upper, _band: true,
-          borderColor: 'transparent', backgroundColor: s.cor + '26',  // ~0.15 de opacidade
+          borderColor: 'transparent', backgroundColor: s.cor + '26',
           borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: idxLower,
           tension: 0.2, spanGaps: false,
+          datalabels: { display: false }
         });
         datasets.push({
           label: s.candidato, data: pct,
           borderColor: s.cor, backgroundColor: s.cor + '18', borderWidth: 2,
           pointBackgroundColor: s.cor, pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
-          pointRadius: 5, pointHoverRadius: 7, tension: 0.2, spanGaps: false,
+          pointStyle: pStyle,
+          pointRadius: isPontosUnicos ? 7 : 5, pointHoverRadius: 8, tension: 0.2, spanGaps: false,
+          datalabels: {
+            display: ctx => ctx.dataset.data[ctx.dataIndex] !== null,
+            align: sIdx % 2 === 0 ? 'top' : 'bottom',
+            offset: 4,
+            formatter: v => v !== null ? `${v.toFixed(1)}%` : '',
+            color: s.cor,
+            font: { family: "'JetBrains Mono', monospace", size: 10, weight: 'bold' }
+          }
         });
       });
 
       chartHistoricoMulti = new Chart(ctx, {
         type: 'line',
-        plugins: [eventosMarkerPlugin],
+        plugins: [eventosMarkerPlugin, ChartDataLabels],
         data: { labels: todasDatas.map(formatarData), datasets },
         options: {
           responsive: true, maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            datalabels: { display: false },
+            datalabels: { display: true },
             legend: { display: true, position: 'top', labels: { filter: item => !item.text.startsWith('_band'), color: '#0A2240', font: { family: "'Inter', sans-serif", size: 12 }, usePointStyle: true, padding: 16 } },
             tooltip: {
               backgroundColor: '#FFFFFF', titleColor: '#0A2240', bodyColor: '#5a7184',
@@ -697,13 +712,17 @@
 
       const todasDatas = [...new Set(series.flatMap(s => s.dados.map(d => d.data)))].sort();
 
+      const STYLES = ['circle', 'triangle', 'rectRot', 'star', 'rect', 'crossRot'];
       const datasets = [];
-      series.forEach(s => {
+      series.forEach((s, sIdx) => {
         const porData = {};
         s.dados.forEach(d => { porData[d.data] = d; });
         const pct   = todasDatas.map(dt => porData[dt] ? porData[dt].percentual : null);
         const lower = todasDatas.map(dt => { const d = porData[dt]; return d ? d.percentual - parseMargem(d.margem_erro) : null; });
         const upper = todasDatas.map(dt => { const d = porData[dt]; return d ? d.percentual + parseMargem(d.margem_erro) : null; });
+
+        const pStyle = STYLES[sIdx % STYLES.length];
+        const isPontosUnicos = s.dados.length === 1;
 
         const idxLower = datasets.length;
         datasets.push({
@@ -711,30 +730,41 @@
           borderColor: 'transparent', backgroundColor: 'transparent',
           borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false,
           tension: 0.2, spanGaps: false,
+          datalabels: { display: false }
         });
         datasets.push({
           label: '_band_upper_' + s.candidato, data: upper, _band: true,
           borderColor: 'transparent', backgroundColor: s.cor + '26',
           borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: idxLower,
           tension: 0.2, spanGaps: false,
+          datalabels: { display: false }
         });
         datasets.push({
           label: s.candidato, data: pct,
           borderColor: s.cor, backgroundColor: s.cor + '18', borderWidth: 2,
           pointBackgroundColor: s.cor, pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
-          pointRadius: 5, pointHoverRadius: 7, tension: 0.2, spanGaps: false,
+          pointStyle: pStyle,
+          pointRadius: isPontosUnicos ? 7 : 5, pointHoverRadius: 8, tension: 0.2, spanGaps: false,
+          datalabels: {
+            display: ctx => ctx.dataset.data[ctx.dataIndex] !== null,
+            align: sIdx % 2 === 0 ? 'top' : 'bottom',
+            offset: 4,
+            formatter: v => v !== null ? `${v.toFixed(1)}%` : '',
+            color: s.cor,
+            font: { family: "'JetBrains Mono', monospace", size: 10, weight: 'bold' }
+          }
         });
       });
 
       chartHistoricoMultiRJ = new Chart(ctx, {
         type: 'line',
-        plugins: [eventosMarkerPluginRJ],
+        plugins: [eventosMarkerPluginRJ, ChartDataLabels],
         data: { labels: todasDatas.map(formatarData), datasets },
         options: {
           responsive: true, maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            datalabels: { display: false },
+            datalabels: { display: true },
             legend: { display: true, position: 'top', labels: { filter: item => !item.text.startsWith('_band'), color: '#0A2240', font: { family: "'Inter', sans-serif", size: 12 }, usePointStyle: true, padding: 16 } },
             tooltip: {
               backgroundColor: '#FFFFFF', titleColor: '#0A2240', bodyColor: '#5a7184',

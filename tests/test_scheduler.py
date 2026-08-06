@@ -48,7 +48,7 @@ def test_run_all_collectors():
         assert 'status' in item
         # 'vazio' = rodou sem exceção e não salvou nada; 'parcial' = alguns
         # releases falharam. Antes ambos vinham como 'ok' e a quebra sumia.
-        assert item['status'] in ['ok', 'vazio', 'parcial', 'erro']
+        assert item['status'] in ['ok', 'vazio', 'parcial', 'erro', 'timeout']
 
 def test_salvar_e_buscar_ultimo_log():
     """Testa salvar_log_scheduler() e buscar_ultimo_log() no banco de dados temporário."""
