@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+
+{% block title %}Integridade Estatística — Pulso Eleitoral{% endblock %}
+
+{% block head %}
+  <style>
+    .integ-hero {
+      background: var(--pe-navy);
+      padding: 40px 24px 32px;
+      text-align: center;
+    }
+    .integ-hero__badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+    }
+    .integ-hero__title { color: #fff; font-size: 26px; font-weight: 500; margin-bottom: 8px; }
+    .integ-hero__sub { color: rgba(255,255,255,0.6); font-size: 14px; max-width: 640px; margin: 0 auto; }
+
+    .integ-wrap { max-width: 1000px; margin: 0 auto; padding: 32px 0 48px; }
+
+    .integ-disclaimer {
+      background: #FDF6EC;
+      border: 1px solid var(--pe-warn);
+      border-radius: 6px;
+      padding: 14px 16px;
+      font-size: 13px;
+      color: var(--pe-text);
+      margin-bottom: 28px;
+    }
+
+    .integ-section { margin-bottom: 36px; }
+    .integ-section__title {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--pe-navy);
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--pe-surface);
+    }
+    .integ-controls { margin-bottom: 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .integ-controls select {
+      font: inherit; font-size: 13px; padding: 6px 10px;
+      border: 1px solid var(--pe-surface); border-radius: 4px; background: var(--pe-surface-2);
+      color: var(--pe-text);
+    }
+
+    /* Cards por instituto */
+    .integ-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .integ-card {
+      background: var(--pe-surface-2);
+      border: 1px solid var(--pe-surface);
+      border-radius: 6px;
+      padding: 14px 16px;
+    }
+    .integ-card__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .integ-card__nome { font-weight: 500; color: var(--pe-text); }
+    .integ-card__nao-agregado { font-size: 11px; color: var(--pe-text-muted); }
+    .integ-badge {
+      font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .03em;
+      padding: 3px 10px; border-radius: 999px; color: #fff; white-space: nowrap;
+    }
+    .integ-badge--sem_indicios { background: var(--pe-up); }
+    .integ-badge--atencao { background: var(--pe-warn); }
+    .integ-badge--anomalo { background: var(--pe-down); }
+    .integ-teste { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-top: 1px dashed var(--pe-surface); }
+    .integ-teste__nome { color: var(--pe-text-muted); }
+    .integ-teste__valor { font-family: 'JetBrains Mono', monospace; color: var(--pe-text); }
+    .integ-teste__valor--flag { color: var(--pe-down); font-weight: 500; }
+    .integ-teste__valor--na { color: var(--pe-text-muted); font-style: italic; font-family: inherit; }
+
+    .integ-chart { position: relative; height: 300px; background: var(--pe-surface-2); border: 1px solid var(--pe-surface); border-radius: 6px; padding: 14px; }
+
+    /* Tabela de pesquisas */
+    .integ-tabela-wrap { overflow-x: auto; }
+    .integ-tabela { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .integ-tabela th {
+      text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .03em;
+      color: var(--pe-text-muted); padding: 8px 10px; border-bottom: 2px solid var(--pe-surface);
+    }
+    .integ-tabela td { padding: 8px 10px; border-bottom: 1px solid var(--pe-surface); }
+    .integ-tabela td.mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Upload de microdados */
+    .integ-upload {
+      background: var(--pe-surface);
+      border-radius: 6px;
+      padding: 18px;
+    }
+    .integ-upload__nota { font-size: 12px; color: var(--pe-text-muted); margin: 8px 0 14px; }
+    .integ-upload input[type="file"] { font-size: 13px; margin-bottom: 10px; }
+    .integ-upload textarea {
+      width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      border: 1px solid var(--pe-surface-2); border-radius: 4px; padding: 8px;
+      min-height: 60px; margin-bottom: 10px; box-sizing: border-box;
+    }
+    .integ-upload button {
+      font: inherit; font-size: 13px; font-weight: 500; color: #fff;
+      background: var(--pe-navy); border: none; border-radius: 4px;
+      padding: 8px 18px; cursor: pointer;
+    }
+    .integ-upload button:disabled { opacity: .6; cursor: wait; }
+    .integ-upload__erro { color: var(--pe-down); font-size: 13px; margin-top: 10px; }
+
+    .integ-laudo { margin-top: 20px; }
+    .integ-laudo h3 { font-size: 14px; color: var(--pe-navy); margin: 16px 0 8px; }
+
+    /* Metodologia */
+    .integ-met details {
+      background: var(--pe-surface-2); border: 1px solid var(--pe-surface);
+      border-radius: 6px; padding: 12px 16px; margin-bottom: 8px;
+    }
+    .integ-met summary { font-weight: 500; color: var(--pe-navy); cursor: pointer; font-size: 14px; }
+    .integ-met p { font-size: 13px; color: var(--pe-text); margin: 10px 0 0; line-height: 1.55; }
+
+    .integ-vazio { color: var(--pe-text-muted); font-size: 13px; font-style: italic; }
+  </style>
+{% endblock %}
+
+{% block topbar_nav %}
+  <a class="pe-topbar__nav-item" href="/dashboard">Dashboard</a>
+  <a class="pe-topbar__nav-item" href="/metodologia">Metodologia</a>
+  <a class="pe-topbar__nav-item" href="/admin">Admin</a>
+{% endblock %}
+
+{% block before_content %}
+  <div class="integ-hero">
+    <div class="integ-hero__badge">Área restrita</div>
+    <div class="integ-hero__title">Integridade Estatística</div>
+    <p class="integ-hero__sub">
+      Perícia forense de dados sobre as pesquisas coletadas: dígito final,
+      subdispersão, desvio vs. consenso e registro TSE — mais laudo de
+      microdados sob demanda.
+    </p>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="integ-wrap">
+
+    <div class="integ-disclaimer" id="integ-disclaimer">
+      <strong>Indícios não são prova.</strong> Os testes desta página medem a
+      improbabilidade dos números sob amostragem aleatória simples. Um resultado
+      "anômalo" é um convite à investigação — pode ter explicação metodológica
+      legítima (cotas, arredondamento editorial, tracking) e nunca deve ser
+      divulgado como fraude comprovada.
+    </div>
+
+    <section class="integ-section">
+      <h2 class="integ-section__title">Institutos — score de anomalia</h2>
+      <div class="integ-controls">
+        <label for="integ-cargo">Cargo:</label>
+        <select id="integ-cargo">
+          <option value="presidente">Presidente</option>
+          <option value="governador_rj">Governador RJ</option>
+        </select>
+      </div>
+      <div class="integ-cards" id="integ-cards"><span class="integ-vazio">Carregando…</span></div>
+    </section>
+
+    <section class="integ-section">
+      <h2 class="integ-section__title">Dígito final — observado vs. esperado</h2>
+      <div class="integ-controls">
+        <label for="integ-inst-select">Instituto:</label>
+        <select id="integ-inst-select"></select>
+      </div>
+      <div class="integ-chart"><canvas id="chart-digito-final"></canvas></div>
+    </section>
+
+    <section class="integ-section">
+      <h2 class="integ-section__title">Desvio vs. consenso (z-score por instituto/candidato)</h2>
+      <div class="integ-chart" id="integ-chart-z-wrap"><canvas id="chart-zscores"></canvas></div>
+    </section>
+
+    <section class="integ-section">
+      <h2 class="integ-section__title">Pesquisas na janela — score individual</h2>
+      <div class="integ-tabela-wrap">
+        <table class="integ-tabela">
+          <thead>
+            <tr>
+              <th>Data</th><th>Instituto</th><th>Máx |z|</th>
+              <th>Diverg. TSE</th><th>Score</th><th>Categoria</th>
+            </tr>
+          </thead>
+          <tbody id="integ-pesquisas"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="integ-section">
+      <h2 class="integ-section__title">Laudo de microdados (CSV)</h2>
+      <div class="integ-upload">
+        <form id="integ-form-microdados">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div><input type="file" name="arquivo" accept=".csv,text/csv" required></div>
+          <label for="integ-proporcoes" style="font-size:12px;">Proporções de referência (JSON, opcional) —
+            ex.: <code>{"sexo": {"F": 52, "M": 48}}</code></label>
+          <textarea id="integ-proporcoes" name="proporcoes" placeholder='{"coluna": {"categoria": percentual}}'></textarea>
+          <button type="submit" id="integ-btn-analisar">Analisar</button>
+        </form>
+        <p class="integ-upload__nota">
+          O arquivo é processado em memória e <strong>não é armazenado</strong> —
+          microdados podem conter dados pessoais (LGPD). Limite: 2&nbsp;MB.
+          Testes aplicados: Lei de Benford, dígito final, duplicatas exatas de
+          questionário e aderência/divergência KL às proporções informadas.
+        </p>
+        <div class="integ-upload__erro" id="integ-upload-erro"></div>
+      </div>
+      <div class="integ-laudo" id="integ-laudo"></div>
+    </section>
+
+    <section class="integ-section integ-met">
+      <h2 class="integ-section__title">Metodologia dos testes</h2>
+      <details>
+        <summary>Dígito final (qui-quadrado, gl=9)</summary>
+        <p>Em percentuais reais de pesquisa, o último dígito decimal é
+        aproximadamente uniforme entre 0 e 9. Excesso de terminações em .0 e .5
+        sugere arredondamento manual ou estimativa "no olho". Exige ≥ 30
+        percentuais publicados pelo instituto (janela de 365 dias, todos os
+        cargos); abaixo disso o painel marca "dados insuficientes".</p>
+      </details>
+      <details>
+        <summary>Subdispersão — "bom demais para ser verdade"</summary>
+        <p>Sob amostragem aleatória, a série de um candidato num mesmo instituto
+        flutua com variância mínima p(1−p)/n. Variância muito ABAIXO disso
+        (estatística Σ(pᵢ−p̄)²/(p̄(1−p̄)/nᵢ) na cauda esquerda da qui-quadrado) é o
+        indício clássico de números fabricados (caso Research 2000). Exige ≥ 5
+        pesquisas por série. Ressalva: amostragem por cotas reduz a variância
+        legitimamente — isolado, este teste é indício fraco.</p>
+      </details>
+      <details>
+        <summary>Z-score vs. consenso</summary>
+        <p>Média do instituto por candidato comparada à média dos demais
+        institutos na janela de 90 dias, normalizada pelo erro-padrão binomial
+        combinado. |z| &gt; 2 é atenção; |z| &gt; 3 é outlier (menos de 0,3% de
+        probabilidade sob amostragem honesta e ausência de viés de casa).</p>
+      </details>
+      <details>
+        <summary>Divergência TSE</summary>
+        <p>Compara a amostra publicada no release com a registrada no TSE
+        (pesquisas ligadas pelo protocolo). Divergência &gt; 10% é sinalizada.
+        Divergência pequena é normal: o TSE guarda a amostra planejada; o
+        release publica a realizada.</p>
+      </details>
+      <details>
+        <summary>Lei de Benford e testes de microdados</summary>
+        <p>A Lei de Benford (1º dígito: "1" em ~30,1% dos casos, "9" em ~4,6%)
+        só vale para grandezas que atravessam ≥ 2 ordens de magnitude — por isso
+        NÃO é aplicada aos percentuais agregados do banco (limitados a 0–100),
+        apenas a colunas de contagens nos microdados enviados. O laudo também
+        procura questionários duplicados (copy-paste) e compara a distribuição
+        demográfica da amostra com proporções de referência via qui-quadrado e
+        divergência de Kullback-Leibler.</p>
+      </details>
+      <details>
+        <summary>Score composto</summary>
+        <p>Cada teste com p &lt; 0,01 (ou |z| &gt; 3) soma 2 pontos; p &lt; 0,05
+        (ou |z| &gt; 2) soma 1; divergência TSE soma 1 por pesquisa (teto 2).
+        0 = sem indícios; 1–2 = atenção; ≥ 3 = anômalo. Testes sem N mínimo não
+        pontuam — ausência de dados nunca vira veredito. Esta página analisa
+        todos os institutos, inclusive os fora da média agregada.</p>
+      </details>
+    </section>
+
+  </div>
+{% endblock %}
+
+{% block chart_libs %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  let dados = null;
+  let chartDigito = null;
+  let chartZ = null;
+
+  const fmtP = (p) => p < 0.0001 ? '<0.0001' : p.toFixed(4);
+
+  function badge(cat, label) {
+    return `<span class="integ-badge integ-badge--${cat}">${label}</span>`;
+  }
+
+  function linhaTeste(nome, valor, flag, na) {
+    const cls = na ? 'integ-teste__valor--na' : (flag ? 'integ-teste__valor integ-teste__valor--flag' : 'integ-teste__valor');
+    return `<div class="integ-teste"><span class="integ-teste__nome">${nome}</span>` +
+           `<span class="${cls}">${valor}</span></div>`;
+  }
+
+  function renderCards() {
+    const el = document.getElementById('integ-cards');
+    if (!dados.institutos.length) {
+      el.innerHTML = '<span class="integ-vazio">Nenhum instituto com dados na janela.</span>';
+      return;
+    }
+    el.innerHTML = dados.institutos.map(i => {
+      const t = i.testes;
+      let linhas = '';
+      if (t.digito_final.status) {
+        linhas += linhaTeste('Dígito final', 'dados insuficientes', false, true);
+      } else {
+        linhas += linhaTeste('Dígito final (p)', fmtP(t.digito_final.p_valor), t.digito_final.p_valor < 0.05);
+      }
+      if (t.subdispersao.status) {
+        linhas += linhaTeste('Subdispersão', 'dados insuficientes', false, true);
+      } else {
+        linhas += linhaTeste('Subdispersão (p)', fmtP(t.subdispersao.p_subdispersao), t.subdispersao.p_subdispersao < 0.05);
+      }
+      if (t.zscore_consenso.status) {
+        linhas += linhaTeste('Z vs consenso', 'dados insuficientes', false, true);
+      } else {
+        linhas += linhaTeste('Máx |z| vs consenso', t.zscore_consenso.max_z.toFixed(2), t.zscore_consenso.max_z > 2);
+      }
+      linhas += linhaTeste('Pesquisas c/ diverg. TSE', String(t.divergencia_tse.pesquisas_divergentes),
+                           t.divergencia_tse.pesquisas_divergentes > 0);
+      const naoAgregado = i.agregar === 0 ? ' <span class="integ-card__nao-agregado">(fora da média)</span>' : '';
+      return `<div class="integ-card">
+        <div class="integ-card__head">
+          <span class="integ-card__nome">${i.instituto}${naoAgregado}</span>
+          ${badge(i.categoria, i.categoria_label + ' · ' + i.score)}
+        </div>${linhas}</div>`;
+    }).join('');
+  }
+
+  function renderChartDigito() {
+    const sel = document.getElementById('integ-inst-select');
+    const comDados = dados.institutos.filter(i => !i.testes.digito_final.status);
+    sel.innerHTML = comDados.map(i => `<option value="${i.instituto}">${i.instituto}</option>`).join('')
+      || '<option value="">— sem instituto com N suficiente —</option>';
+    const desenhar = () => {
+      const inst = comDados.find(i => i.instituto === sel.value) || comDados[0];
+      if (chartDigito) { chartDigito.destroy(); chartDigito = null; }
+      if (!inst) return;
+      const d = inst.testes.digito_final;
+      const esperado = d.n / 10;
+      chartDigito = new Chart(document.getElementById('chart-digito-final'), {
+        type: 'bar',
+        data: {
+          labels: ['0','1','2','3','4','5','6','7','8','9'],
+          datasets: [
+            { label: 'Observado', data: d.contagens, backgroundColor: PE.navy },
+            { label: 'Esperado (uniforme)', data: Array(10).fill(esperado),
+              type: 'line', borderColor: PE.red, borderDash: [6, 4], pointRadius: 0 }
+          ]
+        },
+        options: { ...PE_CHART_DEFAULTS,
+          plugins: { ...PE_CHART_DEFAULTS.plugins, legend: { display: true } },
+          scales: { y: { beginAtZero: true } } }
+      });
+    };
+    sel.onchange = desenhar;
+    desenhar();
+  }
+
+  function renderChartZ() {
+    if (chartZ) { chartZ.destroy(); chartZ = null; }
+    const zs = dados.zscores.slice(0, 20);
+    const wrap = document.getElementById('integ-chart-z-wrap');
+    if (!zs.length) {
+      wrap.innerHTML = '<span class="integ-vazio">Sem séries suficientes (mínimo: 3 institutos por candidato, 2 pesquisas por instituto).</span>';
+      return;
+    }
+    wrap.style.height = Math.max(200, zs.length * 28 + 60) + 'px';
+    chartZ = new Chart(document.getElementById('chart-zscores'), {
+      type: 'bar',
+      data: {
+        labels: zs.map(e => `${e.instituto} — ${e.candidato}`),
+        datasets: [{
+          data: zs.map(e => e.z),
+          backgroundColor: zs.map(e => Math.abs(e.z) > 3 ? PE.down : (Math.abs(e.z) > 2 ? PE.warn : PE.navy)),
+        }]
+      },
+      options: { ...PE_CHART_DEFAULTS, indexAxis: 'y',
+        scales: { x: { suggestedMin: -4, suggestedMax: 4, grid: { color: (ctx) =>
+          Math.abs(ctx.tick.value) === 2 || Math.abs(ctx.tick.value) === 3 ? PE.warn : 'rgba(0,0,0,0.06)' } } } }
+    });
+  }
+
+  function renderPesquisas() {
+    const tbody = document.getElementById('integ-pesquisas');
+    if (!dados.pesquisas.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="integ-vazio">Nenhuma pesquisa na janela.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = dados.pesquisas.map(p => `<tr>
+      <td class="mono"><a href="/pesquisa/${p.id}">${peFormatDate(p.data_pesquisa)}</a></td>
+      <td>${p.instituto}</td>
+      <td class="mono">${p.max_z === null ? '—' : p.max_z.toFixed(2)}</td>
+      <td class="mono">${p.divergencia_tse === null ? '—' : p.divergencia_tse.toFixed(1) + '%'}</td>
+      <td class="mono">${p.score}</td>
+      <td>${badge(p.categoria, p.categoria_label)}</td>
+    </tr>`).join('');
+  }
+
+  async function carregar() {
+    const cargo = document.getElementById('integ-cargo').value;
+    dados = await peFetch('/api/integridade', { cargo });
+    if (!dados) {
+      document.getElementById('integ-cards').innerHTML =
+        '<span class="integ-vazio">Erro ao carregar os dados.</span>';
+      return;
+    }
+    renderCards();
+    renderChartDigito();
+    renderChartZ();
+    renderPesquisas();
+  }
+
+  document.getElementById('integ-cargo').addEventListener('change', carregar);
+  carregar();
+
+  // ---- Upload de microdados ----
+  const form = document.getElementById('integ-form-microdados');
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const btn = document.getElementById('integ-btn-analisar');
+    const erroEl = document.getElementById('integ-upload-erro');
+    const laudoEl = document.getElementById('integ-laudo');
+    erroEl.textContent = '';
+    laudoEl.innerHTML = '';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/integridade/microdados', { method: 'POST', body: new FormData(form) });
+      const corpo = await res.json();
+      if (!res.ok) {
+        erroEl.textContent = corpo.erro || `Erro HTTP ${res.status}`;
+        return;
+      }
+      laudoEl.innerHTML = renderLaudo(corpo);
+    } catch (e) {
+      erroEl.textContent = 'Falha ao enviar o arquivo: ' + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  function tabela(cabecalhos, linhas) {
+    return `<div class="integ-tabela-wrap"><table class="integ-tabela"><thead><tr>` +
+      cabecalhos.map(c => `<th>${c}</th>`).join('') + `</tr></thead><tbody>` +
+      linhas.map(l => `<tr>${l.map(c => `<td>${c}</td>`).join('')}</tr>`).join('') +
+      `</tbody></table></div>`;
+  }
+
+  function renderLaudo(laudo) {
+    let html = `<h3>Resumo</h3><p style="font-size:13px;">${laudo.resumo.linhas} linhas ×
+      ${laudo.resumo.colunas} colunas (delimitador "${laudo.resumo.delimitador}").</p>`;
+
+    const d = laudo.duplicatas;
+    html += `<h3>Questionários duplicados</h3>`;
+    if (d.grupos === 0) {
+      html += '<p style="font-size:13px;">Nenhuma linha exatamente duplicada.</p>';
+    } else {
+      html += `<p style="font-size:13px;color:var(--pe-down);"><strong>${d.linhas_duplicadas}</strong>
+        linhas duplicadas (${d.pct}% do arquivo) em ${d.grupos} grupos —
+        possível copy-paste de questionários.</p>`;
+    }
+
+    const linhasCol = laudo.colunas.map(c => [
+      c.nome, c.tipo, c.n_validos,
+      c.benford ? fmtP(c.benford.p_valor) : '—',
+      c.digito_final ? fmtP(c.digito_final.p_valor) : '—',
+      c.aderencia ? fmtP(c.aderencia.p_valor) : '—',
+      c.kl === null ? '—' : (c.kl === Infinity || c.kl === 'inf' ? '∞' : c.kl.toFixed ? c.kl.toFixed(4) : c.kl),
+    ]);
+    html += `<h3>Testes por coluna</h3>` +
+      tabela(['Coluna', 'Tipo', 'N', 'Benford (p)', 'Díg. final (p)', 'Aderência (p)', 'KL'], linhasCol);
+
+    if (laudo.avisos.length) {
+      html += `<h3>Avisos</h3><ul style="font-size:13px;">` +
+        laudo.avisos.map(a => `<li>${a}</li>`).join('') + '</ul>';
+    }
+    html += `<p style="font-size:12px;color:var(--pe-text-muted);margin-top:12px;">
+      Interpretação: p-valor baixo (&lt; 0,05) indica que a coluna se afasta do
+      padrão esperado — indício a investigar, não prova de fraude.</p>`;
+    return html;
+  }
+})();
+</script>
+{% endblock %}

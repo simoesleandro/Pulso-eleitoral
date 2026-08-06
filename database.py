@@ -61,6 +61,10 @@ from db.pesquisas import (
 # ─── KPIs analíticos avançados e visão geral ───────────────────────────────
 from db.kpis import get_kpis_avancados, get_visao_geral, _media_intervalo
 
+# ─── Integridade: indícios de anomalia estatística (dígito final, subdispersão,
+#     z-score vs consenso, divergência TSE) ────────────────────────────────────
+from db.integridade import get_integridade_geral
+
 # ─── Motor de Monte Carlo (genérico, qualquer cargo) + 2º turno ────────────
 from db.monte_carlo import (
     fator_volatilidade, _redistribuir_indecisos, prob_vitoria_primeiro_turno,
