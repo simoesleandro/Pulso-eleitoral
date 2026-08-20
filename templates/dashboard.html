@@ -383,7 +383,7 @@
 
     // ─── Presidente ───────────────────────────────────────────
     async function carregarPresidente() {
-      let data = fallbackPres;
+      let data = { ...fallbackPres, tipo: tipoPres };
       let usouFallback = true;
       try {
         const res = await fetch('/api/pesquisas/presidente?tipo=' + tipoPres);
