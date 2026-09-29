@@ -11,7 +11,7 @@ correções feitas em seguida.
 |---|---|
 | Data | 2026-09-29 |
 | Base auditada | `765e580` (main de 05/08/2026) |
-| Lotes de correção | A e B concluídos (ver [Status dos lotes](#status-dos-lotes)) |
+| Lotes de correção | A, B e C concluídos; D1 em andamento (ver [Status dos lotes](#status-dos-lotes)) |
 
 ## Resumo
 
@@ -66,7 +66,7 @@ presidente no banco de produção.
 | 4 | Datafolha manda HTML cru para o extrator de governador e tem falso positivo no roteamento | `datafolha.py:381` passa o `html` sem limpar, e o extrator corta em 8000 caracteres (`gemini_extractor.py:565`). `'rio' in url` casa com "cenarios": uma URL "…lula-lidera-em-todos-os-cenarios-e-governo…" vai para o extrator de governador | Texto não limpo como em `_parse_com_gemini`; busca por substring solta | Limpar o texto com BeautifulSoup; regex com fronteira de palavra (`rio-de-janeiro`, `\brj\b`) | Baixo | ⬜ |
 | 5 | Paraná trata RS, RN e releases nacionais como se fossem do RJ | Os marcadores em `paraná_pesquisas.py:36` incluem `"rio"`. `_e_release_rj` dá True para "…rio-grande-do-sul…", "…rio-grande-do-norte…" e "cenarios-presidente-brasil…". Só os 10 primeiros links são processados (linha 177) | Marcador genérico demais | Remover o `"rio"` solto e manter só marcadores específicos | Baixo | ⬜ |
 | 6 | Um único `tipo` por release e reextração a cada coleta; o estimulado some, e em presidente não existe espontânea | `base.py:340` e o `_build_items` do Paraná (linha 134) aplicam um só `tipo` a todos os candidatos. Deduplicação por instituto+cargo+URL (`base.py:138`), com DELETE e reinserção (`base.py:186`). Produção: a pesquisa 30 (Paraná, 03/06) só tem espontânea; presidente tem 312 linhas, todas estimuladas | O extrator devolve um bloco só; o `save` sobrescreve a cada execução, e uma nova extração do Gemini pode trocar o tipo | Extrator devolve lista de blocos `{tipo, candidatos}`; gravar por (pesquisa, tipo); não reextrair pesquisa já casada com o TSE | Médio: muda o contrato do `save` (`test_collectors`) | ⬜ |
-| 7 | Candidatos novos de governador nunca entram em banco já existente | `db/candidatos.py:71` sai se a tabela tem qualquer linha. Local: 31 linhas, governador só com Paes, Castro, Freixo e Neves (o seed tem 13). Produção: as cores de Garotinho (`#C0392B`) e Ruas (`#5a7184`) são a paleta de fallback (`pesquisas.py:15`), não as do seed (`#BA7517`, `#C0392B`). "Garotinho" e "Anthony Garotinho" viram séries separadas | O seed só roda com a tabela vazia | Migração idempotente: `INSERT OR IGNORE` por `nome_canonico` + juntar apelidos | Médio: não pode sobrescrever `status`/`ativo` editados à mão | ⬜ |
+| 7 | Candidatos novos de governador nunca entram em banco já existente | `db/candidatos.py:71` sai se a tabela tem qualquer linha. Local: 31 linhas, governador só com Paes, Castro, Freixo e Neves (o seed tem 13). Produção: as cores de Garotinho (`#C0392B`) e Ruas (`#5a7184`) são a paleta de fallback (`pesquisas.py:15`), não as do seed (`#BA7517`, `#C0392B`). "Garotinho" e "Anthony Garotinho" viram séries separadas | O seed só roda com a tabela vazia | Migração idempotente: `INSERT OR IGNORE` por `nome_canonico` + juntar apelidos | Médio: não pode sobrescrever `status`/`ativo` editados à mão | ✅ Lote C (`6802740`, `9653baf`) |
 | 8 | Seção de governador vazia: média, Monte Carlo, KPIs e rejeição | `/api/media-agregada?cargo=governador_rj` devolve `candidatos: []`. Com `dias=365`, só 4 de 7 candidatos (somem Garotinho, com 11,0%, Busnello e Cyro). Monte Carlo com `candidatos_simulados: []`; KPIs com `top2_soma: 0.0` | Janela de 30 dias (`pesquisas.py:242`) contra última pesquisa de 61 dias atrás, mais o corte de pelo menos 2 entradas (`pesquisas.py:310`) | Primeiro resolver a cobertura (#1–5). Depois, com dado escasso, mostrar a última pesquisa com aviso de defasagem | Alto se mexer no corte de 2 entradas: contrato de `test_agregacao.py` + `/metodologia` | ⬜ |
 | 9 | Toggle estimulada/espontânea de presidente devolve o que estiver em cache | `app.py:857`: `@cache.cached(timeout=300)` sem chave própria (o padrão do flask-caching 2.4 é `query_string=False`). Produção: `?tipo=espontanea` devolveu `"tipo":"estimulada"` com os mesmos dados de `?tipo=estimulada`, embora não exista nenhuma espontânea | A chave de cache ignora `?tipo`. O filtro no SQL existe (`pesquisas.py:67-72`) mas não chega a rodar | Chave normalizada incluindo o `tipo`; teste com SimpleCache | Baixo | ✅ Lote A (`e2b4b6d`) |
 | 10 | Zigue-zague nas séries | Não há cenários empilhados: 0 pesquisas com candidato repetido por tipo e 0 com soma acima de 105%. `get_historico_multi` (`pesquisas.py:504-546`) põe todos os institutos numa linha só. Lula em 23/09: 43,0 / 41,0 / 46,3 / 40,0; Flávio em 16/09: Gerp 44 × PoderData 36. No front, `porData[d.data] = d` (`dashboard.html:605`, `:719`) sobrescreve pontos da mesma data, e o tooltip pega o primeiro da data | Série por candidato em vez de candidato+instituto; índice só por data | Pontos por instituto (dispersão) + uma linha de tendência agregada; indexar por data+instituto | Médio (visual) | ⬜ |
@@ -132,6 +132,69 @@ Suíte depois do Lote B: **319 passed, 3 deselected, em ~54s**. Antes eram
 ~220s, porque os testes batiam na rede real. O CI (`fly-deploy.yml`) roda
 `python -m pytest -q`, que herda o `-m 'not network'` do `pyproject.toml`.
 
+### Lote C — concluído e aplicado em produção
+
+| Commit | Bug | O que fez |
+|---|---|---|
+| `6802740` | #7 | Migração idempotente do roster em todo `init_db`: `INSERT OR IGNORE` por `nome_canonico` e soma dos apelidos do seed que faltam. Campo de candidato existente nunca é alterado |
+| `9653baf` | #7 | `scripts/migrate_unificar_apelidos.py`: renomeia as intenções gravadas com apelido para o nome canônico. Dry-run por padrão, `--aplicar` grava; conflito na mesma pesquisa e tipo não é unificado, só reportado |
+
+Em produção:
+
+- **Roster:** a migração inseriu 9 candidatos.
+- **Unificação do Garotinho:** aplicada. "Garotinho" e "Anthony Garotinho"
+  viraram uma série só.
+- **Backup** do banco de antes do Lote C: `/data/backup_pre_lote_c.db`, no
+  volume do Fly.
+
+### Mudanças de infra — período eleitoral (até 25/10)
+
+Commit `580664d` (`fly.toml`):
+
+- **Máquina sempre ligada:** `auto_stop_machines = 'off'` e
+  `min_machines_running = 1`. Causa: o auto stop do Fly derrubava a máquina
+  com a coleta rodando. A coleta roda numa thread em background, disparada
+  por `POST /admin/coletar-async`, e o auto stop decide pelo tráfego HTTP,
+  não pelo trabalho em andamento no processo. Evidência: log de produção
+  às 14:57:28 com "autostopping machine" durante a coleta.
+- **1 GB de RAM** (antes 512 MB): 512 MB ficava apertado para o Chromium do
+  Playwright junto com o app.
+- **Reverter depois do 2º turno (25/10):** voltar para
+  `auto_stop_machines = 'stop'` e `min_machines_running = 0`, como registra o
+  comentário no `fly.toml`, e a memória para 512 MB. A memória não está
+  anotada no `fly.toml`.
+
+### Lote D1 — em andamento (observabilidade e capacidade)
+
+Preparação para a semana do 1º turno (04/10). Branch
+`fix/lote-d1-observabilidade`, ainda sem push. Os hashes podem mudar num
+rebase.
+
+Achados nos logs de produção que motivaram o lote:
+
+- O app não configurava logging: só WARNING ou acima chegava ao
+  `flyctl logs`.
+- O stdout estava com buffer: "Iniciando na porta 8080" só aparecia no
+  desligamento, depois do SIGINT.
+- A fila do Waitress chegou a 7 requisições com uma pessoa só abrindo o
+  dashboard. O padrão do Waitress é 4 threads, e o dashboard dispara 12
+  chamadas de API ao carregar.
+
+| Commit | O que fez |
+|---|---|
+| `76e0441` | `configurar_logging()`: raiz em INFO, com horário, nível e nome do logger, sem duplicar o `basicConfig()` do Waitress. Uma linha INFO por coletor com status, gravadas, falhas e duração. Timeout do coletor vira WARNING com o nome, logado no estouro. `PYTHONUNBUFFERED=1` no `fly.toml` |
+| `1bb5957` | `WAITRESS_THREADS`, padrão 16, também no `fly.toml`. Valor inválido cai no padrão sem derrubar o boot |
+
+Antes de subir as threads, conferido: o SQLite abre uma conexão por
+chamada (`get_conn`/`get_db` em `db/core.py`), e nenhuma conexão é
+compartilhada entre threads.
+
+Suíte depois do D1: **347 passed, 3 deselected, em ~40s**.
+
+Fica para outro lote: o logger `COLLECTOR` (`collectors/base.py`) tem
+handler próprio com `propagate = False` e formato sem horário nem nível.
+Suas linhas continuam saindo, mas fora do formato novo.
+
 ### Achados que surgiram durante a execução e já foram corrigidos
 
 - **Sync automático sobrescreveria produção.** Com a coleta no Fly, uma
@@ -184,7 +247,9 @@ Consequências:
 - Para um limite real: executor fora do `with`, com `shutdown(wait=False)`
   e cancelamento cooperativo, ou um processo separado por coletor.
 - Para o Verita: prazo por página e total próprio.
-- Registrar a duração real de cada coletor no log.
+- Registrar a duração real de cada coletor no log. Feito no Lote D1
+  (`76e0441`), que também passou a logar o timeout no momento do estouro.
+  O limite continua sem interromper o coletor.
 
 **Risco:** médio. Uma thread abandonada continua gravando no SQLite.
 
@@ -247,8 +312,7 @@ teste.
 
 ## Ordem recomendada para o que falta
 
-1. **#7:** migração do roster de candidatos. Precisa vir antes de chegar
-   dado novo de governador, senão os nomes entram sem normalizar.
+1. ~~**#7:** migração do roster de candidatos.~~ Feito no Lote C.
 2. **#5, #4, #2, #3:** cobertura de governador, um coletor por vez, cada um
    com teste. Depois, uma coleta e conferir `/admin/cobertura?cargo=governador_rj`.
 3. **N1:** timeout real, para que a cobertura nova não trave a coleta nem
