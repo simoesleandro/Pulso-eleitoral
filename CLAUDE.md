@@ -10,7 +10,7 @@ dashboard público (Chart.js).
 python -m pytest -q                    # suíte de testes (config em pyproject.toml)
 python app.py                          # roda o app localmente (Waitress/Flask)
 python coletar.py                      # coleta manual (todos os institutos)
-python scripts/sync_db.py              # sincroniza banco local → Fly.io
+python scripts/sync_db.py --force-sync # SUBSTITUI o banco de produção pelo local (checado)
 python scripts/sync_tse.py             # registro oficial do TSE (dry-run)
 python scripts/sync_tse.py --aplicar   # ...e grava os casamentos
 ```
@@ -38,16 +38,22 @@ TSE diário às 9h30) só liga **fora** do Fly: o gate desliga sob
 `TESTING=True` e sob `FLY_APP_NAME`. Consequência: em produção nenhum job
 agendado do scheduler roda — nem o sync do TSE, que não tem workflow no
 GitHub Actions. O serviço Windows (WinSW, `PulsoEleitoral.xml`) e o
-`coletar.py` são caminhos legados/manuais de coleta local: quando rodam fora
-do Fly e há dado novo, `run_all_collectors()`/`coletar.py` chamam
-`sync_para_fly()` (`scripts/sync_db.py`), que sobe o SQLite **local** e chama
-`POST /admin/apply-db`.
+`coletar.py` são caminhos legados/manuais de coleta local: gravam só no
+`data/pulso.db` local e **não** sincronizam com o Fly.
 
-- **Não rodar coleta local com banco local defasado**: o `sync_para_fly()`
-  automático substitui o banco de produção inteiro pelo local. Como a coleta
-  agora grava direto no Fly, o `data/pulso.db` local fica para trás (em
-  set/2026: 1 pesquisa local contra 44 em produção) — um sync a partir dele
-  apaga o que o Fly coletou.
+- **Trava do sync (`scripts/sync_db.py`)**: `sync_para_fly()` sobe o SQLite
+  local e chama `POST /admin/apply-db`, substituindo o banco de produção
+  inteiro. Como a coleta grava direto no Fly, o banco local fica para trás
+  (em set/2026: 1 pesquisa local contra 44 em produção). Por isso:
+  (1) nenhum fluxo de coleta chama o sync — `run_all_collectors()` e
+  `coletar.py` só logam que o dado ficou local; (2) o sync exige confirmação
+  explícita (`--force-sync` na CLI, `force_sync=True` na função), senão
+  levanta `SyncAbortado`; (3) antes de tocar no flyctl, conta as pesquisas de
+  produção pelo export público (`/api/v1/export/pesquisas.csv`) e aborta se
+  o local tiver menos — ou se não conseguir contar (fail-fast, nunca
+  sincroniza às cegas). A contagem local usa a mesma semântica do export
+  (pesquisa com instituto e ao menos uma intenção). Coberto por
+  `tests/test_sync_db.py`.
 
 ## Regras que quebram deploy ou banco de produção
 

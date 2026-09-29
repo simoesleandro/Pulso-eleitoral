@@ -108,17 +108,16 @@ def main():
                 send_telegram(montar_mensagem_nova_pesquisa(pesquisa_info))
                 logger.info(f"Notificação nova pesquisa: {instituto} / {cargo} / {data_pesquisa}")
 
-    # Sincroniza com Fly.io se houve dados novos
+    # Sem sync automático: a coleta roda no Fly e produção é a fonte da
+    # verdade. Subir o banco local é ato explícito e checado:
+    # python scripts/sync_db.py --force-sync
     if pesquisas_novas > 0 or intencoes_novas > 0:
-        logger.info(f"Dados novos detectados ({pesquisas_novas} pesquisas, {intencoes_novas} intenções) — iniciando sync")
-        from scripts.sync_db import sync_para_fly
-        sucesso = sync_para_fly()
-        if sucesso:
-            logger.info("Fly.io atualizado automaticamente")
-        else:
-            logger.warning("Sync falhou — dashboard do Fly.io pode estar desatualizado")
+        logger.info(
+            f"Dados novos só no banco local ({pesquisas_novas} pesquisas, {intencoes_novas} "
+            "intenções) — produção não foi alterada (sync é manual: scripts/sync_db.py --force-sync)"
+        )
     else:
-        logger.info("Sem dados novos — sync ignorado")
+        logger.info("Sem dados novos")
 
     # Verifica variações bruscas
     from database import detectar_variacoes_bruscas

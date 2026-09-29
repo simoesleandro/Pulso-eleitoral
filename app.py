@@ -125,9 +125,9 @@ _coleta_status = {
 }
 
 def run_all_collectors(progress_callback=None):
-    """Roda todos os coletores cadastrados sequencialmente, salva log de execução,
-    notifica via Telegram se configurado e sincroniza com o Fly.io apenas se estiver
-    rodando localmente (fora da nuvem)."""
+    """Roda todos os coletores cadastrados sequencialmente, salva log de execução
+    e notifica via Telegram se configurado. Nunca sincroniza com o Fly.io — ver
+    scripts/sync_db.py."""
     from collectors import ALL_COLLECTORS
     from database import salvar_log_scheduler, get_db, detectar_variacoes_bruscas
     from notifier import (
@@ -223,13 +223,15 @@ def run_all_collectors(progress_callback=None):
     except Exception:
         pass
 
-    # Sincroniza com Fly.io APENAS se estiver rodando no PC local (fora do Fly.io)
+    # Sem sync automático para o Fly: a coleta roda lá e produção é a fonte
+    # da verdade. Um sync a partir de uma coleta local substituiria produção
+    # pelo banco local (defasado). Subir o banco local é ato explícito:
+    # python scripts/sync_db.py --force-sync (com checagem de defasagem).
     if (pesquisas_novas > 0 or intencoes_novas > 0) and not os.getenv('FLY_APP_NAME'):
-        try:
-            from scripts.sync_db import sync_para_fly
-            sync_para_fly()
-        except Exception as e:
-            app.logger.error("Falha no sync para Fly: %s", e)
+        app.logger.info(
+            "Coleta local gravou dado novo só no banco local — produção não foi "
+            "alterada (sync é manual: scripts/sync_db.py --force-sync)."
+        )
 
     return resultados
 

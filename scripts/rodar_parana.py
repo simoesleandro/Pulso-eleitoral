@@ -55,7 +55,7 @@ def main():
         print("\n=== --salvar: gravando no banco ===")
         resultado = coletor.save(itens)
         print(f"  status: {resultado}")
-        print("\nPara subir pro Fly.io depois de conferir: python scripts/sync_db.py")
+        print("\nPara subir pro Fly.io depois de conferir: python scripts/sync_db.py --force-sync")
     else:
         print("\nDry-run: nada foi gravado. Se os números acima estiverem corretos, rode de novo com --salvar.")
 
