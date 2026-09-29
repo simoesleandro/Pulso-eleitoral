@@ -21,20 +21,33 @@ importe `app` em contexto de teste precisa do mesmo cuidado.
 
 ## Arquitetura em 5 linhas
 
-`app.py` roda localmente como serviço Windows (WinSW, `PulsoEleitoral.xml`)
-com um `BackgroundScheduler` interno que dispara `run_all_collectors()` às
-segundas e quintas, 10h (`app.py`, 2x/semana para poupar a cota de gasto
-mensal do Gemini; gate: desliga sob `TESTING=True` e sob `FLY_APP_NAME`) →
-coleta com todos os `ALL_COLLECTORS` (`collectors/__init__.py`, fonte única
-de verdade da lista — `coletar.py` também importa dali) → grava em SQLite
-local → se houve pesquisa/intenção nova, chama `sync_para_fly()`
-(`scripts/sync_db.py`) automaticamente, que sobe o arquivo e chama
-`POST /admin/apply-db` → Fly.io troca `/data/pulso.db` e reinicia o processo
-→ dashboard público serve os dados. **O Fly nunca coleta**. `coletar.py`
-continua existindo para coleta manual/ad-hoc e replica o mesmo contrato
-(conta pesquisas/intenções antes/depois, sincroniza só se houve dado novo),
-mas também envia notificações Telegram e roda alerta de variação brusca —
-coisas que o scheduler interno do `app.py` não faz.
+**A coleta roda no Fly** (desde o commit 906c6de, jul/2026). O workflow
+`.github/workflows/coleta_agendada.yml` (segundas e quintas, 13h UTC = 10h
+BRT, 2x/semana para poupar a cota mensal do Gemini; também `workflow_dispatch`)
+acorda a máquina via `GET /api/status`, dispara `POST /admin/coletar-async`
+com o header `X-Admin-Pass` e acompanha por `GET /admin/coletar-status`. No
+Fly, `coletar-async` roda `run_all_collectors()` numa thread em background
+(um por vez, lock em `_coleta_status`; timeout de 45s por coletor) → coleta
+com todos os `ALL_COLLECTORS` (`collectors/__init__.py`, fonte única de
+verdade da lista — `coletar.py` também importa dali) → grava direto em
+`/data/pulso.db` → envia Telegram (resumo, pesquisas novas e alerta de
+variação brusca) → `cache.clear()` → dashboard público serve os dados.
+
+O `BackgroundScheduler` interno do `app.py` (coleta seg/qui 10h e sync do
+TSE diário às 9h30) só liga **fora** do Fly: o gate desliga sob
+`TESTING=True` e sob `FLY_APP_NAME`. Consequência: em produção nenhum job
+agendado do scheduler roda — nem o sync do TSE, que não tem workflow no
+GitHub Actions. O serviço Windows (WinSW, `PulsoEleitoral.xml`) e o
+`coletar.py` são caminhos legados/manuais de coleta local: quando rodam fora
+do Fly e há dado novo, `run_all_collectors()`/`coletar.py` chamam
+`sync_para_fly()` (`scripts/sync_db.py`), que sobe o SQLite **local** e chama
+`POST /admin/apply-db`.
+
+- **Não rodar coleta local com banco local defasado**: o `sync_para_fly()`
+  automático substitui o banco de produção inteiro pelo local. Como a coleta
+  agora grava direto no Fly, o `data/pulso.db` local fica para trás (em
+  set/2026: 1 pesquisa local contra 44 em produção) — um sync a partir dele
+  apaga o que o Fly coletou.
 
 ## Regras que quebram deploy ou banco de produção
 
@@ -100,8 +113,11 @@ coisas que o scheduler interno do `app.py` não faz.
   `tamanho_amostra` só preenche quando falta, porque o TSE guarda a amostra
   *registrada* e o release publica a *realizada*; e `popular_cnpjs` roda em
   `init_db` **depois** do `seed.sql` (antes dele os institutos não existem e
-  o UPDATE não acha linha). O sync **não chama o Gemini** — por isso roda
-  diariamente (9h30), enquanto a coleta roda 2x/semana por causa da cota.
+  o UPDATE não acha linha). O sync **não chama o Gemini** — por isso foi
+  agendado diariamente (9h30), enquanto a coleta roda 2x/semana por causa da
+  cota. Esse job vive no scheduler interno, que não liga no Fly (ver
+  Arquitetura): hoje o sync só roda à mão (`scripts/sync_tse.py`) ou com o
+  `app.py` rodando localmente.
 - **Curadoria** (`institutos.agregar`): só instituto com `agregar = 1` entra
   na média e nas afirmações derivadas — média agregada, variação brusca,
   house effects, série do gráfico, corrida atual, líder presidente, líder
