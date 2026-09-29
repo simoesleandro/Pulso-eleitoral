@@ -1,7 +1,9 @@
 import os
+import re
 import json
 import logging
 import time
+import unicodedata
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -311,10 +313,43 @@ def normalizar_nome(nome: str) -> str | None:
     """
     if not nome:
         return None
-    chave = nome.lower().strip()
     mapa = _mapa_nomes()
+    chave = nome.lower().strip()
     if chave in mapa:
         return mapa[chave]  # nome_canonico ou None (descartar)
+    # "Eduardo Paes (PSD)", "Lula – PT": sem o partido, senão vira outra série.
+    sem_partido = _sem_partido(nome)
+    chave = sem_partido.lower()
+    if chave in mapa:
+        return mapa[chave]
+    return sem_partido
+
+
+# Siglas/nomes de partido que aparecem colados ao nome do candidato nas tabelas
+# dos institutos. Lista explícita: um sufixo que não é partido ("- Filho",
+# "(hipotético)") nunca é cortado.
+_PARTIDOS = {
+    "pt", "pl", "psd", "psdb", "mdb", "psol", "novo", "uniao", "uniao brasil",
+    "pp", "progressistas", "pdt", "psb", "republicanos", "podemos", "avante",
+    "solidariedade", "pcdob", "pc do b", "pv", "rede", "cidadania", "dc", "prtb",
+    "pstu", "pco", "up", "pcb", "missao", "democrata", "agir", "mobiliza", "pmb",
+    "prd", "psc", "ptb", "patriota", "pros", "pmn",
+}
+_SUFIXO_PARENTESE_RE = re.compile(r"\s*\(([^()]+)\)\s*$")
+_SUFIXO_TRACO_RE = re.compile(r"\s+[-–—]\s+([^-–—]+)$")
+
+
+def _e_partido(texto: str) -> bool:
+    t = unicodedata.normalize('NFKD', texto.lower()).encode('ascii', 'ignore').decode('ascii')
+    return " ".join(t.split()) in _PARTIDOS
+
+
+def _sem_partido(nome: str) -> str:
+    nome = nome.strip()
+    for regex in (_SUFIXO_PARENTESE_RE, _SUFIXO_TRACO_RE):
+        m = regex.search(nome)
+        if m and _e_partido(m.group(1)):
+            return nome[:m.start()].strip()
     return nome
 
 
