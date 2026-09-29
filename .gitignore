@@ -16,3 +16,5 @@ scratch/
 # Artefatos locais de tooling
 pulso.db
 .impeccable/
+
+backups/
