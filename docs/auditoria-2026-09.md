@@ -61,7 +61,7 @@ presidente no banco de produção.
 | # | Bug | Evidência | Causa raiz | Correção proposta | Risco | Status |
 |---|---|---|---|---|---|---|
 | 1 | Verita quebra em todo PDF de governador RJ, e a coleta inteira do Verita vira "erro" | `collectors/verita.py:158` usa `date.today()` sem importar `date` (imports nas linhas 14–20). Reproduzido: `NameError: name 'date' is not defined`. Produção: Verita com 1 pesquisa, a última de 04/04; o TSE tem 3 de governador RJ | Import faltando. A exceção sobe por `fetch()` e o `run()` descarta tudo, inclusive o nacional | Importar `date`; isolar a falha por PDF | Baixo | ✅ Lote A (`8c4a436`, `6d311f0`). Ver item novo N1 |
-| 2 | Quaest nunca grava governador | `_inferir_cargo` (`quaest.py:75`, `atlas.py:73`) só é chamado por testes (`test_quaest.py:66`, `test_atlas.py:66`). O `_parse_release` usa `PROMPT_EXTRACAO`, que manda ignorar pesquisas estaduais (`gemini_extractor.py:173-178`). Produção: Quaest com 0 pesquisas; o TSE tem 2 de governador RJ | Inferência de cargo é código morto; o prompt nacional descarta conteúdo estadual | Mandar releases de governador RJ para `extrair_governador_rj`, como o Paraná faz, com critério que não use `'governo'` | Médio: `test_quaest.py:73` exige que `'governo'` resulte em governador (casaria com "avaliação do governo") | ⬜ |
+| 2 | Quaest nunca grava governador | `_inferir_cargo` (`quaest.py:75`, `atlas.py:73`) só é chamado por testes (`test_quaest.py:66`, `test_atlas.py:66`). O `_parse_release` usa `PROMPT_EXTRACAO`, que manda ignorar pesquisas estaduais (`gemini_extractor.py:173-178`). Produção: Quaest com 0 pesquisas; o TSE tem 2 de governador RJ | Inferência de cargo é código morto; o prompt nacional descarta conteúdo estadual | Mandar releases de governador RJ para `extrair_governador_rj`, como o Paraná faz, com critério que não use `'governo'` | Médio: `test_quaest.py:73` exige que `'governo'` resulte em governador (casaria com "avaliação do governo") | ⏸ Adiado para depois do 1º turno: ver [N5](#n5--quaest-descoberta-quebrada-e-números-do-rj-só-em-imagem) |
 | 3 | Agregadores (Gazeta, CNN, Poder360) descartam governador. Vetor, Prefab, Real Time e Gerp não têm caminho algum | Com UF detectada, os dados vão para `_salvar_regional`, que filtra só presidenciáveis (`_filtrar_presidenciais` em `base.py`; `gazetadopovo.py:155-158`; `cnn_brasil.py:85-88`). Sem UF, cai no prompt nacional. Resultado: 0 de 22 pesquisas desses institutos | Governador só é previsto por coletor próprio de instituto | Com UF RJ e texto de governador: `extrair_governador_rj` + gravar com `cargo=governador_rj` | Médio: a detecção de instituto do Poder360 cai em `inst_id = 1` (Datafolha) quando não reconhece o nome (`_parse_com_gemini`) | ⬜ |
 | 4 | Datafolha manda HTML cru para o extrator de governador e tem falso positivo no roteamento | `datafolha.py:381` passa o `html` sem limpar, e o extrator corta em 8000 caracteres (`gemini_extractor.py:565`). `'rio' in url` casa com "cenarios": uma URL "…lula-lidera-em-todos-os-cenarios-e-governo…" vai para o extrator de governador | Texto não limpo como em `_parse_com_gemini`; busca por substring solta | Limpar o texto com BeautifulSoup; regex com fronteira de palavra (`rio-de-janeiro`, `\brj\b`) | Baixo | ⬜ |
 | 5 | Paraná trata RS, RN e releases nacionais como se fossem do RJ | Os marcadores em `paraná_pesquisas.py:36` incluem `"rio"`. `_e_release_rj` dá True para "…rio-grande-do-sul…", "…rio-grande-do-norte…" e "cenarios-presidente-brasil…". Só os 10 primeiros links são processados (linha 177) | Marcador genérico demais | Remover o `"rio"` solto e manter só marcadores específicos | Baixo | ⬜ |
@@ -309,6 +309,44 @@ vazia, porque o cliente pediu um tipo específico, e fixar o formato num
 teste.
 
 **Risco:** baixo.
+
+### N5 — Quaest: descoberta quebrada e números do RJ só em imagem
+
+Encontrado ao executar o #2 no Lote D2a (2026-09-29). Muda a correção
+proposta para o #2.
+
+- **Descoberta quebrada.** `LISTING_URLS` aponta para
+  `/category/politica/`, que não existe mais. As categorias do WordPress
+  hoje são `analises-de-pesquisas`, `noticias-quaest` e outras. Por
+  requests, a página volta com ~140 KB e nenhum post. O fallback para
+  Playwright não dispara, porque a página passa de 5.000 caracteres e não
+  tem "cookie" no começo. Renderizada com Playwright, cai em "Política de
+  Cookies". Nenhum release chega ao `_parse_release`. É por isso que a
+  Quaest tem 0 pesquisas em produção, inclusive de presidente.
+- **Números do RJ só em imagem.** As 2 pesquisas da Quaest de governador
+  RJ no TSE (RJ-00613/2026, divulgada em 27/04, e RJ-02671/2026, em
+  27/07) saem em posts de vários estados
+  (`genial-quaest-cenarios-eleitorais-rj-pr-pa` e `…-2`, "RJ, PR e PA").
+  O texto do post só traz "Paes entre 38% e 42% nos três cenários" e os
+  números de **2º turno** (Paes 48% × Garotinho 18%; Paes 52% × Ruas 16%).
+  Os números de 1º turno por candidato estão nas imagens `RJ1…RJ10.jpeg`
+  do post.
+
+**Por que foi adiado:** extrair o governador a partir do texto, como
+propunha o #2, gravaria números de 2º turno como 1º turno, sem erro
+aparente. E hoje não renderia nada, porque a descoberta não acha os posts.
+
+**Correção proposta (lote próprio, depois do 1º turno):**
+- Descoberta pela WP REST API (`/wp-json/wp/v2/posts`), que o
+  `QuaestRegionalColetor` já usa. Isso também passa a trazer os releases
+  nacionais de presidente, e muda a série de presidente.
+- Extração das imagens `RJ*.jpeg` com Gemini multimodal.
+- Roteamento de governador sem `'governo'` solto. `_inferir_cargo`
+  continua morto na Quaest e no Atlas (Atlas bloqueado por DNS, não
+  mexido).
+
+**Risco:** médio. Muda a série de presidente e cria um caminho novo de
+extração por imagem.
 
 ## Ordem recomendada para o que falta
 
