@@ -1,7 +1,9 @@
 # fly.toml app configuration file generated for pulso-eleitoral on 2026-06-16T20:53:42-03:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
+# Eleições 2026: máquina sempre ligada e 1 GB de RAM até o fim do 2º turno (25/10).
+# Depois, voltar para auto_stop_machines = 'stop', min_machines_running = 0
+# e memory = '512mb'.
 
 app = 'pulso-eleitoral'
 primary_region = 'gru'
