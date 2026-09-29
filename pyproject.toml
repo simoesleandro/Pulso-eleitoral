@@ -1,3 +1,8 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+# Testes `network` acessam a rede real (sites dos institutos) e ficam fora da
+# execução padrão e do CI. Para rodá-los: python -m pytest -m network
+addopts = "-q -m 'not network'"
+markers = [
+    "network: acessa a rede real; fora da suíte padrão e do CI (rode com -m network)",
+]

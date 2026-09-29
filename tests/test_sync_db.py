@@ -2,8 +2,6 @@ import os
 os.environ['TESTING'] = 'True'
 
 import sqlite3
-import subprocess
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -124,13 +122,19 @@ def test_sync_confirmado_com_local_em_dia_segue_para_o_upload(tmp_path, producao
     flyctl["upload"].assert_called_once_with(db)
 
 
-def test_cli_sem_force_sync_sai_com_erro():
-    """`python scripts/sync_db.py` sem a flag não sincroniza nada e sai != 0."""
-    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
-    proc = subprocess.run([sys.executable, str(RAIZ / "scripts" / "sync_db.py")],
-                          capture_output=True, text=True, timeout=60, cwd=RAIZ, env=env)
-    assert proc.returncode != 0
-    assert "--force-sync" in (proc.stdout + proc.stderr)
+def test_cli_sem_force_sync_sai_com_erro(producao_com, flyctl, caplog):
+    """`python scripts/sync_db.py` sem a flag não sincroniza nada e sai != 0.
+    Chama main() no próprio processo: um subprocesso escaparia do bloqueio
+    de rede e do load_dotenv neutralizado do conftest."""
+    get = producao_com(n_pesquisas=1)
+    with caplog.at_level("ERROR", logger=sync_db.logger.name):
+        codigo = sync_db.main([])
+
+    assert codigo != 0
+    assert "--force-sync" in caplog.text
+    get.assert_not_called()
+    flyctl["run"].assert_not_called()
+    flyctl["upload"].assert_not_called()
 
 
 def test_coleta_local_nao_chama_sync(monkeypatch):

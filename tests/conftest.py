@@ -97,3 +97,128 @@ def mock_gemini(request, monkeypatch):
         'collectors.gemini_extractor.extrair_com_gemini',
         fake_extrair
     )
+    # Os extratores de governador RJ e regional multiestado também chamam o
+    # Gemini — sem fake, qualquer coletor exercitado num teste (Paraná,
+    # Verita, Datafolha, QuaestRegional) iria ao modelo real.
+    monkeypatch.setattr(
+        'collectors.gemini_extractor.extrair_governador_rj',
+        lambda texto, fonte_url="": {"candidatos": []}
+    )
+    monkeypatch.setattr(
+        'collectors.gemini_extractor.extrair_regional_multiestado',
+        lambda texto, fonte_url="": []
+    )
+
+
+# ─── Bloqueio de rede ─────────────────────────────────────────────────────
+class RedeBloqueadaEmTeste(RuntimeError):
+    """Um teste da suíte padrão tentou acessar a rede real."""
+
+
+class _RegistroDeRede:
+    """Guarda as tentativas de acesso à rede de um teste. Muito código de
+    produção engole exceções (fetch_with_retry, BaseCollector.run, os
+    extratores do Gemini), então levantar não basta: a fixture reprova o
+    teste no teardown se sobrou qualquer tentativa registrada. Um teste que
+    provoca a tentativa de propósito limpa `tentativas` depois de conferir."""
+
+    def __init__(self):
+        self.tentativas: list[str] = []
+
+    def bloquear(self, alvo):
+        alvo = str(alvo)
+        self.tentativas.append(alvo)
+        raise RedeBloqueadaEmTeste(f"Teste tentou acessar a rede: {alvo}")
+
+
+_HOSTS_LOCAIS = {"localhost", "127.0.0.1", "::1"}
+
+
+def _host_local(host) -> bool:
+    if isinstance(host, bytes):
+        host = host.decode()
+    return host is None or host in _HOSTS_LOCAIS
+
+
+@pytest.fixture(autouse=True)
+def bloqueio_de_rede(request, monkeypatch):
+    """Qualquer acesso real à rede num teste da suíte padrão levanta
+    RedeBloqueadaEmTeste ("Teste tentou acessar a rede: <URL>") e reprova o
+    teste. Testes marcados com @pytest.mark.network (fora da suíte padrão,
+    rodam com `pytest -m network`) não passam pelo bloqueio."""
+    if request.node.get_closest_marker("network"):
+        yield None
+        return
+
+    import socket
+
+    import httpx
+    import requests
+    from google import genai
+
+    import collectors.playwright_base as playwright_base
+
+    registro = _RegistroDeRede()
+
+    def requests_bloqueado(self, method, url, *args, **kwargs):
+        registro.bloquear(url)
+
+    def httpx_bloqueado(self, req, *args, **kwargs):
+        registro.bloquear(req.url)
+
+    async def httpx_async_bloqueado(self, req, *args, **kwargs):
+        registro.bloquear(req.url)
+
+    monkeypatch.setattr(requests.sessions.Session, "request", requests_bloqueado)
+    monkeypatch.setattr(httpx.Client, "send", httpx_bloqueado)
+    monkeypatch.setattr(httpx.AsyncClient, "send", httpx_async_bloqueado)
+
+    # Rede de segurança para bibliotecas fora de requests/httpx (inclui a
+    # resolução DNS de app._url_segura). Loopback continua liberado.
+    getaddrinfo_original = socket.getaddrinfo
+    connect_original = socket.socket.connect
+    connect_ex_original = socket.socket.connect_ex
+
+    def getaddrinfo_bloqueado(host, *args, **kwargs):
+        if _host_local(host):
+            return getaddrinfo_original(host, *args, **kwargs)
+        registro.bloquear(host)
+
+    def _alvo_externo(sock, endereco):
+        if sock.family == getattr(socket, "AF_UNIX", None) or not isinstance(endereco, tuple):
+            return None
+        host, porta = endereco[0], endereco[1]
+        return None if _host_local(host) else f"{host}:{porta}"
+
+    def connect_bloqueado(self, endereco):
+        alvo = _alvo_externo(self, endereco)
+        if alvo:
+            registro.bloquear(alvo)
+        return connect_original(self, endereco)
+
+    def connect_ex_bloqueado(self, endereco):
+        alvo = _alvo_externo(self, endereco)
+        if alvo:
+            registro.bloquear(alvo)
+        return connect_ex_original(self, endereco)
+
+    monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo_bloqueado)
+    monkeypatch.setattr(socket.socket, "connect", connect_bloqueado)
+    monkeypatch.setattr(socket.socket, "connect_ex", connect_ex_bloqueado)
+
+    # Playwright: guarda atrás do mock de _get_page_playwright (mock_playwright).
+    monkeypatch.setattr(playwright_base, "sync_playwright",
+                        lambda *a, **k: registro.bloquear("playwright (navegador real)"))
+    # Gemini: o cliente real nunca é instanciado. Testes que precisam dele
+    # usam @patch('google.genai.Client'), que sobrepõe este bloqueio.
+    monkeypatch.setattr(genai, "Client",
+                        lambda *a, **k: registro.bloquear("cliente real do Gemini (google.genai.Client)"))
+
+    yield registro
+
+    if registro.tentativas:
+        pytest.fail(
+            "Teste tentou acessar a rede (a exceção pode ter sido engolida pelo "
+            f"código): {registro.tentativas}",
+            pytrace=False,
+        )

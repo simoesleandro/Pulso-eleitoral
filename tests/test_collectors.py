@@ -61,8 +61,12 @@ def test_detectar_coletor_institutos_existentes():
     assert _detectar_coletor('https://datafolha.folha.uol.com.br/algo') == 'datafolha'
     assert _detectar_coletor('https://institutoverita.com.br/algo') == 'verita'
 
+@pytest.mark.network
 def test_run_does_not_crash_on_empty_fetch(tmp_path):
-    """Verifica que o método run() não crasha quando o fetch() retorna uma lista vazia []."""
+    """Verifica que o método run() não crasha quando o fetch() retorna uma lista vazia [].
+    Chama o fetch() REAL de todos os coletores contra os sites dos institutos —
+    fora da suíte padrão; rode com `pytest -m network`. A versão offline é
+    test_run_com_fetch_vazio_offline."""
     db_file = tmp_path / "test_collectors.db"
     
     # Cria a estrutura do banco temporário
@@ -78,6 +82,21 @@ def test_run_does_not_crash_on_empty_fetch(tmp_path):
         # Executa o run() que chama fetch() e depois save()
         # Não deve levantar exceções mesmo com retorno vazio de fetch()
         collector.run()
+
+def test_run_com_fetch_vazio_offline(tmp_path, monkeypatch):
+    """run() de todos os coletores concretos com fetch() vazio: não levanta
+    e reporta "vazio" (rodou sem erro, salvou zero)."""
+    db_file = tmp_path / "test_collectors_offline.db"
+    conn = sqlite3.connect(db_file)
+    schema_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "schema.sql")
+    with open(schema_path, "r", encoding="utf-8") as f:
+        conn.executescript(f.read())
+    conn.close()
+
+    for collector_cls in ALL_COLLECTORS:
+        collector = collector_cls(str(db_file))
+        monkeypatch.setattr(collector, "fetch", lambda: [])
+        assert collector.run() == {"status": "vazio", "salvas": 0, "falhas": []}, collector_cls.__name__
 
 def test_save_empty_list_does_not_error(tmp_path):
     """Verifica que o método save() com lista vazia não gera erros ou exceções no banco."""

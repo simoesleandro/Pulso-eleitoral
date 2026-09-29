@@ -37,8 +37,12 @@ def client():
             sess['logged_in'] = True
         yield client
 
+@pytest.mark.network
 def test_run_all_collectors():
-    """Testa que run_all_collectors() executa e retorna lista estruturada com pelo menos um item."""
+    """Testa que run_all_collectors() executa e retorna lista estruturada com pelo menos um item.
+    Roda os coletores REAIS contra os sites dos institutos (~2 min) — fora da
+    suíte padrão; rode com `pytest -m network`. A versão offline é
+    test_run_all_collectors_estrutura_offline."""
     resultados = run_all_collectors()
     assert isinstance(resultados, list)
     assert len(resultados) >= 1
@@ -49,6 +53,34 @@ def test_run_all_collectors():
         # 'vazio' = rodou sem exceção e não salvou nada; 'parcial' = alguns
         # releases falharam. Antes ambos vinham como 'ok' e a quebra sumia.
         assert item['status'] in ['ok', 'vazio', 'parcial', 'erro', 'timeout']
+
+def test_run_all_collectors_estrutura_offline(monkeypatch):
+    """Contrato de run_all_collectors() sem rede: uma entrada por coletor,
+    com o status devolvido pelo run(), contagem de falhas quando houver, e
+    "erro" (sem derrubar os demais) quando o run() levanta."""
+    class ColetorOk:
+        def __init__(self, db_path): pass
+        def run(self): return {"status": "vazio", "salvas": 0, "falhas": []}
+
+    class ColetorParcial:
+        def __init__(self, db_path): pass
+        def run(self): return {"status": "parcial", "salvas": 1, "falhas": [("u1", "e"), ("u2", "e")]}
+
+    class ColetorQueExplode:
+        def __init__(self, db_path): pass
+        def run(self): raise RuntimeError("quebrou")
+
+    import collectors
+    monkeypatch.setattr(collectors, "ALL_COLLECTORS", [ColetorOk, ColetorParcial, ColetorQueExplode])
+    monkeypatch.setattr("notifier.send_telegram", lambda *a, **k: None)
+
+    resultados = run_all_collectors()
+
+    assert resultados == [
+        {"coletor": "ColetorOk", "status": "vazio"},
+        {"coletor": "ColetorParcial", "status": "parcial", "falhas": 2},
+        {"coletor": "ColetorQueExplode", "status": "erro", "msg": "quebrou"},
+    ]
 
 def test_salvar_e_buscar_ultimo_log():
     """Testa salvar_log_scheduler() e buscar_ultimo_log() no banco de dados temporário."""
