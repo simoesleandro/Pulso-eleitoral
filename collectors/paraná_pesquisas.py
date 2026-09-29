@@ -11,6 +11,7 @@
 # Só releases do Rio de Janeiro são processados (o instituto publica vários estados).
 
 import io
+import re
 import time
 import requests
 import pdfplumber
@@ -30,17 +31,28 @@ HEADERS = {
     "Referer": BASE_URL,
 }
 
-# Marcadores de que o release/PDF é do Rio de Janeiro.
-_RJ_MARKERS = (
-    "rio-de-janeiro", "rio_de_janeiro", "-rj-", "_rj_", "/rj/",
-    "rio", "fluminense", "governo-do-rio", "estado-do-rio",
-    "rj-01", "rj-02", "rj-03", "rj-04", "rj-05", "rj-06", "rj-07", "rj-08", "rj-09"
+# Marcadores de que o release é do Rio de Janeiro. Nada de "rio" solto: casava
+# com rio-grande-do-sul, rio-grande-do-norte e "cenarios". "rj" só como token
+# (entre separadores), para pegar "…-n-o-rj-04036-…" e "/rj/" sem casar
+# dentro de palavra.
+_RJ_RE = re.compile(
+    r"rio[-_]de[-_]janeiro"
+    r"|fluminense"
+    r"|(?:estado|governo)[-_]do[-_]rio(?![-_]grande)"
+    r"|(?<![a-z0-9])rj(?![a-z])"
 )
 
 
 def _e_release_rj(href: str) -> bool:
     h = href.lower()
-    return "/pesquisas/" in h and any(m in h for m in _RJ_MARKERS)
+    if "/pesquisas/" not in h or not _RJ_RE.search(h):
+        return False
+    # Pesquisa de presidente feita no RJ ("…rio-de-janeiro-para-o-cargo-de-
+    # presidente-…-br-01920…"): o extrator força cargo=governador_rj e
+    # gravaria presidenciáveis na série de governador.
+    if "presidente" in h and "governador" not in h:
+        return False
+    return True
 
 
 def _e_pdf_registro(filename: str) -> bool:
