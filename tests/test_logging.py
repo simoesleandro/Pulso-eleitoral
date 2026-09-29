@@ -124,8 +124,53 @@ def test_timeout_do_coletor_gera_warning_com_o_nome(monkeypatch, caplog):
     with caplog.at_level(logging.INFO, logger="app"):
         resultados = run_all_collectors()
 
-    assert resultados == [{"coletor": "ColetorLento", "status": "timeout", "msg": "Excedeu 0.05s"}]
+    # O run() terminou (a thread não é interrompida — item N1): vale o status
+    # dele, com o atraso marcado à parte.
+    assert resultados == [{"coletor": "ColetorLento", "status": "ok", "atraso": True,
+                           "msg": "Excedeu 0.05s"}]
     avisos = [r for r in caplog.records
               if r.levelno == logging.WARNING and "ColetorLento" in r.getMessage()
               and "timeout" in r.getMessage()]
     assert len(avisos) == 1
+
+
+def test_coletor_que_grava_e_estoura_o_timeout_mostra_o_gravado(monkeypatch, caplog):
+    """Evidência de produção: Datafolha gravou 60 intenções e o resumo saiu
+    "status=timeout gravadas=0". O resumo tem que trazer a contagem real,
+    com o atraso como marcador adicional."""
+    def grava_devagar(self):
+        time.sleep(0.3)
+        return {"status": "parcial", "salvas": 7, "falhas": [("u1", "e")]}
+    lento = _coletor("ColetorLentoQueGrava", grava_devagar)
+
+    import collectors
+    monkeypatch.setattr(collectors, "ALL_COLLECTORS", [lento])
+    monkeypatch.setattr("notifier.send_telegram", lambda *a, **k: None)
+    monkeypatch.setattr(app_module, "TIMEOUT_COLETOR_S", 0.05)
+
+    with caplog.at_level(logging.INFO, logger="app"):
+        resultados = run_all_collectors()
+
+    assert resultados == [{"coletor": "ColetorLentoQueGrava", "status": "parcial", "falhas": 1,
+                           "atraso": True, "msg": "Excedeu 0.05s"}]
+    resumo = [r.getMessage() for r in caplog.records
+              if r.getMessage().startswith("Coletor ColetorLentoQueGrava ") and "duração" in r.getMessage()]
+    assert len(resumo) == 1
+    assert "status=parcial_com_atraso" in resumo[0]
+    assert "gravadas=7" in resumo[0] and "falhas=1" in resumo[0]
+
+
+def test_timeout_levantado_pelo_proprio_run_e_erro_nao_atraso(monkeypatch):
+    """Em 3.11+ concurrent.futures.TimeoutError é o TimeoutError embutido: um
+    timeout de rede que escapa do run() não pode passar por atraso."""
+    def estoura(self):
+        raise TimeoutError("socket timeout")
+    rapido = _coletor("ColetorComTimeoutDeRede", estoura)
+
+    import collectors
+    monkeypatch.setattr(collectors, "ALL_COLLECTORS", [rapido])
+    monkeypatch.setattr("notifier.send_telegram", lambda *a, **k: None)
+
+    resultados = run_all_collectors()
+
+    assert resultados == [{"coletor": "ColetorComTimeoutDeRede", "status": "erro", "msg": "socket timeout"}]

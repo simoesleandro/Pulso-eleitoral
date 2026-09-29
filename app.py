@@ -174,6 +174,7 @@ def run_all_collectors(progress_callback=None):
             progress_callback(idx, total, nome_coletor, None)
         inicio = time.monotonic()
         salvas = n_falhas = 0
+        atraso = False
         try:
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
@@ -181,13 +182,22 @@ def run_all_collectors(progress_callback=None):
                 try:
                     res = future.result(timeout=TIMEOUT_COLETOR_S)
                 except concurrent.futures.TimeoutError:
+                    # Em 3.11+ é o TimeoutError embutido: se o future já
+                    # terminou, quem levantou foi o próprio run() (ex.: timeout
+                    # de rede), não o prazo — vira "erro" abaixo.
+                    if future.done():
+                        raise
                     # Loga no estouro: a saída do with ainda espera a thread
                     # terminar (item N1 da auditoria), e a linha sairia atrasada.
                     app.logger.warning(
                         "Coletor %s excedeu o timeout de %ss; a thread segue até terminar.",
                         nome_coletor, TIMEOUT_COLETOR_S,
                     )
-                    raise
+                    atraso = True
+            if atraso:
+                # A saída do with esperou a thread: o resultado real existe, e
+                # o que o coletor gravou vale. O atraso é só um marcador.
+                res = future.result()
             entrada = {
                 "coletor": nome_coletor,
                 "status": res.get("status", "ok") if isinstance(res, dict) else "ok",
@@ -199,18 +209,20 @@ def run_all_collectors(progress_callback=None):
                 n_falhas = len(res.get("falhas") or [])
                 if n_falhas:
                     entrada["falhas"] = n_falhas
-            resultados.append(entrada)
-        except concurrent.futures.TimeoutError:
-            entrada = {"coletor": nome_coletor, "status": "timeout", "msg": f"Excedeu {TIMEOUT_COLETOR_S}s"}
-            resultados.append(entrada)
         except Exception as e:
             app.logger.error(f"Erro no coletor {nome_coletor}: {e}")
             entrada = {"coletor": nome_coletor, "status": "erro", "msg": str(e)}
-            resultados.append(entrada)
+        # O status do dict continua o do run() ("ok", "parcial"...): o Telegram
+        # e o /admin comparam com esses valores. O atraso vai num campo à parte.
+        if atraso:
+            entrada["atraso"] = True
+            entrada.setdefault("msg", f"Excedeu {TIMEOUT_COLETOR_S}s")
+        resultados.append(entrada)
 
         app.logger.info(
             "Coletor %s status=%s gravadas=%d falhas=%d duração=%.1fs",
-            nome_coletor, entrada["status"], salvas, n_falhas, time.monotonic() - inicio,
+            nome_coletor, entrada["status"] + ("_com_atraso" if atraso else ""),
+            salvas, n_falhas, time.monotonic() - inicio,
         )
 
         if progress_callback:
