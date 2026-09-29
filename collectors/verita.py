@@ -13,6 +13,7 @@
 
 import io
 import time
+from datetime import date
 import requests
 import pdfplumber
 from bs4 import BeautifulSoup
