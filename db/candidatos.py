@@ -11,8 +11,11 @@ escrevam nesse mesmo global. Por isso as funções abaixo acessam
 em vez de um cache local neste módulo.
 """
 import json
+import logging
 
 import database
+
+logger = logging.getLogger(__name__)
 
 # Roster canônico que popula a tabela `candidatos`. Cada item:
 # (nome_canonico, [apelidos...], espectro, cor_hex, is_presidencial, ativo)
@@ -64,20 +67,79 @@ _CANDIDATOS_SEED = [
 ]
 
 
-def _popular_candidatos(conn) -> None:
-    """Insere o roster canônico na tabela candidatos se ela estiver vazia (idempotente)."""
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM candidatos")
-    if cur.fetchone()[0] > 0:
-        return
+def _popular_candidatos(conn) -> dict:
+    """Completa o roster da tabela candidatos a partir do seed (idempotente).
+
+    Roda em todo init_db, inclusive em banco que já existe — antes só rodava
+    com a tabela vazia, e candidato acrescentado ao seed depois nunca chegava
+    à produção (Garotinho e Ruas caíam na paleta de fallback de cor).
+
+    - Candidato do seed ausente entra inteiro (INSERT OR IGNORE por nome_canonico).
+    - Candidato existente só ganha os apelidos do seed que ainda não tem.
+      Nada mais é tocado: status, ativo, cor, espectro podem ter sido
+      editados à mão.
+    - Apelido que já pertence a outro candidato não é copiado (deixaria o
+      mapa de normalização ambíguo).
+    - Apelidos existentes em JSON ilegível ficam como estão.
+
+    Retorna {"inseridos": [nome, ...], "apelidos_adicionados": {nome: [apelido, ...]}}.
+    """
+    existentes = {}
+    for nome, apelidos_json in conn.execute("SELECT nome_canonico, apelidos FROM candidatos"):
+        try:
+            apelidos = json.loads(apelidos_json) if apelidos_json else []
+        except ValueError:
+            apelidos = None  # ilegível: não sobrescrever
+        existentes[nome] = apelidos
+
+    dono = {}  # chave minúscula -> nome_canonico que já a usa
+    for nome, apelidos in existentes.items():
+        for chave in [nome, *(apelidos or [])]:
+            dono.setdefault(chave.lower().strip(), nome)
+
+    def livres(nome, apelidos):
+        return [a for a in apelidos if dono.get(a.lower().strip(), nome) == nome]
+
+    inseridos, apelidos_adicionados = [], {}
     for nome, apelidos, espectro, cor, is_pres, ativo in _CANDIDATOS_SEED:
-        cur.execute(
-            "INSERT INTO candidatos (nome_canonico, apelidos, espectro, cor_hex, is_presidencial, ativo) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (nome, json.dumps(apelidos, ensure_ascii=False), espectro, cor, is_pres, ativo)
-        )
+        if nome not in existentes:
+            aceitos = livres(nome, apelidos)
+            conn.execute(
+                "INSERT OR IGNORE INTO candidatos "
+                "(nome_canonico, apelidos, espectro, cor_hex, is_presidencial, ativo) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (nome, json.dumps(aceitos, ensure_ascii=False), espectro, cor, is_pres, ativo)
+            )
+            inseridos.append(nome)
+            for chave in [nome, *aceitos]:
+                dono.setdefault(chave.lower().strip(), nome)
+            continue
+
+        atuais = existentes[nome]
+        if atuais is None:
+            continue
+        ja_tem = {a.lower().strip() for a in atuais}
+        novos = [a for a in livres(nome, apelidos) if a.lower().strip() not in ja_tem]
+        if novos:
+            conn.execute(
+                "UPDATE candidatos SET apelidos = ? WHERE nome_canonico = ?",
+                (json.dumps(atuais + novos, ensure_ascii=False), nome)
+            )
+            apelidos_adicionados[nome] = novos
+            for chave in novos:
+                dono.setdefault(chave.lower().strip(), nome)
+
     conn.commit()
+    if inseridos or apelidos_adicionados:
+        # WARNING, não INFO: o app não configura logging, e só WARNING+ chega
+        # ao stderr (e aos logs do Fly) pelo handler de último recurso.
+        if inseridos:
+            logger.warning("Roster: %d candidato(s) inserido(s) do seed: %s",
+                           len(inseridos), ", ".join(inseridos))
+        for nome, novos in apelidos_adicionados.items():
+            logger.warning("Roster: apelidos adicionados a %s: %s", nome, ", ".join(novos))
     _invalidar_cache_candidatos()
+    return {"inseridos": inseridos, "apelidos_adicionados": apelidos_adicionados}
 
 
 def _invalidar_cache_candidatos() -> None:

@@ -66,7 +66,8 @@ def init_db(force_seed=False):
         conn.executescript(schema_sql)
         conn.commit()
 
-    # Popula a tabela candidatos (idempotente — só insere se vazia).
+    # Completa a tabela candidatos a partir do seed (idempotente — insere os
+    # ausentes e soma apelidos; nunca altera campo de candidato existente).
     # Import local (não no topo do módulo) para evitar ciclo de import:
     # db.candidatos importa get_db daqui (db.core) no nível do módulo.
     from db.candidatos import _popular_candidatos
