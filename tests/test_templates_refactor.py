@@ -182,3 +182,12 @@ def test_pe_grid_3_existe_e_colapsa_em_mobile():
     assert 'repeat(3, 1fr)' in bloco
     # breakpoint mobile (mesmo padrão de 767px usado no resto do arquivo)
     assert '@media (max-width: 767px)' in css
+
+
+def test_metodologia_explica_percentual_sobre_o_total(client):
+    """Os percentuais são sobre o total de entrevistados, não sobre os votos
+    válidos — e a página diz por quê (tabelas do Verita trazem as duas bases)."""
+    html = client.get('/metodologia').data.decode('utf-8')
+    assert 'id="base-percentual"' in html
+    assert 'sobre o total de entrevistados' in html
+    assert 'votos válidos' in html
