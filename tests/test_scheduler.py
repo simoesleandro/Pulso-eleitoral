@@ -113,10 +113,10 @@ def test_route_admin_coletar_async_and_status(client):
         data = res_async.json
         assert 'status' in data
 
-def test_admin_coletar_with_x_admin_pass():
+def test_admin_coletar_with_x_admin_pass(monkeypatch):
     """Testa que o header X-Admin-Pass permite autenticação para chamadas automatizadas sem cookie de sessão."""
     flask_app.config['TESTING'] = True
-    os.environ['ADMIN_PASS'] = 'secret-pass-123'
+    monkeypatch.setenv('ADMIN_PASS', 'secret-pass-123')
     
     with flask_app.test_client() as unauth_client:
         with patch('app.run_all_collectors') as mock_run:

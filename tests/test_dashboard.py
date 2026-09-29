@@ -292,7 +292,7 @@ def test_api_regional(client):
     assert isinstance(data['estados'], dict)
 
 @patch('google.genai.Client')
-def test_api_analise_cache(mock_client_class, client):
+def test_api_analise_cache(mock_client_class, client, monkeypatch):
     """Testa o endpoint /api/visao-geral/analise com cache e mock do Gemini."""
     setup_db_with_seed()
     
@@ -302,7 +302,7 @@ def test_api_analise_cache(mock_client_class, client):
     mock_client.models.generate_content.return_value = mock_response
     mock_client_class.return_value = mock_client
     
-    os.environ['GEMINI_API_KEY'] = 'fake-api-key-123'
+    monkeypatch.setenv('GEMINI_API_KEY', 'fake-api-key-123')
     
     # 1. Primeira chamada: chama Gemini e salva em cache
     response = client.get('/api/visao-geral/analise')

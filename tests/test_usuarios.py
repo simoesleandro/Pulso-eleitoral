@@ -1,9 +1,5 @@
 import os
 os.environ['TESTING'] = 'True'
-# Fixa uma senha admin conhecida ANTES do seed (init_db lê ADMIN_PASS no seed).
-# Sem isso, em ambientes sem .env/secret (ex.: CI) o admin é semeado com senha
-# aleatória (plano 005 removeu o default 'pulso2026') e os testes de login falham.
-os.environ.setdefault('ADMIN_PASS', 'test-admin-pass')
 
 import pytest
 from database import (
@@ -13,8 +9,13 @@ from database import (
 from app import app as flask_app
 
 @pytest.fixture(autouse=True)
-def setup_and_teardown():
+def setup_and_teardown(sem_chaves_de_api, monkeypatch):
     """Garante que o banco de dados de testes seja limpo antes e depois de cada teste."""
+    # Senha admin conhecida ANTES do seed (init_db lê ADMIN_PASS no seed).
+    # Sem ela o admin é semeado com senha aleatória (plano 005 removeu o
+    # default 'pulso2026') e os testes de login falham. Depende de
+    # sem_chaves_de_api para rodar depois da limpeza de chaves do conftest.
+    monkeypatch.setenv('ADMIN_PASS', 'test-admin-pass')
     if os.path.exists(DB_PATH):
         try:
             os.remove(DB_PATH)

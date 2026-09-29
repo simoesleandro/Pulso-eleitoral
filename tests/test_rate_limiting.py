@@ -1,10 +1,6 @@
 import os
 # Configura o ambiente de testes antes de importar os módulos do projeto
 os.environ['TESTING'] = 'True'
-# Fixa uma senha admin conhecida ANTES do seed (init_db lê ADMIN_PASS no seed) —
-# mesmo cuidado de tests/test_usuarios.py, embora aqui a senha usada no POST
-# seja sempre incorreta (só o retorno 200 vs 429 importa, não o login em si).
-os.environ.setdefault('ADMIN_PASS', 'test-admin-pass')
 
 import pytest
 
@@ -13,7 +9,7 @@ from app import app as flask_app, limiter
 
 
 @pytest.fixture(autouse=True)
-def setup_and_teardown():
+def setup_and_teardown(sem_chaves_de_api, monkeypatch):
     """Garante que o banco de testes exista antes de cada teste, seguindo o
     mesmo padrão de tests/test_database.py e tests/test_usuarios.py: DB_PATH
     é um arquivo compartilhado por todo o processo de pytest (não isolado por
@@ -21,6 +17,10 @@ def setup_and_teardown():
     teardown — sem recriar aqui, uma requisição a /login vira
     'OperationalError: no such table: usuarios' dependendo da ordem de
     execução dos arquivos."""
+    # Senha admin conhecida ANTES do seed (init_db lê ADMIN_PASS no seed) —
+    # mesmo cuidado de tests/test_usuarios.py, embora aqui a senha usada no
+    # POST seja sempre incorreta (só o retorno 200 vs 429 importa).
+    monkeypatch.setenv('ADMIN_PASS', 'test-admin-pass')
     if os.path.exists(DB_PATH):
         try:
             os.remove(DB_PATH)
