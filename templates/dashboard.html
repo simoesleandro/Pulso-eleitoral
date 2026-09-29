@@ -137,11 +137,9 @@
             </div>
           </div>
           <div id="pres-fonte" class="pe-mono" style="margin-top:8px;">Fonte: —</div>
-          <div id="pres-fallback-aviso" style="display:none; margin-top:10px; padding:10px 14px; border-radius:8px;
+          <div id="pres-vazio" role="status" style="display:none; margin-top:10px; padding:10px 14px; border-radius:8px;
                background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.4);
-               color:var(--pe-text); font-size:12px;">
-            ⚠️ Dados de exemplo — falha ao carregar a pesquisa real. Recarregue a página.
-          </div>
+               color:var(--pe-text); font-size:12px;"></div>
         </div>
       </div>
 
@@ -219,11 +217,9 @@
             </div>
           </div>
           <div id="gov-fonte" class="pe-mono" style="margin-top:8px;">Fonte: —</div>
-          <div id="gov-fallback-aviso" style="display:none; margin-top:10px; padding:10px 14px; border-radius:8px;
+          <div id="gov-vazio" role="status" style="display:none; margin-top:10px; padding:10px 14px; border-radius:8px;
                background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.4);
-               color:var(--pe-text); font-size:12px;">
-            ⚠️ Dados de exemplo — falha ao carregar a pesquisa real de governador. Recarregue a página.
-          </div>
+               color:var(--pe-text); font-size:12px;"></div>
         </div>
       </div>
 
@@ -336,21 +332,38 @@
       carregarHistoricoMulti();
     }
 
-    const fallbackPres = {
-      candidatos: ["Lula", "Flávio Bolsonaro", "Ciro Gomes", "Simone Tebet"],
-      percentuais: [44.2, 37.5, 4.8, 3.5],
-      data_coleta: "2026-06-08",
-      instituto: "Atlas (Fallback)",
-      margem_erro: 2.0
+    // Sem dado real, o card mostra um estado vazio explícito — nunca números
+    // de exemplo (antes havia fallbacks com candidatos e percentuais
+    // inventados, que se passavam por pesquisa real).
+    const MSG_VAZIO = {
+      pres: 'Nenhuma pesquisa de presidente disponível no período.',
+      gov:  'Nenhuma pesquisa de governador do RJ disponível no período.',
+    };
+    const MSG_ERRO = {
+      pres: 'Não foi possível carregar a pesquisa de presidente. Recarregue a página.',
+      gov:  'Não foi possível carregar a pesquisa de governador do RJ. Recarregue a página.',
     };
 
-    const fallbackGov = {
-      candidatos: ["Eduardo Paes", "Cláudio Castro", "Marcelo Freixo", "Rodrigo Neves"],
-      percentuais: [37.2, 23.8, 12.0, 10.2],
-      data_coleta: "2026-06-05",
-      instituto: "Quaest (Fallback)",
-      margem_erro: 2.5
-    };
+    // Liga/desliga o estado vazio do card `prefixo` ('pres' | 'gov'). Com
+    // mensagem: esconde o gráfico, zera os KPIs para "—" e mostra o aviso.
+    function estadoVazioCard(prefixo, mensagem) {
+      const aviso = document.getElementById(`${prefixo}-vazio`);
+      const grafico = document.getElementById(prefixo === 'pres' ? 'chart-presidente' : 'chart-governador');
+      if (!mensagem) {
+        aviso.style.display = 'none';
+        grafico.parentElement.style.display = '';
+        return;
+      }
+      aviso.textContent = mensagem;
+      aviso.style.display = 'block';
+      grafico.parentElement.style.display = 'none';
+      document.getElementById(`${prefixo}-instituto`).textContent = '—';
+      document.getElementById(`${prefixo}-tipo-chart`).innerHTML = '';
+      document.getElementById(`${prefixo}-tipo-info`).innerHTML = '';
+      document.getElementById(`${prefixo}-margem-bloco`).style.display = 'none';
+      document.getElementById(`${prefixo}-data`).textContent = '—';
+      document.getElementById(`${prefixo}-fonte`).textContent = 'Fonte: —';
+    }
 
     function formatarData(isoStr) {
       if (!isoStr) return "—";
@@ -383,18 +396,30 @@
 
     // ─── Presidente ───────────────────────────────────────────
     async function carregarPresidente() {
-      let data = { ...fallbackPres, tipo: tipoPres };
-      let usouFallback = true;
+      let data = null;
+      let falhou = false;
       try {
         const res = await fetch('/api/pesquisas/presidente?tipo=' + tipoPres);
         if (res.ok) {
           const json = await res.json();
-          if (json.candidatos && json.candidatos.length > 0) { data = json; usouFallback = false; }
+          if (json.candidatos && json.candidatos.length > 0) data = json;
+        } else {
+          falhou = true;
         }
-      } catch (err) { console.warn('Erro presidente:', err); }
+      } catch (err) { console.warn('Erro presidente:', err); falhou = true; }
 
-      const presFallbackAviso = document.getElementById('pres-fallback-aviso');
-      if (presFallbackAviso) presFallbackAviso.style.display = usouFallback ? 'block' : 'none';
+      if (!data) {
+        if (chartPres) { chartPres.destroy(); chartPres = null; }
+        estadoVazioCard('pres', falhou ? MSG_ERRO.pres : MSG_VAZIO.pres);
+        // Mesmo sem dado, o selo segue o tipo escolhido no toggle — o
+        // usuário vê que é a pesquisa *daquele* tipo que está faltando.
+        const badgeSelecionado = tipoBadgeHTML(tipoPres);
+        document.getElementById('pres-tipo-chart').innerHTML = badgeSelecionado;
+        document.getElementById('pres-tipo-info').innerHTML  = badgeSelecionado;
+        document.getElementById('pres-atualizacao-badge').textContent = 'pesquisa: —';
+        return;
+      }
+      estadoVazioCard('pres', null);
 
       document.getElementById('pres-instituto').textContent = data.instituto;
       const presTipoBadge = tipoBadgeHTML(data.tipo);
@@ -442,18 +467,24 @@
 
     // ─── Governador ───────────────────────────────────────────
     async function carregarGovernador() {
-      let data = fallbackGov;
-      let usouFallback = true;
+      let data = null;
+      let falhou = false;
       try {
         const res = await fetch('/api/pesquisas/governador-rj');
         if (res.ok) {
           const json = await res.json();
-          if (json.candidatos && json.candidatos.length > 0) { data = json; usouFallback = false; }
+          if (json.candidatos && json.candidatos.length > 0) data = json;
+        } else {
+          falhou = true;
         }
-      } catch (err) { console.warn('Erro governador:', err); }
+      } catch (err) { console.warn('Erro governador:', err); falhou = true; }
 
-      const govFallbackAviso = document.getElementById('gov-fallback-aviso');
-      if (govFallbackAviso) govFallbackAviso.style.display = usouFallback ? 'block' : 'none';
+      if (!data) {
+        if (chartGov) { chartGov.destroy(); chartGov = null; }
+        estadoVazioCard('gov', falhou ? MSG_ERRO.gov : MSG_VAZIO.gov);
+        return;
+      }
+      estadoVazioCard('gov', null);
 
       document.getElementById('gov-instituto').textContent = data.instituto;
       const govTipoBadge = tipoBadgeHTML(data.tipo);

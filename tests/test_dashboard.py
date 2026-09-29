@@ -472,3 +472,35 @@ def test_api_export_agregado_json(client):
     assert data['cargo'] == 'presidente'
     assert 'candidatos' in data
 
+
+
+# Candidatos a governador do RJ do roster + nomes que só existiam nos
+# fallbacks fabricados do front (Ciro/Tebet). Lula e Flávio ficam de fora:
+# aparecem legitimamente como rótulos do card de 2º turno, cujos números
+# vêm da API.
+_NOMES_QUE_NAO_PODEM_VIR_HARDCODED = [
+    "Eduardo Paes", "Cláudio Castro", "Marcelo Freixo", "Rodrigo Neves",
+    "Douglas Ruas", "Anthony Garotinho", "André Marinho", "Coronel Busnello",
+    "Cyro Garcia", "Wilson Witzel", "Washington Reis", "Otoni de Paula",
+    "Tarcísio Motta", "Ciro Gomes", "Simone Tebet",
+]
+
+
+def test_dashboard_sem_dados_fabricados_com_governador_vazio(client):
+    """Com a API de governador vazia, a página não pode trazer nenhum
+    candidato nem percentual de fallback — só o estado vazio explícito.
+    Antes, o front caía num "Quaest (Fallback)" com números inventados."""
+    import re
+    setup_db_empty()
+
+    api = client.get('/api/pesquisas/governador-rj').json
+    assert api['candidatos'] == []
+
+    html = client.get('/dashboard').get_data(as_text=True)
+    for nome in _NOMES_QUE_NAO_PODEM_VIR_HARDCODED:
+        assert nome not in html, f"candidato hardcoded na página: {nome}"
+    assert "(Fallback)" not in html
+    assert "Dados de exemplo" not in html
+    # Array literal de percentuais decimais (ex.: [37.2, 23.8, ...])
+    assert not re.search(r"\[\s*\d+\.\d+\s*,", html)
+    assert "Nenhuma pesquisa de governador do RJ disponível no período." in html
