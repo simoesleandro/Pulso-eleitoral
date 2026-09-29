@@ -14,6 +14,8 @@ primary_region = 'gru'
   # Sem buffer no stdout: senão os print() só chegam ao flyctl logs no
   # desligamento do processo.
   PYTHONUNBUFFERED = '1'
+  # O padrão do Waitress (4) enfileirava as chamadas do dashboard.
+  WAITRESS_THREADS = '16'
 
 [[mounts]]
   source = 'pulso_data'

@@ -1538,16 +1538,40 @@ def api_export_agregado_json():
     data = get_media_agregada(cargo)
     return jsonify(data)
 
-if __name__ == '__main__':
+WAITRESS_THREADS_PADRAO = 16
+
+
+def _threads_waitress() -> int:
+    """Threads do Waitress via WAITRESS_THREADS. O padrão do Waitress (4)
+    enfileirava as ~12 chamadas que o dashboard dispara ao carregar. Valor
+    inválido cai no padrão em vez de derrubar o boot."""
+    bruto = os.getenv("WAITRESS_THREADS")
+    if bruto is None:
+        return WAITRESS_THREADS_PADRAO
+    threads = _parse_num(bruto, int, 0)
+    if threads < 1:
+        app.logger.warning(
+            "WAITRESS_THREADS=%r inválido; usando %d.", bruto, WAITRESS_THREADS_PADRAO
+        )
+        return WAITRESS_THREADS_PADRAO
+    return threads
+
+
+def iniciar_servidor():
     port = int(os.getenv("PORT", 5080))
-    
+
     # Inicia scheduler só se não for produção
     if not os.getenv("FLY_APP_NAME"):
         if not scheduler.running:
             scheduler.start()
-    
+
     init_db()
-    
+
     from waitress import serve
-    print(f"[Pulso Eleitoral] Iniciando na porta {port}")
-    serve(app, host="0.0.0.0", port=port)
+    threads = _threads_waitress()
+    print(f"[Pulso Eleitoral] Iniciando na porta {port} com {threads} threads")
+    serve(app, host="0.0.0.0", port=port, threads=threads)
+
+
+if __name__ == '__main__':
+    iniciar_servidor()
