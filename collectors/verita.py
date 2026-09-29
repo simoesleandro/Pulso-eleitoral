@@ -217,9 +217,13 @@ class VeritaCollector(PlaywrightCollector, BaseCollector):
         resultados = []
         for idx, link in enumerate(links):
             self.logger.info("[Verita] Pesquisa %d/%d: %s", idx + 1, len(links), link)
-            html = self._get_page(link)
-            dados = self._parse_release(html, link)
-            resultados.extend(dados)
+            # Falha num PDF não pode derrubar os outros (nem o nacional):
+            # registra, conta no resumo do run() e segue para o próximo.
+            try:
+                html = self._get_page(link)
+                resultados.extend(self._parse_release(html, link))
+            except Exception as e:
+                self._registrar_falha_coleta(link, e)
             time.sleep(2)
 
         self.logger.info("[Verita] %d registros de %d pesquisas", len(resultados), len(links))

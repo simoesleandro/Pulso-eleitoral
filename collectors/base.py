@@ -18,6 +18,17 @@ class BaseCollector(ABC):
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.logger = logger
+        # Falhas isoladas durante o fetch() (ex.: um PDF quebrado), que não
+        # derrubam a coleta inteira. run() as soma às falhas do save().
+        self.falhas_coleta: list[tuple[str, str]] = []
+
+    def _registrar_falha_coleta(self, url: str, exc: Exception) -> None:
+        """Registra a falha de um item do fetch() e deixa a coleta seguir.
+        Nunca silenciosa: vai para o log.error (com traceback) e para o
+        resumo do run(), onde conta como falha e deixa o status "parcial"."""
+        erro = f"{type(exc).__name__}: {exc}"
+        self.logger.error("[%s] Falha ao processar %s: %s", self.name, url, erro, exc_info=exc)
+        self.falhas_coleta.append((url, erro))
 
     def _get_page_requests(self, url: str) -> str:
         """Faz requisição utilizando requests com headers do coletor."""
@@ -61,11 +72,12 @@ class BaseCollector(ABC):
         Retorna {"status": "ok"|"vazio"|"parcial"|"erro", "salvas": int, "falhas": list}.
         "vazio" = rodou sem exceção mas não salvou nada (fonte mudou ou quebrou)."""
         logger.info("[%s] Iniciando execução do coletor...", self.name)
+        self.falhas_coleta = []
         try:
             pesquisas = self.fetch()
             logger.info("[%s] Coleta concluída com sucesso. %d registros obtidos.", self.name, len(pesquisas))
             resultado = self.save(pesquisas)
-            falhas = resultado.get("falhas", [])
+            falhas = self.falhas_coleta + resultado.get("falhas", [])
             salvas = resultado.get("pesquisas", 0)
             if falhas:
                 status = "parcial"
