@@ -5,14 +5,18 @@
 #   1. Playwright carrega a SPA e extrai a URL do PDF embutida na página
 #   2. requests baixa o PDF do Supabase
 #   3. pdfplumber extrai o texto do PDF
-#   4. _parse_com_gemini() estrutura os dados
+#   4. Nacional: _parse_com_gemini(). Governador RJ: _recorte_governador()
+#      manda só a tabela estimulada (percentual sobre o total) para
+#      extrair_governador_rj().
 #
-# PDFs estaduais (Relatorio_{Estado}_...) são ignorados silenciosamente —
-# contêm pesquisas de governador/senador, não presidenciais.
-# Somente PDFs nacionais (nome contém 'Brasil' ou 'Nacional') são processados.
+# A listagem é filtrada pelo título do card antes de abrir cada página: só
+# nacionais e RJ com governador. PDFs de outros estados são ignorados, e PDFs
+# do RJ sem pergunta de governador (pesquisas de presidente no RJ) também.
 
 import io
+import re
 import time
+import unicodedata
 from datetime import date
 import requests
 import pdfplumber
@@ -36,8 +40,140 @@ HEADERS = {
 
 
 def _is_pdf_nacional(pdf_url: str) -> bool:
-    filename = pdf_url.split('/')[-1]
-    return 'Brasil' in filename or 'Nacional' in filename
+    filename = pdf_url.split('/')[-1].lower()
+    return 'brasil' in filename or 'nacional' in filename
+
+
+def _norm(texto: str) -> str:
+    """Minúsculas e sem acento: toda busca em texto de PDF/listagem passa por aqui."""
+    return unicodedata.normalize('NFKD', (texto or '').lower()).encode('ascii', 'ignore').decode('ascii')
+
+
+# RJ no nome do arquivo ou no título do card: nome por extenso ou "rj" como token.
+_RJ_RE = re.compile(r"rio[\s_-]+de[\s_-]+janeiro|(?<![a-z])rj(?![a-z])")
+
+
+def _card_relevante(titulo: str) -> bool:
+    """Card da listagem que pode ter PDF nacional ou de governador do RJ.
+    Sem título não dá para decidir: abre (perder pesquisa é pior que abrir
+    uma página a mais)."""
+    t = _norm(titulo)
+    if not t:
+        return True
+    if 'brasil' in t or 'nacional' in t:
+        return True
+    return bool(_RJ_RE.search(t)) and 'governador' in t
+
+
+# --- Recorte da tabela de governador (relatórios SPSS do Verita) ---
+# O relatório traz, por pergunta, Frequência | Porcentual (sobre o total) |
+# Porcentagem válida | acumulativa, seguido de um gráfico só com a válida.
+# O extrator recebe só o cabeçalho da pesquisa e, da pergunta estimulada de
+# governador, "Nome Frequência Porcentual" de cada candidato: o Pulso usa o
+# percentual sobre o total (ver /metodologia). Se a estrutura não for
+# reconhecida, o PDF é pulado — nunca vai texto bruto, que traria a válida.
+
+_PERGUNTA_RE = re.compile(r"^\s*pergunta\s+\d+", re.IGNORECASE | re.MULTILINE)
+_PCT = r"\d{0,3},\d"
+_LINHA_COMPLETA_RE = re.compile(
+    rf"^(?P<nome>.*[^\d\s])\s+(?P<n>\d+)\s+(?P<pct>{_PCT})\s+{_PCT}\s+{_PCT}$")
+_LINHA_NUMEROS_RE = re.compile(rf"^(?P<n>\d+)\s+(?P<pct>{_PCT})\s+{_PCT}\s+{_PCT}$")
+_LINHA_TOTAL_RE = re.compile(rf"^total\s+(?P<n>\d+)\s+{_PCT}\s+100,0$", re.IGNORECASE)
+_VALIDO_RE = re.compile(r"^v[aá]lido\b\s*", re.IGNORECASE)
+_METADADOS = ('registro:', 'periodo:', 'amostra:', 'margem de erro:')
+
+
+class TabelaNaoReconhecida(Exception):
+    """A pergunta de governador existe, mas a tabela não tem a estrutura esperada."""
+
+
+def _e_estimulada_governador(enunciado: str) -> bool:
+    e = _norm(enunciado)
+    return ('governador' in e
+            and any(m in e for m in ('estes fossem os candidatos',
+                                     'esses fossem os candidatos', 'estimulada'))
+            and 'nao votaria' not in e and 'segunda' not in e and 'segundo turno' not in e)
+
+
+def _linhas_candidatos(linhas: list[str]) -> list[tuple[str, int, str]]:
+    """Linhas da tabela entre o cabeçalho de colunas e o Total. Aceita o nome
+    quebrado em volta dos números ("NOME -" / "95 4,7 4,8 94,7" / "PARTIDO").
+    Qualquer linha que não se encaixe derruba a tabela inteira."""
+    try:
+        inicio = next(i for i, l in enumerate(linhas) if 'acumulativa' in _norm(l)) + 1
+    except StopIteration:
+        raise TabelaNaoReconhecida("sem cabeçalho de colunas")
+    cabecalho = _norm(' '.join(linhas[:inicio]))
+    if 'frequencia' not in cabecalho or 'porcentual' not in cabecalho:
+        raise TabelaNaoReconhecida("cabeçalho sem Frequência/Porcentual")
+
+    linhas_tab, pendente, aguarda_sufixo, total = [], [], False, None
+    for bruta in linhas[inicio:]:
+        linha = _VALIDO_RE.sub('', bruta.strip()).strip()
+        if not linha:
+            continue
+        m_total = _LINHA_TOTAL_RE.match(linha)
+        if m_total:
+            total = int(m_total.group('n'))
+            break
+        m = _LINHA_COMPLETA_RE.match(linha)
+        if m:
+            if pendente:
+                raise TabelaNaoReconhecida(f"nome solto antes de {linha!r}")
+            linhas_tab.append([m.group('nome').strip(), int(m.group('n')), m.group('pct')])
+            aguarda_sufixo = False
+            continue
+        m = _LINHA_NUMEROS_RE.match(linha)
+        if m:
+            if not pendente:
+                raise TabelaNaoReconhecida(f"números sem nome: {linha!r}")
+            linhas_tab.append([' '.join(pendente), int(m.group('n')), m.group('pct')])
+            pendente, aguarda_sufixo = [], True
+            continue
+        if re.search(r"\d", linha):
+            raise TabelaNaoReconhecida(f"linha fora do formato: {linha!r}")
+        if aguarda_sufixo:
+            linhas_tab[-1][0] += ' ' + linha
+            aguarda_sufixo = False
+        else:
+            pendente.append(linha)
+
+    if total is None:
+        raise TabelaNaoReconhecida("sem linha de Total")
+    if pendente:
+        raise TabelaNaoReconhecida("nome sem números no fim da tabela")
+    if len(linhas_tab) < 2:
+        raise TabelaNaoReconhecida("menos de 2 candidatos")
+    if sum(n for _, n, _ in linhas_tab) != total:
+        raise TabelaNaoReconhecida("soma das frequências não bate com o Total")
+    return [tuple(l) for l in linhas_tab]
+
+
+def _recorte_governador(texto: str) -> str | None:
+    """Cabeçalho da pesquisa + "Nome Frequência Porcentual" da pergunta
+    estimulada de governador. None se o PDF não tem pergunta de governador;
+    TabelaNaoReconhecida se tem, mas a tabela não pôde ser lida."""
+    marcas = list(_PERGUNTA_RE.finditer(texto))
+    for i, m in enumerate(marcas):
+        fim = marcas[i + 1].start() if i + 1 < len(marcas) else len(texto)
+        linhas = texto[m.start():fim].splitlines()
+        corte = next((j for j, l in enumerate(linhas)
+                      if 'porcentagem' in _norm(l) or 'frequencia' in _norm(l)), len(linhas))
+        enunciado = ' '.join(l.strip() for l in linhas[1:corte])
+        if not _e_estimulada_governador(enunciado):
+            continue
+        candidatos = _linhas_candidatos(linhas[corte:])
+        antes = texto[:marcas[0].start()].splitlines()
+        metadados = [l.strip() for l in antes if any(k in _norm(l) for k in _METADADOS)]
+        return "\n".join(
+            metadados
+            + [f"Pergunta: {enunciado}",
+               "Tabela: candidato, frequência (entrevistados) e porcentual sobre o total de entrevistados"]
+            + [f"{nome} {n} {pct}" for nome, n, pct in candidatos]
+        )
+    if 'governador' in _norm(texto):
+        raise TabelaNaoReconhecida("pergunta estimulada de governador não encontrada")
+    return None
 
 
 # --- Infraestrutura futura: pesquisas_regionais presidenciais por UF ---
@@ -110,20 +246,23 @@ class VeritaCollector(PlaywrightCollector, BaseCollector):
         )
 
     def _extract_links(self, html: str) -> list[str]:
-        """Extrai links /pesquisa/{uuid} da página de listagem."""
+        """Extrai links /pesquisa/{uuid} da listagem, só dos cards que podem ter
+        PDF nacional ou de governador do RJ: cada link custa uma página
+        Playwright, e a listagem passa de 90 pesquisas de todos os estados."""
         if not html:
             return []
         try:
             soup = BeautifulSoup(html, 'lxml')
-            seen = set()
-            unique = []
+            titulos: dict[str, list[str]] = {}
             for a in soup.find_all('a', href=True):
                 href = a['href']
                 if '/pesquisa/' in href:
                     url = href if href.startswith('http') else BASE_URL + href
-                    if url not in seen:
-                        seen.add(url)
-                        unique.append(url)
+                    # Cada card tem mais de um <a>; junta os textos por URL.
+                    titulos.setdefault(url, []).append(a.get_text(' ', strip=True))
+            unique = [u for u, t in titulos.items() if _card_relevante(' '.join(t))]
+            self.logger.info("[Verita] %d de %d pesquisas da listagem podem ter PDF "
+                             "nacional ou de governador RJ", len(unique), len(titulos))
             return unique
         except Exception as e:
             self.logger.warning("[Verita] Erro ao extrair links: %s", e)
@@ -185,7 +324,7 @@ class VeritaCollector(PlaywrightCollector, BaseCollector):
             return []
 
         filename = pdf_url.split('/')[-1]
-        is_rj = any(m in filename.lower() for m in ['rio_de_janeiro', 'rj', 'rio-de-janeiro'])
+        is_rj = bool(_RJ_RE.search(_norm(filename)))
 
         if not _is_pdf_nacional(pdf_url) and not is_rj:
             return []
@@ -196,9 +335,22 @@ class VeritaCollector(PlaywrightCollector, BaseCollector):
             return []
 
         if is_rj:
-            self.logger.info("[Verita] PDF Governador RJ: %s", filename)
+            # O nome do arquivo só diz que é do RJ, não que é de governador:
+            # há PDFs do RJ só de presidente (BR-02698, BR-09535), que não são
+            # nacionais nem de governador e ficam de fora.
+            try:
+                recorte = _recorte_governador(texto)
+            except TabelaNaoReconhecida as e:
+                self.logger.warning(
+                    "[Verita] PDF do RJ pulado: tabela de governador não reconhecida (%s): %s",
+                    e, filename)
+                return []
+            if recorte is None:
+                self.logger.info("[Verita] PDF do RJ sem pergunta de governador, pulado: %s", filename)
+                return []
+            self.logger.info("[Verita] PDF Governador RJ: %s (%d chars recortados)", filename, len(recorte))
             from .gemini_extractor import extrair_governador_rj
-            res_gov = extrair_governador_rj(texto, fonte_url=url)
+            res_gov = extrair_governador_rj(recorte, fonte_url=url)
             return self._build_items_gov(res_gov, url)
 
         self.logger.info("[Verita] PDF nacional: %s", filename)
