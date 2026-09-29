@@ -11,7 +11,7 @@ correções feitas em seguida.
 |---|---|
 | Data | 2026-09-29 |
 | Base auditada | `765e580` (main de 05/08/2026) |
-| Lotes de correção | A, B e C concluídos; D1 em andamento (ver [Status dos lotes](#status-dos-lotes)) |
+| Lotes de correção | A, B, C e D1 concluídos; D2a na `main` com deploy pendente; D2a2 em andamento (ver [Status dos lotes](#status-dos-lotes)) |
 
 ## Resumo
 
@@ -63,8 +63,8 @@ presidente no banco de produção.
 | 1 | Verita quebra em todo PDF de governador RJ, e a coleta inteira do Verita vira "erro" | `collectors/verita.py:158` usa `date.today()` sem importar `date` (imports nas linhas 14–20). Reproduzido: `NameError: name 'date' is not defined`. Produção: Verita com 1 pesquisa, a última de 04/04; o TSE tem 3 de governador RJ | Import faltando. A exceção sobe por `fetch()` e o `run()` descarta tudo, inclusive o nacional | Importar `date`; isolar a falha por PDF | Baixo | ✅ Lote A (`8c4a436`, `6d311f0`). Ver item novo N1 |
 | 2 | Quaest nunca grava governador | `_inferir_cargo` (`quaest.py:75`, `atlas.py:73`) só é chamado por testes (`test_quaest.py:66`, `test_atlas.py:66`). O `_parse_release` usa `PROMPT_EXTRACAO`, que manda ignorar pesquisas estaduais (`gemini_extractor.py:173-178`). Produção: Quaest com 0 pesquisas; o TSE tem 2 de governador RJ | Inferência de cargo é código morto; o prompt nacional descarta conteúdo estadual | Mandar releases de governador RJ para `extrair_governador_rj`, como o Paraná faz, com critério que não use `'governo'` | Médio: `test_quaest.py:73` exige que `'governo'` resulte em governador (casaria com "avaliação do governo") | ⏸ Adiado para depois do 1º turno: ver [N5](#n5--quaest-descoberta-quebrada-e-números-do-rj-só-em-imagem) |
 | 3 | Agregadores (Gazeta, CNN, Poder360) descartam governador. Vetor, Prefab, Real Time e Gerp não têm caminho algum | Com UF detectada, os dados vão para `_salvar_regional`, que filtra só presidenciáveis (`_filtrar_presidenciais` em `base.py`; `gazetadopovo.py:155-158`; `cnn_brasil.py:85-88`). Sem UF, cai no prompt nacional. Resultado: 0 de 22 pesquisas desses institutos | Governador só é previsto por coletor próprio de instituto | Com UF RJ e texto de governador: `extrair_governador_rj` + gravar com `cargo=governador_rj` | Médio: a detecção de instituto do Poder360 cai em `inst_id = 1` (Datafolha) quando não reconhece o nome (`_parse_com_gemini`) | ⬜ |
-| 4 | Datafolha manda HTML cru para o extrator de governador e tem falso positivo no roteamento | `datafolha.py:381` passa o `html` sem limpar, e o extrator corta em 8000 caracteres (`gemini_extractor.py:565`). `'rio' in url` casa com "cenarios": uma URL "…lula-lidera-em-todos-os-cenarios-e-governo…" vai para o extrator de governador | Texto não limpo como em `_parse_com_gemini`; busca por substring solta | Limpar o texto com BeautifulSoup; regex com fronteira de palavra (`rio-de-janeiro`, `\brj\b`) | Baixo | ⬜ |
-| 5 | Paraná trata RS, RN e releases nacionais como se fossem do RJ | Os marcadores em `paraná_pesquisas.py:36` incluem `"rio"`. `_e_release_rj` dá True para "…rio-grande-do-sul…", "…rio-grande-do-norte…" e "cenarios-presidente-brasil…". Só os 10 primeiros links são processados (linha 177) | Marcador genérico demais | Remover o `"rio"` solto e manter só marcadores específicos | Baixo | ⬜ |
+| 4 | Datafolha manda HTML cru para o extrator de governador e tem falso positivo no roteamento | `datafolha.py:381` passa o `html` sem limpar, e o extrator corta em 8000 caracteres (`gemini_extractor.py:565`). `'rio' in url` casa com "cenarios": uma URL "…lula-lidera-em-todos-os-cenarios-e-governo…" vai para o extrator de governador | Texto não limpo como em `_parse_com_gemini`; busca por substring solta | Limpar o texto com BeautifulSoup; regex com fronteira de palavra (`rio-de-janeiro`, `\brj\b`) | Baixo | ✅ Lote D2a (`5daf944`) |
+| 5 | Paraná trata RS, RN e releases nacionais como se fossem do RJ | Os marcadores em `paraná_pesquisas.py:36` incluem `"rio"`. `_e_release_rj` dá True para "…rio-grande-do-sul…", "…rio-grande-do-norte…" e "cenarios-presidente-brasil…". Só os 10 primeiros links são processados (linha 177) | Marcador genérico demais | Remover o `"rio"` solto e manter só marcadores específicos | Baixo | ✅ Lote D2a (`926f4e9`) |
 | 6 | Um único `tipo` por release e reextração a cada coleta; o estimulado some, e em presidente não existe espontânea | `base.py:340` e o `_build_items` do Paraná (linha 134) aplicam um só `tipo` a todos os candidatos. Deduplicação por instituto+cargo+URL (`base.py:138`), com DELETE e reinserção (`base.py:186`). Produção: a pesquisa 30 (Paraná, 03/06) só tem espontânea; presidente tem 312 linhas, todas estimuladas | O extrator devolve um bloco só; o `save` sobrescreve a cada execução, e uma nova extração do Gemini pode trocar o tipo | Extrator devolve lista de blocos `{tipo, candidatos}`; gravar por (pesquisa, tipo); não reextrair pesquisa já casada com o TSE | Médio: muda o contrato do `save` (`test_collectors`) | ⬜ |
 | 7 | Candidatos novos de governador nunca entram em banco já existente | `db/candidatos.py:71` sai se a tabela tem qualquer linha. Local: 31 linhas, governador só com Paes, Castro, Freixo e Neves (o seed tem 13). Produção: as cores de Garotinho (`#C0392B`) e Ruas (`#5a7184`) são a paleta de fallback (`pesquisas.py:15`), não as do seed (`#BA7517`, `#C0392B`). "Garotinho" e "Anthony Garotinho" viram séries separadas | O seed só roda com a tabela vazia | Migração idempotente: `INSERT OR IGNORE` por `nome_canonico` + juntar apelidos | Médio: não pode sobrescrever `status`/`ativo` editados à mão | ✅ Lote C (`6802740`, `9653baf`) |
 | 8 | Seção de governador vazia: média, Monte Carlo, KPIs e rejeição | `/api/media-agregada?cargo=governador_rj` devolve `candidatos: []`. Com `dias=365`, só 4 de 7 candidatos (somem Garotinho, com 11,0%, Busnello e Cyro). Monte Carlo com `candidatos_simulados: []`; KPIs com `top2_soma: 0.0` | Janela de 30 dias (`pesquisas.py:242`) contra última pesquisa de 61 dias atrás, mais o corte de pelo menos 2 entradas (`pesquisas.py:310`) | Primeiro resolver a cobertura (#1–5). Depois, com dado escasso, mostrar a última pesquisa com aviso de defasagem | Alto se mexer no corte de 2 entradas: contrato de `test_agregacao.py` + `/metodologia` | ⬜ |
@@ -164,11 +164,9 @@ Commit `580664d` (`fly.toml`):
   comentário no `fly.toml`, e a memória para 512 MB. A memória não está
   anotada no `fly.toml`.
 
-### Lote D1 — em andamento (observabilidade e capacidade)
+### Lote D1 — concluído e publicado (observabilidade e capacidade)
 
-Preparação para a semana do 1º turno (04/10). Branch
-`fix/lote-d1-observabilidade`, ainda sem push. Os hashes podem mudar num
-rebase.
+Preparação para a semana do 1º turno (04/10).
 
 Achados nos logs de produção que motivaram o lote:
 
@@ -194,6 +192,70 @@ Suíte depois do D1: **347 passed, 3 deselected, em ~40s**.
 Fica para outro lote: o logger `COLLECTOR` (`collectors/base.py`) tem
 handler próprio com `propagate = False` e formato sem horário nem nível.
 Suas linhas continuam saindo, mas fora do formato novo.
+
+### Lote D2a — concluído, deploy pendente (cobertura de governador RJ, parte 1)
+
+O push entrou na `main`. O deploy falhou por infraestrutura do Fly (volume
+num host inacessível), não por código.
+
+| Commit | Bug | O que fez |
+|---|---|---|
+| `926f4e9` | #5 | Paraná: RJ reconhecido por `rio-de-janeiro`, `fluminense`, `estado/governo-do-rio` (sem "-grande") ou `rj` como token. Fora também a pesquisa de presidente feita no RJ (`…para-o-cargo-de-presidente-…br-01920`) |
+| `5daf944` | #4 | Datafolha: texto limpo (`BaseCollector._texto_limpo`) para o extrator de governador; roteamento com fronteira de palavra. Na listagem real, o release de governador **de SP** com "cenarios" no slug ia para o extrator do RJ |
+| `89e8be7` | #2 | Quaest adiada: ver [N5](#n5--quaest-descoberta-quebrada-e-números-do-rj-só-em-imagem) |
+
+- **Limite de 10 links do Paraná:** mantido. Ele se aplica depois do filtro
+  de RJ, e a página 1 da listagem tem 1 release do RJ entre 14 posts.
+- **Datafolha:** não há release de governador do RJ na listagem, e o TSE
+  não tem pesquisa Datafolha de governador RJ. A correção é defensiva.
+
+**Expectativa de cobertura**, contra as 33 pesquisas de governador RJ do
+snapshot do TSE (sincronizado em 05/08):
+
+| Instituto | TSE | Já em produção | Novas com D2a/D2a2 |
+|---|---|---|---|
+| Paraná | 4 | 3 | 0. Falta a RJ-04997 (abril), fora da página 1 da listagem, a única varrida |
+| Datafolha | 0 | 0 | 0 |
+| Quaest | 2 | 0 | 0 (adiada, N5) |
+| Verita | 3 | 0 | até 1: a RJ-03394 (abril). Maio (RJ-08977) e junho (RJ-00542) não estão publicadas no site |
+| Vetor, Prefab, Real Time, Gerp, 100 Cidades, Agora | 24 | 0 | Lote D2b (agregadores) |
+
+Fora do snapshot: a Paraná RJ-04036 (setembro) está na página 1 e deve
+entrar na próxima coleta. A RJ-01671 (setembro) e a RJ-02422 (agosto) já
+saíram da página 1 e só entram pelo `/admin/coletar-url`.
+
+### Lote D2a2 — em andamento (Verita e resumo da coleta)
+
+Branch `fix/lote-d2a2-verita`, ainda sem push.
+
+| Commit | O que fez |
+|---|---|
+| `d8c92ac` | Verita: causa raiz do "0 candidatos de governador RJ" era roteamento, não truncamento. Os PDFs de produção (BR-02698, BR-09535) são pesquisas de presidente feitas no RJ, sem pergunta de governador. Listagem filtrada pelo título do card (5 de 95 links). O extrator recebe só o cabeçalho e "Nome Frequência Porcentual" da pergunta estimulada de governador. Tabela não reconhecida: PDF pulado com WARNING, nunca texto bruto |
+| `4cac1a8` | `normalizar_nome` tira o partido colado ao nome ("Eduardo Paes (PSD)", "Lula – PT"), por lista explícita de partidos |
+| `fa9acce` | `/metodologia`: percentuais sobre o total de entrevistados, não sobre os votos válidos, e por quê |
+| `744975f` | Resumo da coleta: depois do timeout, vale o resultado real do `run()`; o atraso vira marcador (`status=ok_com_atraso` no log; `"atraso": true` no dict). TimeoutError do próprio `run()` vira erro |
+
+- **PDFs do Verita de presidente no RJ** (BR-02698, BR-09535): pulados.
+  Não são nacionais e não podem entrar na série de presidente. Dá para
+  gravar em `pesquisas_regionais` (a infraestrutura está comentada em
+  `collectors/verita.py`) num lote futuro.
+
+### Achados da linha de base da coleta (anotados, não corrigidos)
+
+Vistos nos logs de produção depois do Lote D1.
+
+- **A coleta completa passa de 20 min.** Os coletores rodam em sequência.
+  Com o auto stop antigo, a máquina desligava antes de o Verita terminar
+  (e antes do CNN, do QuaestRegional e do Paraná, que vêm depois dele).
+- **Reextração a cada execução.** O Datafolha reprocessa 15 releases e o
+  Verita percorria 95 pesquisas, cada uma com chamada ao Gemini quando há
+  PDF que passa no filtro. Há risco de esgotar a cota do Gemini no domingo.
+  O filtro da listagem do D2a2 reduz o Verita a 5 links, mas o
+  reprocessamento do que já foi gravado continua (ver #6: "não reextrair
+  pesquisa já casada com o TSE").
+- **O Datafolha raspa releases estaduais (MG, CE, PI) que não viram dado.**
+  Gasta página e chamada ao Gemini sem resultado.
+- **A Gazeta só processa 3 releases por coleta.**
 
 ### Achados que surgiram durante a execução e já foram corrigidos
 
@@ -239,9 +301,10 @@ Consequências:
 - **O status mente.** Um coletor lento, como o Verita (Playwright por
   página e `sleep(2)` entre PDFs), termina e grava as pesquisas, mas o
   resumo registra `timeout` ("foi cancelado") e perde a contagem de falhas
-  do `run()`.
-- **Não verificado em produção:** se o Verita de fato passa de 45s. O
-  `scheduler_log` de produção responde isso.
+  do `run()`. Corrigido no Lote D2a2 (`744975f`): o resumo usa o resultado
+  real, com o atraso como marcador.
+- **Verificado em produção:** o Datafolha e a Gazeta passam de 45s, e a
+  coleta completa, de 20 min.
 
 **Correção proposta:**
 - Para um limite real: executor fora do `with`, com `shutdown(wait=False)`
@@ -351,8 +414,10 @@ extração por imagem.
 ## Ordem recomendada para o que falta
 
 1. ~~**#7:** migração do roster de candidatos.~~ Feito no Lote C.
-2. **#5, #4, #2, #3:** cobertura de governador, um coletor por vez, cada um
-   com teste. Depois, uma coleta e conferir `/admin/cobertura?cargo=governador_rj`.
+2. ~~**#5, #4:**~~ Feito no Lote D2a. **#2** adiado (N5). **#3** no Lote
+   D2b, junto com a deduplicação do #12: dois agregadores publicando a mesma
+   pesquisa a gravariam duas vezes, com peso dobrado na média. Depois, uma
+   coleta e conferir `/admin/cobertura?cargo=governador_rj`.
 3. **N1:** timeout real, para que a cobertura nova não trave a coleta nem
    minta no resumo.
 4. **N2:** sync do TSE em produção. A cobertura depende do registro
