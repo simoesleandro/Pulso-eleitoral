@@ -94,8 +94,10 @@ GitHub Actions. O serviço Windows (WinSW, `PulsoEleitoral.xml`) e o
 - **Contrato do coletor**: `BaseCollector` exige `_get_page` (abstrato — usado
   por `/admin/coletar-url`) e `_parse_release` (default: delega ao parser
   Gemini). Um coletor novo sem `_get_page` falha na instanciação, não em
-  request. `collectors/paraná_pesquisas.py` existe mas não está em
-  `ALL_COLLECTORS` — stub nunca implementado (`fetch()` retorna `[]`).
+  request. `collectors/paraná_pesquisas.py` está em `ALL_COLLECTORS` (último
+  da lista): lê só a página 1 da listagem, filtra releases de governador do
+  RJ e extrai do PDF do relatório com `extrair_governador_rj`. Release que
+  já saiu da página 1 só entra via `/admin/coletar-url`.
 - **Extração via Gemini** (`collectors/gemini_extractor.py`): saída do LLM é
   tratada como não-confiável — candidato malformado é descartado
   individualmente (`_to_pct` coage percentuais em formatos comuns), nunca
