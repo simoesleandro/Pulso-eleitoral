@@ -11,6 +11,9 @@ primary_region = 'gru'
 [env]
   FLASK_ENV = 'production'
   PORT = '8080'
+  # Sem buffer no stdout: senão os print() só chegam ao flyctl logs no
+  # desligamento do processo.
+  PYTHONUNBUFFERED = '1'
 
 [[mounts]]
   source = 'pulso_data'

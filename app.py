@@ -3,8 +3,10 @@ import datetime
 import atexit
 import json
 import hmac
+import logging
 import sqlite3
 import threading
+import time
 from functools import wraps
 from urllib.parse import urlparse
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
@@ -19,6 +21,24 @@ from database import init_db, DB_PATH, get_db
 
 # Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
+
+FORMATO_LOG = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+
+
+def configurar_logging():
+    """Logger raiz em INFO com horário, nível e nome — sem isso só WARNING ou
+    acima chega ao flyctl logs. Só instala handler se o raiz não tiver nenhum,
+    a mesma regra do logging.basicConfig() que o waitress.serve() chama: o
+    dele vira no-op e cada linha sai uma vez só. Idempotente."""
+    raiz = logging.getLogger()
+    if not raiz.handlers:
+        logging.basicConfig(format=FORMATO_LOG)
+    raiz.setLevel(logging.INFO)
+
+
+# Antes do Flask(): o app.logger só ganha handler próprio se nenhum ancestral
+# tiver um, então configurar depois duplicaria as mensagens dele.
+configurar_logging()
 
 app = Flask(__name__)
 
@@ -124,6 +144,10 @@ _coleta_status = {
     "concluidos": []
 }
 
+# Prazo de cada coletor em run_all_collectors. Não interrompe o coletor: a
+# thread segue até terminar (item N1 de docs/auditoria-2026-09.md).
+TIMEOUT_COLETOR_S = 45
+
 def run_all_collectors(progress_callback=None):
     """Roda todos os coletores cadastrados sequencialmente, salva log de execução
     e notifica via Telegram se configurado. Nunca sincroniza com o Fly.io — ver
@@ -148,26 +172,46 @@ def run_all_collectors(progress_callback=None):
         nome_coletor = c.__class__.__name__
         if progress_callback:
             progress_callback(idx, total, nome_coletor, None)
+        inicio = time.monotonic()
+        salvas = n_falhas = 0
         try:
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 future = executor.submit(c.run)
-                res = future.result(timeout=45)
+                try:
+                    res = future.result(timeout=TIMEOUT_COLETOR_S)
+                except concurrent.futures.TimeoutError:
+                    # Loga no estouro: a saída do with ainda espera a thread
+                    # terminar (item N1 da auditoria), e a linha sairia atrasada.
+                    app.logger.warning(
+                        "Coletor %s excedeu o timeout de %ss; a thread segue até terminar.",
+                        nome_coletor, TIMEOUT_COLETOR_S,
+                    )
+                    raise
             entrada = {
                 "coletor": nome_coletor,
                 "status": res.get("status", "ok") if isinstance(res, dict) else "ok",
             }
-            if isinstance(res, dict) and res.get("falhas"):
-                entrada["falhas"] = len(res["falhas"])
+            if isinstance(res, dict):
+                salvas = res.get("salvas", 0)
+                # Inclui as falhas registradas no fetch() por _registrar_falha_coleta
+                # (já logadas em ERROR, com traceback, pelo próprio coletor).
+                n_falhas = len(res.get("falhas") or [])
+                if n_falhas:
+                    entrada["falhas"] = n_falhas
             resultados.append(entrada)
         except concurrent.futures.TimeoutError:
-            app.logger.warning(f"Coletor {nome_coletor} excedeu timeout de 45s e foi cancelado.")
-            entrada = {"coletor": nome_coletor, "status": "timeout", "msg": "Excedeu 45s"}
+            entrada = {"coletor": nome_coletor, "status": "timeout", "msg": f"Excedeu {TIMEOUT_COLETOR_S}s"}
             resultados.append(entrada)
         except Exception as e:
             app.logger.error(f"Erro no coletor {nome_coletor}: {e}")
             entrada = {"coletor": nome_coletor, "status": "erro", "msg": str(e)}
             resultados.append(entrada)
+
+        app.logger.info(
+            "Coletor %s status=%s gravadas=%d falhas=%d duração=%.1fs",
+            nome_coletor, entrada["status"], salvas, n_falhas, time.monotonic() - inicio,
+        )
 
         if progress_callback:
             progress_callback(idx, total, nome_coletor, entrada)
