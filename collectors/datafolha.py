@@ -1,3 +1,4 @@
+import re
 import time
 import unicodedata
 from bs4 import BeautifulSoup
@@ -37,6 +38,23 @@ FILTRO_ESTADUAL = [
 def _normalizar(texto: str) -> str:
     """Lowercase e remove acentos para comparação robusta."""
     return unicodedata.normalize('NFKD', texto.lower()).encode('ascii', 'ignore').decode('ascii')
+
+
+# Governador do RJ, testado com fronteira de palavra sobre o texto já
+# normalizado e com separadores (-, _, /, .) virando espaço. "rio" solto
+# casava com "cenarios", e "governo" solto com "avaliação do governo".
+_RJ_RE = re.compile(r"\b(?:rio de janeiro|rj|fluminense)\b")
+_CARGO_GOVERNADOR_RE = re.compile(r"\bgovernador(?:a)?\b")
+_GOVERNO_DO_RIO_RE = re.compile(r"\bgoverno do (?:estado do )?(?:rio|rj)\b(?! grande)")
+
+
+def _e_governador_rj(texto: str) -> bool:
+    """URL/título de release de governador do RJ: marcador de RJ + cargo de
+    governador, ou "governo do (estado do) Rio" (não "do Rio Grande")."""
+    t = re.sub(r"[^a-z0-9]+", " ", _normalizar(texto or ""))
+    if _GOVERNO_DO_RIO_RE.search(t):
+        return True
+    return bool(_RJ_RE.search(t) and _CARGO_GOVERNADOR_RE.search(t))
 
 
 class DatafolhaCollector(PlaywrightCollector, BaseCollector):
@@ -86,7 +104,7 @@ class DatafolhaCollector(PlaywrightCollector, BaseCollector):
 
                 # 2. texto OU href deve conter alguma palavra de FILTRO_NACIONAL ou ser sobre Governador RJ
                 combinado = _normalizar(texto + ' ' + href)
-                is_rj_gov = 'rio' in combinado and ('governador' in combinado or 'governo' in combinado or 'rj' in combinado)
+                is_rj_gov = _e_governador_rj(texto + ' ' + href)
                 if not any(p in combinado for p in nacional_norm) and not is_rj_gov:
                     continue
 
@@ -150,10 +168,11 @@ class DatafolhaCollector(PlaywrightCollector, BaseCollector):
         ]
 
     def _parse_release(self, html: str, url: str) -> list[dict]:
-        url_lower = url.lower()
-        if 'rio' in url_lower and ('governador' in url_lower or 'governo' in url_lower or 'rj' in url_lower):
+        if _e_governador_rj(url):
             from .gemini_extractor import extrair_governador_rj
-            res_gov = extrair_governador_rj(html, fonte_url=url)
+            # Texto limpo, como em _parse_com_gemini: o extrator corta em 8000
+            # caracteres, e o HTML cru gastava tudo com <head> e scripts.
+            res_gov = extrair_governador_rj(self._texto_limpo(html), fonte_url=url)
             if res_gov.get("candidatos"):
                 return self._build_items_gov(res_gov, url)
 

@@ -304,6 +304,17 @@ class BaseCollector(ABC):
         finally:
             conn.close()
 
+    @staticmethod
+    def _texto_limpo(html: str) -> str:
+        """Texto visível do HTML, sem script/style/nav/footer/header. É o que
+        vai para os extratores Gemini: HTML cru gasta o corte de caracteres
+        do prompt com <head> e scripts."""
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html or "", 'lxml')
+        for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
+            tag.decompose()
+        return soup.get_text(separator=' ', strip=True)
+
     def _parse_com_gemini(self, html: str, url: str,
                            instituto_id: int,
                            permite_regional: bool = False) -> list[dict]:
@@ -312,16 +323,10 @@ class BaseCollector(ABC):
         Retorna lista de dicts no formato padrão do save().
         """
         from collectors.gemini_extractor import extrair_com_gemini
-        from bs4 import BeautifulSoup
         from datetime import date
-        
-        # Extrai texto limpo
-        soup = BeautifulSoup(html, 'lxml')
-        # Remove scripts, styles, nav, footer
-        for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
-            tag.decompose()
-        texto = soup.get_text(separator=' ', strip=True)
-        
+
+        texto = self._texto_limpo(html)
+
         if len(texto) < 50:
             self.logger.warning(f"Texto muito curto em {url}: {len(texto)} chars")
             return []
