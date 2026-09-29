@@ -853,14 +853,28 @@ def pesquisa_detalhe(pesquisa_id):
     cores_candidatos = get_cores_candidatos()
     return render_template('pesquisa_detalhe.html', pesquisa=pesquisa, cores_candidatos=cores_candidatos)
 
+def _tipo_presidente_da_request() -> str:
+    """?tipo= coagido aos valores aceitos (inválido/ausente = estimulada).
+    Compartilhado pelo handler e pela chave de cache, para os dois nunca
+    divergirem."""
+    tipo = request.args.get('tipo', 'estimulada')
+    return tipo if tipo in ('estimulada', 'espontanea') else 'estimulada'
+
+def _chave_cache_presidente():
+    """Chave de cache normalizada para /api/pesquisas/presidente. Sem ela o
+    cache usava só o path e o toggle estimulada/espontânea recebia a
+    resposta do tipo pedido primeiro. Se este endpoint ganhar um novo
+    parâmetro, atualize esta função junto com o handler, senão o novo
+    parâmetro é ignorado pela chave de cache mas honrado pelo handler,
+    servindo respostas erradas para entradas diferentes."""
+    return f"pesquisas-presidente:{_tipo_presidente_da_request()}"
+
 @app.route('/api/pesquisas/presidente')
-@cache.cached(timeout=300)
+@cache.cached(timeout=300, key_prefix=_chave_cache_presidente)
 def api_pesquisas_presidente():
     """Retorna dados consolidados da pesquisa mais recente para Presidente."""
     from database import get_pesquisas_mais_recentes
-    tipo = request.args.get('tipo', 'estimulada')
-    if tipo not in ('estimulada', 'espontanea'):
-        tipo = 'estimulada'
+    tipo = _tipo_presidente_da_request()
     rows = get_pesquisas_mais_recentes('presidente', tipo)
     if not rows:
         return jsonify({
